@@ -4,6 +4,8 @@ A native desktop flight simulator inspired by the childhood cardboard cockpit.
 
 **Status: Phase 0 — project setup and architecture. There is no playable application yet.**
 
+Repository: [excelexx/cardboard-cockpit](https://github.com/excelexx/cardboard-cockpit) (private).
+
 The latest request takes precedence over the original brief: build a native desktop client, pursue a realistic flight-simulator presentation, include an aircraft garage with the Airbus A380, F-35, B-2 Spirit, Boeing 737, and Boeing 747, and start with keyboard and mouse controls. Webcam-driven cardboard controls come later.
 
 ## Planned experience

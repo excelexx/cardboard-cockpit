@@ -6,7 +6,7 @@ Checked September 18, 2026.
 
 - Read the supplied Cardboard Cockpit brief and incorporated the native-client, five-aircraft garage, realistic visuals, and keyboard/mouse-first amendments.
 - Created the local project folder and planned source directories.
-- Confirmed GitHub CLI access to the `excelexx` account. The repository will be private by default.
+- Created and pushed the private GitHub repository [excelexx/cardboard-cockpit](https://github.com/excelexx/cardboard-cockpit).
 - Selected a native Godot architecture and documented phased acceptance checks.
 - Researched externally sourced aircraft assets. Candidates are separate from downloaded, verified assets.
 
