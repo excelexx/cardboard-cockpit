@@ -1,0 +1,4 @@
+The FlightGear aircraft catalogue identifies the B-2 by Markus Zojer as GPLv2+.
+Source: https://wiki.flightgear.org/B-2_Spirit
+Accessed 2026-09-18. The enclosed COPYING is the unmodified GNU GPL v2 text.
+The FGMEMBERS mirror lacks its own COPYING; this text was copied from the A380 GPL v2 repository.

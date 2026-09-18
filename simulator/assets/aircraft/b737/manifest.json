@@ -1,0 +1,65 @@
+{
+  "id": "b737",
+  "scene": "res://assets/aircraft/b737/b737.tscn",
+  "forward": "-Z",
+  "up": "+Y",
+  "unit": "meter",
+  "bounds": [
+    [
+      -14.3635,
+      -3.0,
+      -16.648045
+    ],
+    [
+      14.3635,
+      8.43716,
+      16.648045
+    ]
+  ],
+  "dimensions": {
+    "wingspan": 28.727,
+    "height": 11.43716,
+    "length": 33.29609
+  },
+  "triangle_count": 48534,
+  "mesh_count": 186,
+  "source_origin_removed": [
+    7.908854999999999,
+    0.25824999999999987,
+    0.0039999999999995595
+  ],
+  "sha256_glb": "89687cd2ddbc6509f4d934bb93f178b0cc078c72fd410b3ffdafda0343a74b60",
+  "landing_gear": "visual group Airframe/LandingGear, initially extended",
+  "gear_mesh_names": [
+    "collar",
+    "lhdragstrut",
+    "lhsteercyl",
+    "mglhaxle",
+    "mglhlinklower",
+    "mglhlinkupper",
+    "mglhlowerstrut",
+    "mglhtyrelh",
+    "mglhtyrerh",
+    "mgouterstrut",
+    "mgrhaxle",
+    "mgrhlinklower",
+    "mgrhlinkupper",
+    "mgrhlowerstrut",
+    "mgrhtyrelh",
+    "mgrhtyrerh",
+    "nlinklower",
+    "nlinkupper",
+    "nlowerstrut",
+    "noseaxle",
+    "nouterstrut",
+    "rhdragstrut",
+    "rhmgouterstrut",
+    "rhsidestrutl",
+    "rhsidestrutu",
+    "rhsteercyl",
+    "sidestrutu",
+    "tyreln",
+    "tyrern"
+  ],
+  "conversion": "Static source mesh assembly; FlightGear animation and systems are not imported."
+}

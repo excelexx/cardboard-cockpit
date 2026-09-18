@@ -1,0 +1,100 @@
+<?xml version="1.0"?>
+<PropertyList>
+ <sim>
+
+  <fuel-fraction>0.5</fuel-fraction>
+
+  <virtual-cockpit archive="y">true</virtual-cockpit>
+
+  <systems>
+   <autopilot>
+     <path>Aircraft/747/747-autopilot.xml</path>
+   </autopilot>
+  </systems> 
+  
+  <sound>
+   <path>Aircraft/747/747-sound.xml</path>
+   <volume>
+      <gear type="double">0.4</gear>
+   </volume>
+  </sound>
+
+  <panel>
+   <path>Aircraft/747/Models/Panels/747-vfr-panel.xml</path>
+   <visibility>false</visibility>
+  </panel>
+
+  <hud>
+   <path>Huds/Custom/default.xml</path>
+   <visibility>false</visibility>
+   <enable3d>false</enable3d>
+  </hud>
+  
+  <model>
+   <path>Aircraft/747/Models/boeing747-400-jw.xml</path>
+  </model>
+
+  <view>
+   <internal archive="y">true</internal>
+   <config>
+     <!-- x/y/z == right/up/back -->
+     <x-offset-m archive="y">-0.38</x-offset-m>
+     <y-offset-m archive="y">3.26</y-offset-m>
+     <z-offset-m archive="y">-18.16</z-offset-m>
+     <pitch-offset-deg archive="y">-13.0</pitch-offset-deg>
+   </config>
+  </view>
+
+  <chase-distance-m type="double" archive="y">-90.0</chase-distance-m>
+
+  <!-- Flap settings from Jim Brennan (see 01 Feb 2004 post to
+       flightgear-devel) based on UAL 747-400.  Note that there is no
+       support yet for driving the slats from the same detent
+       settings.  There are also unmodelled locks at settings 1 and
+       20, see post for details. -->
+  <flaps>
+   <setting>0.000</setting>
+   <setting>0.000</setting> <!-- Flaps 1: 66% Slats only at this detent -->
+   <setting>0.167</setting> <!-- Flaps 5: 100% Slats -->
+   <setting>0.333</setting> <!-- Flaps 10: takeoff -->
+   <setting>0.667</setting> <!-- Flaps 20: takeoff, go-around -->
+   <setting>0.833</setting> <!-- Flaps 25: landing -->
+   <setting>1.000</setting> <!-- Flaps 30: landing -->
+  </flaps>
+
+  <help>
+   <title>Boeing 747</title>
+   <key>
+    <name>j/k</name>
+    <desc>decrease/increase spoilers</desc>
+   </key>
+  </help>
+
+ </sim>
+
+ <autopilot>
+   <config>
+     <min-climb-speed-kt type="float">150.0</min-climb-speed-kt>
+     <best-climb-speed-kt type="float">200.0</best-climb-speed-kt>
+     <target-climb-rate-fpm type="float">2000.0</target-climb-rate-fpm>
+     <target-descent-rate-fpm type="float">1500.0</target-descent-rate-fpm>
+     <elevator-adj-factor type="float">1500.0</elevator-adj-factor>
+     <integral-contribution type="float">0.005</integral-contribution>
+     <zero-pitch-throttle type="float">0.0001</zero-pitch-throttle>
+     <zero-pitch-trim-full-throttle type="float">0.0001</zero-pitch-trim-full-throttle>
+     <max-roll-deg type="float">30</max-roll-deg>
+     <max-aileron type="float">1.0</max-aileron>
+     <indicated-heading-magnetic type="bool">true</indicated-heading-magnetic>
+   </config>
+ </autopilot>
+
+ <instrumentation>
+   <dme n="0">
+      <switch-position type="int">1</switch-position>
+      <frequencies>
+	<source>/instrumentation/nav[0]/frequencies/selected-mhz</source>
+      </frequencies>
+   </dme>
+ </instrumentation>
+
+</PropertyList>

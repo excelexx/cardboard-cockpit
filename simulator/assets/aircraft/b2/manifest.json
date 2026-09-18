@@ -1,0 +1,57 @@
+{
+  "id": "b2",
+  "scene": "res://assets/aircraft/b2/b2.tscn",
+  "forward": "-Z",
+  "up": "+Y",
+  "unit": "meter",
+  "bounds": [
+    [
+      -26.099493000000002,
+      -3.0,
+      -10.602801
+    ],
+    [
+      26.099493000000002,
+      1.4175879999999998,
+      10.602801
+    ]
+  ],
+  "dimensions": {
+    "wingspan": 52.198986000000005,
+    "height": 4.417588,
+    "length": 21.205602
+  },
+  "triangle_count": 5612,
+  "mesh_count": 86,
+  "source_origin_removed": [
+    0.6295890000000002,
+    0.5002650000000002,
+    0.015798999999999452
+  ],
+  "sha256_glb": "7fd054e62dd3a59c619219cce1665895a8f17b63f466e592078678d32e031660",
+  "landing_gear": "visual group Airframe/LandingGear, initially extended",
+  "gear_mesh_names": [
+    "tire.006",
+    "tire.005",
+    "tire.004",
+    "tire.003",
+    "tire.002",
+    "tire.001",
+    "tire.007",
+    "right_gear",
+    "front_gear_hold",
+    "tire",
+    "front_gear",
+    "tire.009",
+    "left_gear_1",
+    "tire.008",
+    "left_gear",
+    "left_gear_hold_0",
+    "left_gear_hold_1",
+    "right_gear_hold_0",
+    "right_gear_hold_1",
+    "front_gear_top",
+    "right_gear_1"
+  ],
+  "conversion": "Static source mesh assembly; FlightGear animation and systems are not imported."
+}
