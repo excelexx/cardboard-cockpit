@@ -1,6 +1,9 @@
 extends CombatDirector
 class_name GooseCampaign
 const Catalog = preload("res://data/aircraft.gd")
+const Route = preload("res://systems/scenic_route.gd")
+var route_index := 0
+var visited_route: Array[int] = []
 const STAGES: Array[Dictionary] = [
 	{"name":"CAMPUS PATROL","plane":"trainer","aircraft":"KESTREL TRAINER","weapon":"WORN GATLING","color":Color(1,0.76,0.32),"count":3,"damage":13.0,"delay":0.10},
 	{"name":"THE FLOCK STRIKES","plane":"f35","aircraft":"F-35 INTERCEPTOR","weapon":"GUIDED MISSILE","color":Color(1,0.55,0.2),"count":5,"damage":150.0,"delay":0.65},
@@ -16,6 +19,8 @@ var transition_time := 0.0
 var stage_clear_clock := 0.0
 var total_shots := 0
 var unlimited := false
+var phase := "takeoff"
+const STAGE_SECONDS := 15.0
 func reset(enabled: bool) -> void:
 	super.reset(enabled)
 	automatic_waves = false
@@ -25,8 +30,15 @@ func reset(enabled: bool) -> void:
 	stage_clock = 0
 	transition_time = 0
 	total_shots = 0
+	route_index = 0
+	visited_route.clear()
 	if enabled:
-		spawn_wave()
+		phase = "takeoff"
+		wave = 1
+		app.apply_campaign_aircraft(plane_profile(0))
+		app.flight.reset(app.profile())
+		app.aircraft.position = app.flight.position
+		announce("AZURE TOWER · Cleared for takeoff. Advance throttle.")
 		app.copilot = showcase and not app.vision.enabled
 		app.used_copilot = showcase
 func stage() -> Dictionary:
@@ -72,6 +84,7 @@ func clear_encounter() -> void:
 	target_id = -1
 	lock_progress = 0
 func spawn_wave() -> void:
+	phase = "combat"
 	clear_encounter()
 	wave = mini(wave+1,STAGES.size())
 	stage_clock = 0
@@ -116,11 +129,24 @@ func spawn_flock(count: int) -> void:
 		next_id += 1
 func tick(dt: float) -> void:
 	if not active: return
+	if phase != "combat":
+		elapsed += dt
+		if phase == "takeoff" and app.flight.airborne and app.flight.position.y > 180:
+			wave = 0
+			spawn_wave()
+		return
 	if showcase:
 		hull = maxf(hull,35)
 		base_health = maxf(base_health,35)
+	update_route()
+	if phase != "combat": return
 	for enemy: Dictionary in enemies:
-		enemy.position += forward()*app.flight.speed*cos(app.flight.pitch)*dt
+		# Encounters lead through the scenery instead of pulling the pilot off route.
+		var direction: Vector3 = (route_target()-app.flight.position).normalized()
+		var side := Vector3(-direction.z,0,direction.x)
+		var lead: Vector3 = app.flight.position+direction*780+side*sin(float(enemy.phase)*1.7)*180
+		lead.y = maxf(lead.y,app.world.ground_height(lead.x,lead.z)+180)
+		enemy.position = enemy.position.lerp(lead,1.0-exp(-dt*0.8))
 	super.tick(dt)
 	if not active: return
 	stage_clock += dt
@@ -131,18 +157,11 @@ func tick(dt: float) -> void:
 		enemy.node.get_node("WingR").rotation.z = -flap
 	if assist and lock_progress>=1:
 		fire_weapon()
-	if showcase:
-		if stage_clock>=30:
-			if wave>=STAGES.size():
-				complete(true,"Three-minute showcase complete. Every aircraft and weapon demonstrated.")
-			else: spawn_wave()
-		elif enemies.is_empty() and stage_clock<27:
-			spawn_flock(maxi(2,int(stage().count)/2))
-	else:
-		stage_clear_clock = stage_clear_clock+dt if enemies.is_empty() else 0
-		if stage_clear_clock>1.5:
-			if wave>=STAGES.size(): complete(true,"The final flock is contained. Waterloo's skies are yours.")
-			else: spawn_wave()
+	# Location, not a timer, advances the journey. Quiet gaps leave time to look out.
+	stage_clear_clock = stage_clear_clock+dt if enemies.is_empty() else 0
+	if stage_clear_clock>8 and route_index not in [2,6,7,8,9,10]:
+		spawn_flock(maxi(2,int(stage().count)/2))
+		stage_clear_clock = 0
 	if elapsed>600 and app.test_mode:
 		complete(false,"Campaign test timed out")
 func fire_gun() -> bool:
@@ -150,7 +169,7 @@ func fire_gun() -> bool:
 func fire_missile() -> bool:
 	return fire_weapon()
 func fire_weapon() -> bool:
-	if not active or gun_cooldown>0 or ammo<=0 or gun_heat>0.95: return false
+	if phase != "combat" or not active or gun_cooldown>0 or ammo<=0 or gun_heat>0.95: return false
 	var spec: Dictionary = stage()
 	var enemy: Dictionary = target()
 	if wave in [2,4] and (enemy.is_empty() or lock_progress<1): return false
@@ -177,7 +196,7 @@ func fire_weapon() -> bool:
 func cardboard_controls() -> void:
 	# Aim-and-fire works with either keyboard steering or tracked cardboard.
 	# No weapon-switch gesture exists: each stage has exactly one weapon.
-	if not assist or not app.vision.enabled or not app.vision.tracking: return
+	if phase != "combat" or not assist or not app.vision.enabled or not app.vision.tracking: return
 	if lock_progress>=1: fire_weapon()
 	if absf(app.vision.yoke.x)>0.85 and not roll_latched:
 		roll_latched = true
@@ -190,3 +209,51 @@ func skip_to(index: int) -> bool:
 	return true
 func complete(success: bool, reason: String) -> void:
 	super.complete(success,reason)
+
+func begin_approach() -> void:
+	phase = "landing"
+	clear_encounter()
+	app.ring_index = 5
+	app.flight.gear = true
+	app.flight.flaps = 2
+	app.show_toast("CAPE NORTH · Weapons safe. Gear down. Follow the approach diamonds.")
+	app.audio.ping()
+
+func pilot_controls() -> Vector3:
+	if phase == "combat": return scenic_controls()
+	if phase == "takeoff":
+		app.flight.throttle = 1.0
+		return Vector3(-app.flight.roll*3,0.7 if app.flight.speed>app.flight.effective_rotation_speed() else 0,0)
+	return app.approach_pilot_controls()
+
+func route_target() -> Vector3:
+	return Route.POINTS[mini(route_index,Route.POINTS.size()-1)]
+
+func update_route() -> void:
+	var delta: Vector3 = route_target()-app.flight.position
+	# Require physical arrival, including altitude: manual flight cannot skip a reveal.
+	if Vector2(delta.x,delta.z).length()>290 or absf(delta.y)>190: return
+	visited_route.append(route_index)
+	if app.test_mode: print("SCENIC CHECKPOINT ",route_index," ",Route.NAMES[route_index]," pos=",app.flight.position)
+	route_index += 1
+	if route_index>=Route.POINTS.size():
+		begin_approach()
+		return
+	var next_stage: int = Route.stage_for(route_index)
+	if next_stage>wave:
+		wave = next_stage-1
+		spawn_wave()
+	app.show_toast(Route.NAMES[route_index]+" · "+Route.HINTS[route_index])
+
+func scenic_controls() -> Vector3:
+	var f: FlightDynamics = app.flight
+	var delta: Vector3 = route_target()-f.position
+	var error: float = wrapf(atan2(delta.x,-delta.z)-f.heading,-PI,PI)
+	var desired_roll: float = clampf(error*1.6,-0.66,0.66)
+	var desired_pitch: float = clampf(atan2(delta.y,maxf(Vector2(delta.x,delta.z).length(),250)),-0.36,0.40)
+	var desired_speed: float = 105.0 if route_index<4 else 115.0
+	if route_index>=8: desired_speed = 100.0
+	f.gear = false
+	f.flaps = 0
+	f.throttle = clampf(0.24+(desired_speed-f.speed)*0.065,0,1)
+	return Vector3(clampf((desired_roll-f.roll)*5,-1,1),clampf((desired_pitch-f.pitch)*6,-1,1),clampf(error*1.4,-1,1))

@@ -104,7 +104,7 @@ func _draw() -> void:
 	if app.mode == "hangar" or app.mode == "briefing":
 		draw_hangar()
 	elif app.flight_kind=="campaign":
-		draw_campaign()
+		draw_flight()
 	elif app.flight_kind=="combat":
 		draw_combat()
 	else:
@@ -190,10 +190,10 @@ func draw_briefing() -> void:
 	for i: int in kinds.size():
 		button("kind_"+kinds[i],Rect2(355+i*228,295,217,53),titles[i],app.flight_kind==kinds[i])
 	var details: Dictionary = {
-		"campaign":["3 MINUTES / SIX UPGRADES / WATERLOO GEESE","Start with a worn gatling. Finish with the Millennium Falcon and plasma.","Aim at geese to fire. Each level has exactly one weapon."],
+		"campaign":["TAKEOFF / SIX INTERCEPTIONS / LANDING","Depart Azure, follow the coast, and bring your aircraft home.","Guided flight available. Aim to fire; weapons safe on approach."],
 		"combat":["F-35 INTERCEPTION / THREE WAVES / DEFEND THE VALLEY","Cannon, lock-on missiles and flares. Sky Shield selects the F-35.","SPACE fires · T launches a locked missile · SHIFT rolls · Hold E ejects."],
-		"valley":["ALPINE DEPARTURE  →  FIVE CHECKPOINTS  →  NORTH FIELD","Take off, follow five glowing rings, then fly the final approach.","Lower gear, set flaps, touch down and brake to a full stop."],
-		"approach":["NORTH FIELD  /  RUNWAY 36  /  STRAIGHT-IN APPROACH","Begin airborne with gear down and approach flaps set.","Follow the guidance diamonds. Flare gently, then hold SPACE to brake."],
+		"valley":["ALPINE DEPARTURE  →  FIVE CHECKPOINTS  →  CAPE NORTH","Take off, follow five glowing rings, then fly the final approach.","Lower gear, set flaps, touch down and brake to a full stop."],
+		"approach":["CAPE NORTH  /  RUNWAY 36  /  STRAIGHT-IN APPROACH","Begin airborne with gear down and approach flaps set.","Follow the guidance diamonds. Flare gently, then hold SPACE to brake."],
 		"free":["TWO AIRPORTS  /  MOUNTAINS  /  YOUR OWN ROUTE","Depart Alpine and explore the valley without checkpoints.","Land at either airport and brake to a stop to complete your flight."]}
 	var lines: Array = details.get(app.flight_kind,details.valley)
 	text(Vector2(355,393),str(lines[0]),12,AMBER,true)
@@ -206,7 +206,7 @@ func draw_briefing() -> void:
 	for i: int in 3:
 		button("weather_"+skies[i],Rect2(355+i*305,547,280,46),sky_names[i],app.conditions==skies[i])
 	if app.flight_kind=="campaign":
-		button("showcase",Rect2(355,611,440,49),"3-MIN SHOWCASE: ON" if app.showcase_mode else "CLEAR-TO-PROGRESS CAMPAIGN",app.showcase_mode)
+		button("showcase",Rect2(355,611,440,49),"GUIDED SORTIE: ON" if app.showcase_mode else "CLEAR-TO-PROGRESS CAMPAIGN",app.showcase_mode)
 		button("developer",Rect2(813,611,431,49),"DEV MODE: ON" if app.developer_mode else "DEV MODE: OFF",app.developer_mode)
 	else:
 		text(Vector2(355,626),"%s  ·  %s km visibility  ·  calm winds" % [app.world.get_conditions().time_of_day,app.world.get_conditions().visibility_km],13,MUTED,true)
@@ -216,6 +216,130 @@ func draw_briefing() -> void:
 	button("fly",Rect2(926,775,319,57),"BEGIN APPROACH  →" if app.flight_kind=="approach" else "CLEARED FOR TAKEOFF  →",true)
 
 func draw_flight() -> void:
+	var f: FlightDynamics = app.flight
+	var campaign: bool = app.flight_kind=="campaign"
+	var fighting: bool = campaign and app.combat.phase=="combat"
+	var landing: bool = app.ring_index>=5
+	var ink := Color(0.025,0.055,0.065,0.70)
+	var phosphor := Color(0.65,1.0,0.79,0.92)
+	# A narrow status rail leaves the outside view and physical cockpit exposed.
+	panel(Rect2(28,24,1544,62),ink)
+	text(Vector2(48,49),"C / C   FLIGHT DECK",12,phosphor,true)
+	text(Vector2(48,72),str(app.profile().short),15,WHITE)
+	var stages: Array[String] = ["01  TAKEOFF","02  INTERCEPT" if campaign else "02  EXPLORE","03  LAND"]
+	var active_stage: int = 2 if landing else 1 if f.airborne else 0
+	for i in range(3):
+		text(Vector2(570+i*170,61),stages[i],13,phosphor if i==active_stage else MUTED,true)
+	text(Vector2(1140,49),"COPILOT ON" if app.copilot else "YOU HAVE CONTROL",12,AMBER if app.copilot else phosphor,true)
+	text(Vector2(1140,72),"H to take control" if app.copilot else "H for guided flight",12,WHITE)
+	zones["views_header"] = Rect2(1380,32,175,44)
+	text(Vector2(1393,60),app.camera_view_label().to_upper()+"  V",12,phosphor,true)
+	# Heading ribbon, pitch ladder, and velocity reference follow actual attitude.
+	for i in range(-3,4):
+		var x: float = 800+i*65
+		line(Vector2(x,136),Vector2(x,144),phosphor)
+		text(Vector2(x-15,128),"%03d" % int(fposmod(f.get_heading_degrees()+i*10,360)),12,phosphor,true)
+	draw_colored_polygon(PackedVector2Array([Vector2(794,151),Vector2(806,151),Vector2(800,143)]),phosphor)
+	var center := Vector2(800,382)
+	for degree in range(-30,31,10):
+		var dy: float = (rad_to_deg(f.pitch+app.look.y-0.10)-degree)*5.0
+		if absf(dy)>130: continue
+		for side in [-1,1]:
+			var a: Vector2 = Vector2(side*36,dy).rotated(f.roll)+center
+			var b: Vector2 = Vector2(side*110,dy).rotated(f.roll)+center
+			line(a,b,Color(0.65,1,0.79,0.60),1.5)
+		text(center+Vector2(118,dy).rotated(f.roll),str(degree),11,phosphor,true)
+	draw_arc(center,9,0,TAU,32,phosphor,1.5,true)
+	line(center+Vector2(-29,0),center+Vector2(-9,0),phosphor,2)
+	line(center+Vector2(9,0),center+Vector2(29,0),phosphor,2)
+	line(center+Vector2(0,-18),center+Vector2(0,-9),phosphor,2)
+	flight_tape(Vector2(510,center.y),f.speed*1.94384,10,"SPEED","KNOTS",phosphor)
+	flight_tape(Vector2(1090,center.y),f.position.y*3.28084,100,"ALTITUDE","FEET",phosphor)
+	text(Vector2(1108,548),"%+d FT/MIN" % int(f.vertical_speed*196.85),11,phosphor,true)
+	panel(Rect2(35,133,252,122),ink)
+	text(Vector2(53,159),"ENGINE POWER",11,MUTED,true)
+	text(Vector2(52,193),"%d%%" % int(f.throttle*100),26,phosphor,true)
+	line(Vector2(54,207),Vector2(264,207),MUTED,3)
+	line(Vector2(54,207),Vector2(54+210*f.throttle,207),phosphor,3)
+	text(Vector2(53,237),"W increase / S decrease",12,WHITE)
+	var instruction := "Follow the amber checkpoints"
+	var detail := "Arrow keys steer   ·   Keep movements gentle"
+	if not f.airborne and not f.ever_airborne:
+		instruction = "Build speed for takeoff" if f.speed<f.effective_rotation_speed() else "Gently raise the nose"
+		detail = "Hold W for power · Lift off at %d knots with ↑" % int(f.effective_rotation_speed()*1.94384)
+	elif fighting:
+		instruction = "Line up the target and fire"
+		detail = "SPACE / click to fire · Green target = locked · Aim assistance active" if app.combat.assist else "SPACE / click to fire · Green target = locked"
+		var c: GooseCampaign = app.combat
+		instruction = c.Route.NAMES[mini(c.route_index,c.Route.NAMES.size()-1)]
+		detail = c.Route.HINTS[mini(c.route_index,c.Route.HINTS.size()-1)]
+		var route_delta: Vector3 = c.route_target()-f.position
+		text(Vector2(54,350),"NEXT VIEW  %.1f KM" % (route_delta.length()/1000),12,phosphor,true)
+		text(Vector2(54,372),"SPACE fire · H guided flight",12,WHITE)
+		if c.developer: text(Vector2(54,395),"DEVELOPER LOADOUT",11,AMBER,true)
+		elif c.showcase: text(Vector2(54,395),"TRAINING SHIELD",11,MUTED,true)
+		# One navigation diamond remains distinct from square enemy brackets.
+		var bearing: float = wrapf(atan2(route_delta.x,-route_delta.z)-f.heading,-PI,PI)
+		var route_screen: Vector2 = app.camera.unproject_position(c.route_target())
+		if app.camera.is_position_behind(c.route_target()): route_screen = Vector2(1230 if bearing>0 else 370,390)
+		route_screen = route_screen.clamp(Vector2(370,190),Vector2(1230,550))
+		var diamond := PackedVector2Array([route_screen+Vector2(0,-13),route_screen+Vector2(13,0),route_screen+Vector2(0,13),route_screen+Vector2(-13,0),route_screen+Vector2(0,-13)])
+		draw_polyline(diamond,Color(0.45,0.85,1),2,true)
+		# The weapon cue follows the aircraft's true firing direction, including look-around.
+		var aim: Vector2 = app.camera.unproject_position(f.position+c.forward()*1500)
+		draw_arc(aim,21,0,TAU,40,phosphor if c.lock_progress>=1 else AMBER,2,true)
+		line(aim+Vector2(-34,0),aim+Vector2(-23,0),phosphor,2)
+		line(aim+Vector2(23,0),aim+Vector2(34,0),phosphor,2)
+		text(Vector2(54,293),"%s" % c.stage().weapon,14,phosphor,true)
+		text(Vector2(54,318),"STAGE %d / 6  ·  SCORE %05d" % [c.wave,c.score],12,WHITE,true)
+		for enemy: Dictionary in c.enemies:
+			if app.camera.is_position_behind(enemy.position): continue
+			var point: Vector2 = app.camera.unproject_position(enemy.position)
+			if point.x<300 or point.x>1300 or point.y<170 or point.y>570: continue
+			var color: Color = phosphor if enemy.id==c.target_id and c.lock_progress>=1 else AMBER
+			draw_rect(Rect2(point-Vector2(19,19),Vector2(38,38)),color,false,1.5)
+			text(point+Vector2(26,4),"%.1f KM" % (f.position.distance_to(enemy.position)/1000),10,color,true)
+		if c.transition_time>0:
+			text(Vector2(560,188),"UPGRADE  /  "+str(c.stage().aircraft),16,AMBER,true)
+	elif landing:
+		instruction = "Line up with Cape North runway"
+		detail = "Reduce power with S · Gear G · Flaps F · H can help you land"
+		if f.airborne: draw_approach()
+		text(Vector2(54,292),"CAPE NORTH  /  RWY 36",13,phosphor,true)
+		text(Vector2(54,316),"%.1f KM TO TOUCHDOWN" % (float(app.approach_data().distance)/1000),12,WHITE,true)
+	elif campaign:
+		instruction = "Climb clear of the airport"
+		detail = "Gently hold ↑ · Interception begins at 590 feet"
+	if app.mode=="rollout":
+		instruction = "Touchdown — brake to a stop"
+		detail = "Hold SPACE to brake · A / D keeps you centered"
+	if f.stall_time>0.8:
+		instruction = "Low speed — add power"
+		detail = "Hold W and gently lower the nose with ↓"
+	panel(Rect2(360,680,880,77),ink)
+	text(Vector2(384,710),instruction,22,WHITE)
+	text(Vector2(384,740),detail,14,phosphor)
+	text(Vector2(36,983),"ARROWS steer   W/S power   H copilot   V view   R restart   F1 help",12,WHITE,true)
+	text(Vector2(1280,983),"GEAR "+("DOWN" if f.gear else "UP"),12,phosphor,true)
+	if app.spectator:
+		panel(Rect2(1280,140,285,96),ink)
+		text(Vector2(1295,170),"CARDBOARD CONTROLS",12,phosphor,true)
+		text(Vector2(1295,199),app.vision.status,11,WHITE,true)
+		text(Vector2(1295,221),"Webcam → yoke + throttle",12,MUTED)
+
+func flight_tape(at: Vector2, value: float, interval: float, label: String, unit: String, color: Color) -> void:
+	text(at+Vector2(-31,-160),label,12,color,true)
+	for i in range(-3,4):
+		var tick: float = floor(value/interval)*interval+i*interval
+		if tick<0: continue
+		var y: float = -(tick-value)/interval*33
+		line(at+Vector2(-25,y),at+Vector2(-12,y),color)
+		if absf(y)>24: text(at+Vector2(0,y+4),"%d" % int(tick),11,color,true)
+	panel(Rect2(at+Vector2(-32,-21),Vector2(108,42)),Color(0.02,0.05,0.065,0.80))
+	text(at+Vector2(-21,8),"%03d" % int(value),24,color,true)
+	text(at+Vector2(-22,149),unit,11,color,true)
+
+func draw_legacy_flight() -> void:
 	var f: FlightDynamics = app.flight
 	panel(Rect2(28,24,1544,76),Color(0.03,0.06,0.08,0.82))
 	text(Vector2(51,59),"C / C",24,AMBER)
@@ -254,7 +378,7 @@ func draw_flight() -> void:
 	var target: Vector3 = app.target_position()
 	var distance: float = f.position.distance_to(target)
 	panel(Rect2(28,122,346,98),Color(0.03,0.06,0.08,0.78))
-	text(Vector2(49,151),"NEXT  /  " + ("CHECKPOINT %02d" % (app.ring_index+1) if app.ring_index<5 and app.flight_kind=="valley" else "NORTH FIELD / RWY 36"),11,AMBER,true)
+	text(Vector2(49,151),"NEXT  /  " + ("CLIMB TO 180 M" if app.flight_kind=="campaign" and app.combat.phase=="takeoff" else "CHECKPOINT %02d" % (app.ring_index+1) if app.ring_index<5 and app.flight_kind=="valley" else "CAPE NORTH / RWY 36"),11,AMBER,true)
 	text(Vector2(48,184),"%.1f km" % (distance/1000.0),27)
 	text(Vector2(207,182),"%d FT MSL" % int(target.y*3.28084),12,MUTED,true)
 	text(Vector2(49,207),"H  TRAINING COPILOT / TAKE OVER",10,GREEN if app.copilot else MUTED,true)
@@ -347,7 +471,7 @@ func draw_results() -> void:
 	panel(Rect2(370,200,860,605))
 	var success: bool = app.mission_success
 	text(Vector2(428,254),"FLIGHT DEBRIEF",13,AMBER,true)
-	text(Vector2(426,319),("Welcome back, captain." if app.flight_kind=="free" else "Welcome to North Field.") if success else "Every flight teaches you.",36)
+	text(Vector2(426,319),("Welcome back, captain." if app.flight_kind=="free" else "Welcome to Cape North.") if success else "Every flight teaches you.",36)
 	paragraph(Vector2(428,355),app.result_reason,742,17,GREEN if success else MUTED)
 	line(Vector2(428,397),Vector2(1170,397))
 	var f: FlightDynamics = app.flight
@@ -385,8 +509,10 @@ func draw_credits() -> void:
 	text(Vector2(353,185),"BUILT WITH THE COMMUNITY",13,AMBER,true)
 	text(Vector2(350,239),"Aircraft, landscapes, and open tools.",32)
 	var lines: Array[String] = ["AIRCRAFT  /  FLIGHTGEAR COMMUNITY", "A380: Ampere K., Innis Cunningham, F. Dalvi, S. Hamilton and contributors.", "F-35B: Petar Jedvaj, Detlef Faber, F-GTUX, Stuart Cassie, Gary Brown and contributors.", "B-2 Spirit: Markus Zojer.", "737-300: Innis Cunningham, Heiko Schulz, Emmanuel Baranger and contributors.", "747: Jim Wilson and FlightGear 747 contributors.", "Aircraft licensed under GPL v2 / v3; source and complete notices included in the project.", "", "LANDSCAPE  /  POLY HAVEN", "CC0 photographic terrain materials and Kloppenheim 06 sky.", "", "ENGINE  /  GODOT", "Godot 4.7.2, Copyright Juan Linietsky, Ariel Manzur and contributors. MIT license.", "Full asset and engine notices are bundled with this application."]
+	lines.insert(10,"Helsinki 3D Mesh 2017 — City of Helsinki, CC BY 4.0. Relocated and converted.")
+	lines.insert(11,"SRTM / GMTED2010 elevation courtesy of USGS, via Mapzen. Rescaled for this fictional coast.")
 	for i: int in lines.size():
-		text(Vector2(354,289+i*32),lines[i],15,AMBER if i in [0,8,11] else MUTED)
+		text(Vector2(354,289+i*28),lines[i],15,AMBER if i in [0,8,13] else MUTED)
 	text(Vector2(354,754),"Demo: Poly by Google · Kenney · MintoDog · British Library / Lawrence Shove",13,WHITE)
 	button("credits",Rect2(953,783,293,52),"BACK",true)
 
@@ -508,8 +634,8 @@ func draw_title() -> void:
 	text(Vector2(77,384),"PROTOCOL",88,WHITE)
 	text(Vector2(82,451),"Waterloo's airspace has a goose problem.",24,WHITE)
 	text(Vector2(82,495),"You have cardboard. They have numbers.",22,MUTED)
-	text(Vector2(82,568),"6 AIRCRAFT   /   6 WEAPONS   /   3 MINUTES",17,AMBER,true)
-	button("demo",Rect2(80,644,470,80),"START THE 3-MINUTE DEMO  →",true)
+	text(Vector2(82,568),"TAKE OFF   /   CLEAR THE SKIES   /   LAND",17,AMBER,true)
+	button("demo",Rect2(80,644,470,80),"START THE FULL SORTIE  →",true)
 	button("brief_campaign",Rect2(80,746,227,54),"Demo setup")
 	button("hangar",Rect2(324,746,226,54),"Aircraft hangar")
 	text(Vector2(82,858),"AIM TO FIRE  ·  CARDBOARD OR KEYBOARD",14,GREEN,true)
@@ -526,15 +652,15 @@ func draw_campaign() -> void:
 	text(Vector2(49,87),"LEVEL %d / 6  ·  %s" % [c.wave,spec.name],13,WHITE,true)
 	text(Vector2(660,60),"%05d" % c.score,30,accent,true)
 	text(Vector2(662,87),"MISSION SCORE",10,MUTED,true)
-	var remaining: int = maxi(0,int(ceil(180-c.elapsed)))
+	var remaining: int = maxi(0,int(ceil((6-c.wave)*c.STAGE_SECONDS+c.STAGE_SECONDS-c.stage_clock)))
 	text(Vector2(1000,62),"%02d:%02d" % [remaining/60,remaining%60] if c.showcase else "CAMPAIGN",28,WHITE,true)
-	text(Vector2(1000,87),"3-MIN SHOWCASE · TRAINING SHIELD" if c.showcase else "CLEAR THE FLOCK TO UPGRADE",10,MUTED,true)
+	text(Vector2(1000,87),"UNTIL APPROACH · TRAINING SHIELD" if c.showcase else "CLEAR THE FLOCK TO UPGRADE",10,MUTED,true)
 	text(Vector2(1350,59),"%02d GEESE" % c.enemies.size(),16,accent,true)
 	text(Vector2(1350,87),"HULL %d%%" % int(c.hull),12,GREEN,true)
 	for i in range(6):
 		var x: float = 29+i*258
 		draw_rect(Rect2(x,124,252,5),accent if i<c.wave else Color(0.2,0.28,0.32))
-		if i==c.wave-1 and c.showcase: draw_rect(Rect2(x,124,252*c.stage_clock/30,5),WHITE)
+		if i==c.wave-1 and c.showcase: draw_rect(Rect2(x,124,252*c.stage_clock/c.STAGE_SECONDS,5),WHITE)
 	var center: Vector2 = app.camera.unproject_position(f.position+c.forward()*1500)
 	var locked: bool = c.lock_progress>=1
 	var color: Color = GREEN if locked else accent
@@ -561,7 +687,7 @@ func draw_campaign() -> void:
 	text(Vector2(760,852),"AMMO",11,MUTED,true)
 	text(Vector2(760,899),str(c.ammo),30,WHITE,true)
 	text(Vector2(1000,852),"UPGRADE IN" if c.showcase else "GEESE LEFT",11,MUTED,true)
-	text(Vector2(1000,899),"%02d SEC" % maxi(0,int(ceil(30-c.stage_clock))) if c.showcase else str(c.enemies.size()),30,WHITE,true)
+	text(Vector2(1000,899),"%02d SEC" % maxi(0,int(ceil(c.STAGE_SECONDS-c.stage_clock))) if c.showcase else str(c.enemies.size()),30,WHITE,true)
 	text(Vector2(1270,852),"AIM ASSIST",11,MUTED,true)
 	text(Vector2(1270,899),"ON" if c.assist else "OFF",30,GREEN,true)
 	text(Vector2(760,943),"Aim to fire · SPACE manual · V camera · H copilot",13,MUTED,true)

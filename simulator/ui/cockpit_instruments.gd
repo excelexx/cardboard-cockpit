@@ -40,6 +40,7 @@ func set_navigation(kind: String, checkpoint: int) -> void:
 	navigation_kind = kind
 	navigation_checkpoint = bounded
 	queue_redraw()
+	_refresh_texture()
 
 func navigation_target() -> Vector3:
 	if navigation_kind == "valley" and navigation_checkpoint < ROUTE.size():
@@ -70,6 +71,12 @@ func update_flight(flight: FlightDynamics, dt: float) -> void:
 	if instrument_time > 1.0 / 24.0:
 		instrument_time = 0.0
 		queue_redraw()
+		_refresh_texture()
+
+func _refresh_texture() -> void:
+	# Keep the flight world smooth; physical instrument LCDs only need 24 Hz.
+	if get_parent() is SubViewport:
+		get_parent().render_target_update_mode=SubViewport.UPDATE_ONCE
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), BACK)

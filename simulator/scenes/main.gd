@@ -4,7 +4,7 @@ const Catalog = preload("res://data/aircraft.gd")
 const Dynamics = preload("res://systems/flight_dynamics.gd")
 const Hud = preload("res://ui/hud.gd")
 const Hangar = preload("res://scenes/hangar.gd")
-const World = preload("res://scenes/world.gd")
+const World = preload("res://scenes/coastal_world.gd")
 const Audio = preload("res://systems/engine_audio.gd")
 const Vision = preload("res://systems/vision_client.gd")
 const Cockpit = preload("res://scenes/cockpit.gd")
@@ -28,6 +28,7 @@ var flight_kind := "valley"
 var conditions := "golden"
 var expanded_hud := false
 var aircraft_visuals: Node3D
+var campaign_models: Dictionary={}
 var touchdown_valid := false
 var selected: int = 0
 var flight: FlightDynamics = Dynamics.new()
@@ -71,6 +72,7 @@ var runtime: float = 0.0
 var capture_at: float = -1
 var capture_file := ""
 var test_mode := false
+var diagnostic_input_lock := false
 var test_finished := false
 var test_limit: float = 500.0
 var auto_capture_index: int = 0
@@ -240,6 +242,7 @@ func update_rings() -> void:
 		mat.emission_energy_multiplier = 2.2 if i == ring_index else 0.6
 
 func start_flight() -> void:
+	set_camera_view("cockpit")
 	campaign_profile.clear()
 	if (flight_kind=="campaign") != (combat is GooseCampaign):
 		remove_child(combat)
@@ -249,13 +252,13 @@ func start_flight() -> void:
 		add_child(combat)
 	if flight_kind == "combat" and str(profile().id)!="f35":
 		select_plane(1)
+	if flight_kind=="campaign": _prepare_campaign_models()
 	help_visible = false
 	calibration_visible = false
 	credits_visible = false
 	camera_menu_open = false
 	camera_snap = true
-	for child: Node in aircraft.get_children():
-		child.queue_free()
+	_clear_aircraft_presentation()
 	var model: Node3D = load_plane()
 	aircraft.add_child(model)
 	aircraft_visuals = Visuals.new()
@@ -285,7 +288,7 @@ func start_flight() -> void:
 		flight.ever_airborne = true
 		flight.airborne_time = 30
 		flight.gear = false
-		cockpit = false
+		cockpit = true
 	if flight_kind == "approach":
 		ring_index = 5
 		flight.position = Vector3(0,155,-11200)
@@ -459,6 +462,7 @@ func on_action(action: String) -> void:
 			save_settings()
 
 func _process(dt: float) -> void:
+	world.update_cloud_passage(flight.position,mode in ["flight","rollout"])
 	runtime += dt
 	toast_time = maxf(0,toast_time-dt)
 	vision.poll(dt)
@@ -491,8 +495,9 @@ func _physics_process(dt: float) -> void:
 		combat.tick_ejection(dt)
 		return
 	if mode == "rollout":
-		var steering: float = float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
-		var brakes: bool = copilot or Input.is_physical_key_pressed(KEY_SPACE)
+		if flight_kind=="campaign": combat.elapsed += dt
+		var steering: float = float(_physical_key(KEY_D))-float(_physical_key(KEY_A))
+		var brakes: bool = copilot or _physical_key(KEY_SPACE)
 		flight.rollout_step(dt,brakes,steering,is_on_runway(flight.position))
 		if not is_on_runway(flight.position): flight.contact = "overrun"
 		aircraft.position = flight.position
@@ -504,19 +509,19 @@ func _physics_process(dt: float) -> void:
 	if mode != "flight":
 		return
 	if str(profile().id)=="f35" and flight.airborne:
-		combat.eject_hold = combat.eject_hold+dt if Input.is_physical_key_pressed(KEY_E) else 0.0
+		combat.eject_hold = combat.eject_hold+dt if _physical_key(KEY_E) else 0.0
 		if combat.eject_hold>=1.0 and combat.eject(): return
 	if flight_kind in ["combat","campaign"]:
 		combat.tick(dt)
 		if mode!="flight": return
-		if Input.is_physical_key_pressed(KEY_SPACE) or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT): combat.fire_gun()
+		if _physical_key(KEY_SPACE) or (not diagnostic_input_lock and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)): combat.fire_gun()
 		if vision.enabled and vision.tracking: copilot = false
 		combat.cardboard_controls()
 		if copilot and combat.lock_progress>=1:
 			combat.fire_gun()
 			combat.fire_missile()
-	var keyboard := Vector3(float(Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_UP))-float(Input.is_physical_key_pressed(KEY_DOWN)),float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)))
-	var throttle_delta: float = float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
+	var keyboard := Vector3(float(_physical_key(KEY_RIGHT))-float(_physical_key(KEY_LEFT)),float(_physical_key(KEY_UP))-float(_physical_key(KEY_DOWN)),float(_physical_key(KEY_D))-float(_physical_key(KEY_A)))
+	var throttle_delta: float = float(_physical_key(KEY_W))-float(_physical_key(KEY_S))
 	if keyboard.length()>0 or throttle_delta!=0:
 		take_manual_control(keyboard.length() > 0)
 	if copilot:
@@ -538,10 +543,10 @@ func _physics_process(dt: float) -> void:
 	var ground: float = world.ground_height(flight.position.x,flight.position.z)
 	var on_runway: bool = world.is_runway(flight.position.x, flight.position.z)
 	var was_airborne: bool = flight.airborne
-	flight.step(dt,control,Input.is_physical_key_pressed(KEY_SPACE),ground,on_runway,false)
+	flight.step(dt,control,_physical_key(KEY_SPACE),ground,on_runway,false)
 	# Resolve against the surface reached by this frame, including runway edges
 	# and rising terrain, rather than the point the aircraft just left.
-	if combat is GooseCampaign and combat.showcase:
+	if combat is GooseCampaign and combat.showcase and combat.phase == "combat":
 		var safe_floor: float = world.ground_height(flight.position.x,flight.position.z)+100.0
 		if flight.position.y<safe_floor:
 			flight.position.y = safe_floor
@@ -578,6 +583,9 @@ func _physics_process(dt: float) -> void:
 	aircraft.position = flight.position
 	aircraft.rotation = Vector3(flight.pitch,-flight.heading,-flight.roll)
 
+func _physical_key(key: Key) -> bool:
+	return not diagnostic_input_lock and Input.is_physical_key_pressed(key)
+
 func take_manual_control(steering: bool) -> void:
 	if copilot:
 		show_toast("You have control")
@@ -589,6 +597,9 @@ func take_manual_control(steering: bool) -> void:
 
 func pilot_controls() -> Vector3:
 	if flight_kind in ["combat","campaign"]: return combat.pilot_controls()
+	return approach_pilot_controls()
+
+func approach_pilot_controls() -> Vector3:
 	var target: Vector3 = target_position()
 	var desired_speed: float = 115.0
 	if not flight.airborne:
@@ -618,12 +629,16 @@ func pilot_controls() -> Vector3:
 	return Vector3(roll_input,pitch_input,0)
 
 func target_position() -> Vector3:
+	if flight_kind=="campaign" and combat.phase=="landing": return Vector3(0,3,Approach.AIM_Z)
+	if flight_kind=="campaign" and combat.phase=="takeoff": return Vector3(0,180,-2000)
+	if flight_kind=="campaign": return combat.route_target()
 	if flight_kind in ["combat","campaign"]:
 		var enemy: Dictionary = combat.target()
 		return enemy.position if not enemy.is_empty() else flight.position+combat.forward()*1500
 	return CHECKPOINTS[ring_index] if ring_index<5 and flight_kind=="valley" else Vector3(0,3,Approach.AIM_Z)
 
 func phase_label() -> String:
+	if flight_kind=="campaign": return "01 / TAKEOFF" if combat.phase=="takeoff" else "02 / INTERCEPTION" if combat.phase=="combat" else "03 / LANDING"
 	if flight_kind in ["combat","campaign"]: return "SKY SHIELD · INTERCEPTION"
 	if mode == "hangar": return "HANGAR"
 	if mode=="rollout" or (mode=="paused" and resume_mode=="rollout"): return "ROLLOUT · BRAKE TO A STOP"
@@ -633,6 +648,8 @@ func phase_label() -> String:
 	return "AIRBORNE · VALLEY CHECKPOINTS"
 
 func flight_prompt() -> String:
+	if flight_kind=="campaign" and combat.phase=="takeoff": return "W throttle · At rotation speed hold UP gently · Climb to 180 m"
+	if flight_kind=="campaign" and combat.phase=="landing": return "Weapons safe · Gear down · Follow diamonds · SPACE brakes after touchdown · H copilot"
 	if mode=="ejected": return "EJECTION SUCCESSFUL · PARACHUTE DEPLOYED"
 	if flight_kind in ["combat","campaign"]: return "SPACE fire · T missile · Z flares · SHIFT roll · Hold E eject"
 	if mode=="rollout": return "Power idle  ·  Hold SPACE to brake  ·  A / D to stay centered"
@@ -653,6 +670,9 @@ func finish_mission() -> void:
 	mission_success = flight.contact=="landed" and touchdown_valid and flight.speed<=0.1 and is_on_runway(flight.position)
 	if mission_success:
 		result_reason = "Landing complete. Aircraft stopped safely."
+		if flight_kind=="campaign":
+			combat.active = false
+			result_reason = "Takeoff, six interception stages, and a full-stop landing complete. Welcome home, pilot."
 		if flight_kind=="valley": result_reason += " Five checkpoints cleared."
 		elif flight_kind=="free": result_reason = "Scenic flight complete. Parked safely after landing."
 	elif flight.contact=="overrun": result_reason = "Runway overrun. Touch down earlier and hold SPACE to brake."
@@ -727,9 +747,10 @@ func update_camera(dt: float) -> void:
 		if cockpit:
 			camera.near = 0.05
 			camera.position = flight.position+plane_basis*Vector3(0,3.0,-float(profile().length)*0.29)
-			camera.basis = plane_basis * Basis.from_euler(Vector3(look.y,look.x,0))
+			# A slightly lowered sightline reveals the route below without leaving the seat.
+			camera.basis = plane_basis * Basis.from_euler(Vector3(look.y-0.10,look.x,0))
 			cockpit_frame.basis = Basis.from_euler(Vector3(look.y,look.x,0)).inverse()
-			camera.fov = 77
+			camera.fov = 82
 		else:
 			camera.near = 0.5
 			if flight_kind=="campaign" and camera_view=="chase":
@@ -803,25 +824,50 @@ func save_settings() -> void:
 
 func apply_campaign_aircraft(tune: Dictionary) -> void:
 	campaign_profile = tune.duplicate(true)
-	for child: Node in aircraft.get_children():
-		aircraft.remove_child(child)
-		child.queue_free()
-	var model: Node3D = load_plane()
-	aircraft.add_child(model)
-	aircraft_visuals = Visuals.new()
-	aircraft.add_child(aircraft_visuals)
-	aircraft_visuals.initialize(model,profile())
+	_clear_aircraft_presentation()
+	if campaign_models.has(str(tune.id)):
+		var cached: Dictionary=campaign_models[str(tune.id)]
+		cached.root.visible=true
+		aircraft_visuals=cached.visuals
+		aircraft_visuals.reset()
+	else:
+		var model: Node3D=load_plane()
+		aircraft.add_child(model)
+		aircraft_visuals=Visuals.new()
+		aircraft.add_child(aircraft_visuals)
+		aircraft_visuals.initialize(model,profile())
 	cockpit_frame.build(profile())
-	flight.reset(tune)
-	flight.position = Vector3(0,700,-3500)
-	flight.speed = 110 if str(tune.id)=="trainer" else 140
-	flight.throttle = 0.4
-	flight.engine = 0.4
-	flight.airborne = true
-	flight.ever_airborne = true
-	flight.airborne_time = 30
-	flight.gear = false
+	# Upgrade the model and handling without teleporting or resetting the sortie.
+	flight.profile = tune
+	flight.gear = not flight.airborne
 	control = Vector3.ZERO
-	cockpit = false
+	# Keep the pilot in the selected seat through upgrades.
 	audio.set_aircraft(profile())
 	update_camera(1.0)
+
+func _clear_aircraft_presentation() -> void:
+	for child in aircraft.get_children():
+		if child.get_meta("campaign_cached",false):
+			child.visible=false
+		else:
+			aircraft.remove_child(child)
+			child.queue_free()
+
+func _prepare_campaign_models() -> void:
+	if not campaign_models.is_empty(): return
+	var previous: Dictionary=campaign_profile
+	for index in range(Campaign.STAGES.size()):
+		var tune: Dictionary=combat.plane_profile(index)
+		campaign_profile=tune
+		var holder:=Node3D.new()
+		holder.set_meta("campaign_cached",true)
+		holder.visible=false
+		aircraft.add_child(holder)
+		var model: Node3D=load_plane()
+		holder.add_child(model)
+		var presentation:=Visuals.new()
+		holder.add_child(presentation)
+		presentation.initialize(model,tune)
+		campaign_models[str(tune.id)]={"root":holder,"visuals":presentation}
+		cockpit_frame.build(tune)
+	campaign_profile=previous

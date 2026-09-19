@@ -22,11 +22,13 @@ var _noise: FastNoiseLite = FastNoiseLite.new()
 var _detail_noise: FastNoiseLite = FastNoiseLite.new()
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _materials: Dictionary = {}
+var _height_grid: Dictionary = {}
 var _environment: WorldEnvironment
 var _sun: DirectionalLight3D
 var _condition_id: String = "golden"
 var _condition_skies: Dictionary = {}
 var _airport_obstacles: Array[AABB] = []
+var metropolis: Node3D
 
 
 func _init() -> void:
@@ -56,8 +58,41 @@ func build() -> void:
 	_build_river()
 	_build_airport(0.0, "NORTHSTAR", "36", "18")
 	_build_airport(DESTINATION_Z, "NORTH FIELD", "36", "18")
+	metropolis=load("res://scenes/metropolitan_world.gd").new()
+	add_child(metropolis)
+	metropolis.build(self)
 	_build_forests()
 	_build_valley_landmarks()
+	_build_farmland()
+	_build_lakeside_town()
+	_build_clouds()
+	_build_scenic_cloud_sea()
+
+
+func _build_farmland() -> void:
+	# Terrain-following agricultural plots give altitude and scale cues on approach.
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var colors: Array[Color] = [Color(0.32,0.38,0.18), Color(0.48,0.43,0.25), Color(0.26,0.34,0.16), Color(0.40,0.35,0.24)]
+	for row in range(9):
+		for column in range(3):
+			var origin := Vector2(-1320+column*210,-11000+row*270)
+			var color: Color = colors[(row*3+column)%colors.size()]
+			for u in range(8):
+				for v in range(10):
+					var base := origin+Vector2(u*24,v*25)
+					for corner: Vector2 in [Vector2(0,0),Vector2(0,25),Vector2(24,0),Vector2(24,0),Vector2(0,25),Vector2(24,25)]:
+						var point := base+corner
+						surface.set_color(color.lightened(0.025 if u%2==0 else 0.0))
+						surface.add_vertex(Vector3(point.x,ground_height(point.x,point.y)+0.22,point.y))
+	surface.generate_normals()
+	var material := _mat("farmland",Color.WHITE)
+	material.vertex_color_use_as_albedo = true
+	var fields := MeshInstance3D.new()
+	fields.name = "ValleyAgriculturalFields"
+	fields.mesh = surface.commit()
+	fields.material_override = material
+	add_child(fields)
 
 
 func _smooth(a: float, b: float, value: float) -> float:
@@ -73,10 +108,14 @@ func _terrain_height(x: float, z: float) -> float:
 	var broad: float = _noise.get_noise_2d(x, z)
 	var detail: float = _detail_noise.get_noise_2d(x, z)
 	var end_weight: float = maxf(_smooth(19300.0, 25500.0, -z), _smooth(4800.0, 9500.0, z))
-	var mountain_weight: float = maxf(_smooth(1350.0, 5100.0, absf(x)), end_weight)
+	# A broad, populated basin instead of two mountain walls beside a bare runway.
+	var mountain_weight: float = maxf(_smooth(3600.0, 7900.0, absf(x)), end_weight)
 	var ridge: float = 1.0 - absf(_noise.get_noise_2d(x + 2810.0, z - 5400.0))
 	var floor_height: float = -2.0 + broad * 23.0 + detail * 5.0
 	var elevation: float = floor_height + mountain_weight * (1050.0 + broad * 1450.0 + pow(ridge, 3.0) * 1480.0)
+	# Paired rock shoulders frame an actual flyable pass, not a wall across the route.
+	var pass_z: float = exp(-pow((z+8250.0)/1050.0,2.0))
+	elevation += pass_z*(820.0*exp(-pow((x+1150.0)/470.0,2.0))+1050.0*exp(-pow((x-1750.0)/510.0,2.0)))
 	# Both airports have a generous level safety area and smooth earth embankments.
 	var nearest_airport: float = minf(absf(z), absf(z - DESTINATION_Z))
 	var airport_weight: float = (1.0 - _smooth(1050.0, 1370.0, absf(x))) * (1.0 - _smooth(1900.0, 2600.0, nearest_airport))
@@ -84,6 +123,10 @@ func _terrain_height(x: float, z: float) -> float:
 	var river_distance: float = absf(x - _river_center(z))
 	var river_weight: float = (1.0 - _smooth(75.0, 205.0, river_distance)) * (1.0 - end_weight)
 	elevation = lerpf(elevation, -23.0, river_weight)
+	# A broad glacial lake on the left side of the outbound flight corridor.
+	var lake_radius: float = Vector2((x+2350.0)/950.0,(z+4800.0)/1700.0).length()
+	var lake_weight: float = 1.0-_smooth(0.82,1.16,lake_radius)
+	elevation = lerpf(elevation,-25.0,lake_weight)
 	return elevation
 
 
@@ -242,6 +285,7 @@ func obstacle_collision(position_value: Vector3, radius: float = 2.0) -> bool:
 	## Major airport buildings use their visible authored bounds, retained after batching.
 	## Tiny furniture and trees remain forgiving; this is not aircraft-wing collision.
 	var safe_radius: float = maxf(radius, 0.0)
+	if metropolis!=null and metropolis.collides(position_value,safe_radius): return true
 	for bounds in _airport_obstacles:
 		var nearest: Vector3 = position_value.clamp(bounds.position, bounds.end)
 		if nearest.distance_squared_to(position_value) <= safe_radius * safe_radius:
@@ -279,8 +323,8 @@ func _build_terrain() -> void:
 		var z: float = TERRAIN_Z_MIN + row * TERRAIN_STEP
 		for column in range(columns):
 			var x: float = TERRAIN_X_MIN + column * TERRAIN_STEP
-			var h: float = _terrain_height(x, z)
-			var normal: Vector3 = Vector3(_terrain_height(x - TERRAIN_STEP, z) - _terrain_height(x + TERRAIN_STEP, z), TERRAIN_STEP * 2.0, _terrain_height(x, z - TERRAIN_STEP) - _terrain_height(x, z + TERRAIN_STEP)).normalized()
+			var h: float = _grid_height(x, z)
+			var normal: Vector3 = Vector3(_grid_height(x - TERRAIN_STEP, z) - _grid_height(x + TERRAIN_STEP, z), TERRAIN_STEP * 2.0, _grid_height(x, z - TERRAIN_STEP) - _grid_height(x, z + TERRAIN_STEP)).normalized()
 			var index: int = row * columns + column
 			vertices[index] = Vector3(x, h, z)
 			normals[index] = normal
@@ -368,13 +412,22 @@ func _build_airport(z_center: float, airport_name: String, north_number: String,
 	add_child(airport)
 	var asphalt: ShaderMaterial = ShaderMaterial.new()
 	asphalt.shader = load("res://assets/environment/asphalt.gdshader") as Shader
-	var concrete: StandardMaterial3D = _mat("concrete", Color(0.43, 0.45, 0.43))
+	asphalt.set_shader_parameter("aggregate",load("res://assets/environment/aerial_asphalt_01_diff_2k.jpg"))
+	asphalt.set_shader_parameter("airport_z",z_center)
+	var concrete:=ShaderMaterial.new()
+	concrete.shader=load("res://assets/environment/concrete.gdshader")
+	concrete.set_shader_parameter("aggregate",load("res://assets/environment/aerial_asphalt_01_diff_2k.jpg"))
 	var pale_concrete: StandardMaterial3D = _mat("pale_concrete", Color(0.57, 0.58, 0.54))
 	var yellow: StandardMaterial3D = _mat("yellow", Color(0.83, 0.64, 0.18))
 	var markings: StandardMaterial3D = _mat("markings", Color(0.89, 0.90, 0.85))
 	var metal: StandardMaterial3D = _mat("airport_metal", Color(0.31, 0.36, 0.37), 0.63, 0.15)
 	var glass: StandardMaterial3D = _mat("airport_glass", Color(0.11, 0.25, 0.29), 0.16, 0.38)
 	var field_green: StandardMaterial3D = _mat("mown_grass", Color(0.28, 0.34, 0.20))
+	for surface_material in [field_green]:
+		surface_material.albedo_texture=load("res://assets/environment/aerial_grass_rock_diff_1k.jpg" if surface_material==field_green else "res://assets/environment/aerial_asphalt_01_diff_2k.jpg")
+		surface_material.uv1_triplanar=true
+		surface_material.uv1_world_triplanar=true
+		surface_material.uv1_scale=Vector3.ONE/(36.0 if surface_material==field_green else 12.0)
 	_box(airport, "Runway", Vector3(0.0, -0.13, 0.0), Vector3(100.0, 0.26, 3200.0), asphalt)
 	_box(airport, "RunwayShoulderWest", Vector3(-56.0, -0.13, 0.0), Vector3(12.0, 0.20, 3220.0), concrete)
 	_box(airport, "RunwayShoulderEast", Vector3(56.0, -0.13, 0.0), Vector3(12.0, 0.20, 3220.0), concrete)
@@ -576,9 +629,15 @@ func _build_forests() -> void:
 		var nearest_airport: float = minf(absf(z), absf(z - DESTINATION_Z))
 		if absf(x) < 540.0 or (absf(x) < 1180.0 and nearest_airport < 2580.0):
 			continue
+		if absf(x)<3450 and z> -13600 and z< -2200:
+			continue # Urban trees are placed along streets and inside parks instead.
+		if x>580 and x<1240 and z>-6970 and z<-5500:
+			continue # Streets and buildings have clear plots, not trees through roofs.
 		if h < -3.0 or h > 1600.0 or absf(x - _river_center(z)) < 215.0:
 			continue
 		var forest_density: float = _noise.get_noise_2d(x * 3.0 + 1200.0, z * 3.0)
+		if x>-1350 and x<-690 and z>-11050 and z<-8500:
+			continue # Keep the agricultural plots clear of forest instances.
 		if forest_density < -0.14:
 			continue
 		var size: float = _rng.randf_range(1.0, 2.5) * (1.0 - _smooth(950.0, 1750.0, h) * 0.5)
@@ -605,7 +664,7 @@ func _build_forests() -> void:
 
 func _build_clouds() -> void:
 	var cloud_shader: Shader = load("res://assets/environment/cloud.gdshader") as Shader
-	for index in range(34):
+	for index in range(16):
 		var cloud: MeshInstance3D = MeshInstance3D.new()
 		cloud.name = "CloudBank_" + str(index)
 		var mesh: QuadMesh = QuadMesh.new()
@@ -620,6 +679,131 @@ func _build_clouds() -> void:
 		cloud.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		cloud.extra_cull_margin = 3000.0
 		add_child(cloud)
+
+
+func _build_scenic_cloud_sea() -> void:
+	# Layered world-space patches form a low cloud sea, visible from both sides.
+	# No volumetric renderer required: keeps the demo viable on integrated GPUs.
+	var shader: Shader = load("res://assets/environment/cloud.gdshader")
+	for i in range(30):
+		var cloud := MeshInstance3D.new()
+		cloud.name = "ScenicCloudSea_%02d" % i
+		var mesh := QuadMesh.new()
+		mesh.size = Vector2(1550,1100)
+		cloud.mesh = mesh
+		cloud.position = Vector3(-1800+(i%6)*700,720+(i%3)*45,-7850-(i/6)*450)
+		cloud.rotation.x = -PI/2
+		var material := ShaderMaterial.new()
+		material.shader = shader
+		material.set_shader_parameter("billboard",false)
+		material.set_shader_parameter("seed",float(i)*3.71)
+		material.set_shader_parameter("cloud_color",Color(0.94,0.96,1.0,0.62))
+		cloud.material_override = material
+		cloud.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(cloud)
+		# Billowed silhouettes break up the horizontal deck at pilot-eye level.
+		var puff := MeshInstance3D.new()
+		puff.name = "CloudCrown_%02d" % i
+		var puff_mesh := QuadMesh.new()
+		puff_mesh.size = Vector2(1000,400+(i%4)*70)
+		puff.mesh = puff_mesh
+		puff.position = cloud.position+Vector3(140,60,0)
+		var puff_mat := ShaderMaterial.new()
+		puff_mat.shader = shader
+		puff_mat.set_shader_parameter("seed",float(i)*12.3)
+		puff_mat.set_shader_parameter("cloud_color",Color(0.94,0.96,1.0,0.65))
+		puff.material_override = puff_mat
+		puff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(puff)
+
+func cloud_immersion(at: Vector3) -> float:
+	var footprint: float = (1.0-_smooth(1300,2300,absf(at.x)))*(1.0-_smooth(900,1550,absf(at.z+8750)))
+	return footprint*_smooth(610,730,at.y)*(1.0-_smooth(810,960,at.y))
+
+func update_cloud_passage(at: Vector3, enabled: bool) -> void:
+	if _environment==null: return
+	var density: float = cloud_immersion(at) if enabled else 0.0
+	var base: float = 0.000014 if _condition_id=="clear" else 0.000052 if _condition_id=="overcast" else 0.000026
+	_environment.environment.fog_density = lerpf(base,0.0035,density)
+
+func _build_lakeside_town() -> void:
+	var town := Node3D.new()
+	town.name = "LakesideDistrict"
+	add_child(town)
+	var water := MeshInstance3D.new()
+	water.name = "GlacialLake"
+	var lake := SurfaceTool.new()
+	lake.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in range(120):
+		var a: float = TAU*i/120.0
+		var b: float = TAU*(i+1)/120.0
+		for p: Vector3 in [Vector3(-2350,-8.5,-4800),Vector3(-2350+cos(b)*980,-8.5,-4800+sin(b)*1750),Vector3(-2350+cos(a)*980,-8.5,-4800+sin(a)*1750)]:
+			lake.set_normal(Vector3.UP)
+			lake.add_vertex(p)
+	water.mesh = lake.commit()
+	var water_mat := ShaderMaterial.new()
+	water_mat.shader = load("res://assets/environment/water.gdshader")
+	water_mat.set_shader_parameter("glacial",true)
+	water.material_override = water_mat
+	add_child(water)
+	var roofs := _mat("district_roofs",Color(0.28,0.16,0.12))
+	var glass := _mat("district_windows",Color(0.17,0.29,0.32),0.22,0.3)
+	var road := _mat("district_roads",Color(0.14,0.15,0.14))
+	# A planned street grid, with pitched-roof houses and courtyards instead of scattered cubes.
+	for block in range(7):
+		var z: float = -6700+block*170
+		for segment in range(12):
+			var x: float = 620+segment*50
+			_box(town,"TownStreet",Vector3(x,ground_height(x,z)+0.3,z),Vector3(52,0.6,10),road)
+		for column in range(6):
+			var x: float = 650+column*92
+			var at := Vector3(x,ground_height(x,z+55),z+55)
+			var height: float = 14.0+float((block+column)%3)*5.0
+			var walls := _mat("district_wall_"+str(column%3),[Color(0.72,0.65,0.51),Color(0.55,0.59,0.57),Color(0.69,0.51,0.36)][column%3])
+			_box(town,"TownHouse",at+Vector3(0,height/2,0),Vector3(37,height,44),walls)
+			for side in [-1,1]:
+				var roof := _box(town,"PitchedRoof",at+Vector3(side*10,height+5,0),Vector3(24,1.5,48),roofs)
+				roof.rotation.z = -side*0.42
+				for window in range(4):
+					_box(town,"Window",at+Vector3(-12+window*8,height*0.65,side*22.1),Vector3(3.8,5,0.3),glass)
+	# Tall recognisable landmark near the settlement.
+	var church_at := Vector3(970,ground_height(970,-6900),-6900)
+	_box(town,"ClockTower",church_at+Vector3(0,34,0),Vector3(23,68,23),_mat("stone",Color(0.57,0.55,0.48)))
+	_cylinder(town,"ClockTowerSpire",church_at+Vector3(0,82,0),18,30,roofs,0)
+	# Legible clock faces on all four sides, facing both approaches.
+	var dial := _mat("clock_dial",Color(0.91,0.83,0.62))
+	var hands := _mat("clock_hands",Color(0.09,0.12,0.13))
+	for side in range(4):
+		var face := Node3D.new()
+		face.position = church_at+Vector3(0,56,0)
+		face.rotation.y = side*PI/2
+		town.add_child(face)
+		_box(face,"ClockFace",Vector3(0,0,11.7),Vector3(13,13,0.4),dial)
+		_box(face,"MinuteHand",Vector3(0,2,12),Vector3(0.7,5,0.5),hands)
+		_box(face,"HourHand",Vector3(1.6,0,12),Vector3(3.8,0.7,0.5),hands)
+	# A steel truss across the river: strong silhouette visible from the cockpit.
+	var bridge_z: float = -10200
+	var bridge_x: float = _river_center(bridge_z)
+	var steel := _mat("truss_steel",Color(0.40,0.23,0.16),0.65,0.3)
+	for side in [-1,1]:
+		for i in range(11):
+			var x: float = bridge_x-200+i*40
+			_box(town,"TrussPost",Vector3(x,27,bridge_z+side*10),Vector3(2,30,2),steel)
+			if i<10:
+				_box(town,"TrussChord",Vector3(x+20,42,bridge_z+side*10),Vector3(41,2,2),steel)
+				var brace := _box(town,"TrussDiagonal",Vector3(x+20,27,bridge_z+side*10),Vector3(50,1.6,1.6),steel)
+				brace.rotation.z = 0.644 if i%2==0 else -0.644
+	# Terminal service vehicles and baggage carts make the departure apron feel inhabited.
+	for airport_z in [0.0,DESTINATION_Z]:
+		for i in range(8):
+			var at := Vector3(340+i%2*85,0,airport_z+80+i*105)
+			_box(town,"ServiceVan",at+Vector3(0,2,0),Vector3(5,4,10),_mat("service_white",Color(0.81,0.81,0.73)))
+			_box(town,"VanWindshield",at+Vector3(0,2.8,-5.1),Vector3(4,1.5,0.1),glass)
+			for side in [-1,1]:
+				for wheel_z in [-3,3]:
+					var wheel := _cylinder(town,"VanWheel",at+Vector3(side*2.5,0.9,wheel_z),0.9,0.5,_mat("tires",Color(0.04,0.045,0.045)))
+					wheel.rotation.z = PI/2
+	_batch_static_geometry(town)
 
 
 func _build_valley_landmarks() -> void:
@@ -683,7 +867,18 @@ func _batch_static_geometry(parent: Node3D) -> void:
 		for value in instances:
 			var instance: MeshInstance3D = value as MeshInstance3D
 			for mesh_surface in range(instance.mesh.get_surface_count()):
-				surface.append_from(instance.mesh, mesh_surface, instance.transform)
+				var arrays: Array=instance.mesh.surface_get_arrays(mesh_surface)
+				var vertices: PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
+				var normals: PackedVector3Array=arrays[Mesh.ARRAY_NORMAL]
+				var uv: PackedVector2Array=arrays[Mesh.ARRAY_TEX_UV] if arrays[Mesh.ARRAY_TEX_UV]!=null else PackedVector2Array()
+				var indices: PackedInt32Array=arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX]!=null else PackedInt32Array()
+				var count: int=indices.size() if not indices.is_empty() else vertices.size()
+				var normal_basis: Basis=instance.basis.inverse().transposed()
+				for n in range(count):
+					var index: int=indices[n] if not indices.is_empty() else n
+					surface.set_normal((normal_basis*normals[index]).normalized())
+					surface.set_uv(uv[index] if uv.size()>index else Vector2.ZERO)
+					surface.add_vertex(instance.transform*vertices[index])
 		var batch: MeshInstance3D = MeshInstance3D.new()
 		batch.name = "StaticBatch_" + str(key)
 		batch.mesh = surface.commit()
@@ -699,6 +894,13 @@ func _batch_static_geometry(parent: Node3D) -> void:
 func is_runway(x: float, z: float) -> bool:
 	return absf(x) <= 50.0 and minf(absf(z), absf(z - DESTINATION_Z)) <= 1600.0
 
+func _grid_height(x: float,z: float) -> float:
+	# Reuse the actual rendered grid instead of recomputing noise/elevation for
+	# every tree, vehicle and flight collision query. Terrain is immutable.
+	var key:=Vector2i(roundi(x),roundi(z))
+	if not _height_grid.has(key): _height_grid[key]=_terrain_height(x,z)
+	return _height_grid[key]
+
 func ground_height(x: float, z: float) -> float:
 	# Runway deck is at zero; terrain immediately underneath remains recessed.
 	if is_runway(x, z):
@@ -711,10 +913,10 @@ func ground_height(x: float, z: float) -> float:
 	var z0: float = TERRAIN_Z_MIN + floorf(grid_z) * TERRAIN_STEP
 	var u: float = grid_x - floorf(grid_x)
 	var v: float = grid_z - floorf(grid_z)
-	var a: float = _terrain_height(x0, z0)
-	var b: float = _terrain_height(x0 + TERRAIN_STEP, z0)
-	var c: float = _terrain_height(x0, z0 + TERRAIN_STEP)
+	var a: float = _grid_height(x0, z0)
+	var b: float = _grid_height(x0 + TERRAIN_STEP, z0)
+	var c: float = _grid_height(x0, z0 + TERRAIN_STEP)
 	if u + v <= 1.0:
 		return a + u * (b - a) + v * (c - a)
-	var d: float = _terrain_height(x0 + TERRAIN_STEP, z0 + TERRAIN_STEP)
+	var d: float = _grid_height(x0 + TERRAIN_STEP, z0 + TERRAIN_STEP)
 	return d + (1.0 - u) * (c - d) + (1.0 - v) * (b - d)
