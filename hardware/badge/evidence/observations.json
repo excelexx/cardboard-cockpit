@@ -1,0 +1,30 @@
+{
+  "observed_at": "2026-09-19",
+  "human_confirmations": {
+    "button_sequence": [
+      "UP",
+      "DOWN",
+      "LEFT",
+      "RIGHT",
+      "HOME",
+      "START",
+      "B",
+      "A"
+    ],
+    "screen_pattern_visible_while_paused": true,
+    "led_colour_with_gpio3_green_and_gpio8_blue_test": "green",
+    "individual_led_red_test": "not observed; no further interactive testing available"
+  },
+  "nfc": {
+    "mode_written": "0x3d",
+    "mode_read_back": "0x3d",
+    "fifo_written": "0x12",
+    "fifo_level_after_write": 1,
+    "fifo_read_back": "0x12",
+    "crc_ready_observed": false,
+    "tag_test": "not performed",
+    "wake_test_timeout_seconds": 2,
+    "powerdown_bit_cleared": false
+  },
+  "scope": "standalone package; no game integration"
+}

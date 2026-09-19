@@ -26,6 +26,11 @@ else:
 # Change these IDs and regenerate BOTH markers if another booth uses the same IDs.
 YOKE_ID = 7
 THROTTLE_ID = 23
+if __package__:
+    from .weapon_switches import WeaponSwitches
+else:
+    from weapon_switches import WeaponSwitches
+
 DEFAULT_CALIBRATION = Path(__file__).resolve().with_name("calibration.local.json")
 PREVIEW_TITLE = "Cardboard Cockpit - private local tracker"
 
@@ -46,7 +51,7 @@ def generate_markers(directory: Path) -> None:
     cv2, np = load_cv()
     dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
     directory.mkdir(parents=True, exist_ok=True)
-    for marker_id, role, size_mm in ((YOKE_ID, "yoke", 70), (THROTTLE_ID, "throttle", 50)):
+    for marker_id, role, size_mm in ((YOKE_ID, "yoke", 70), (THROTTLE_ID, "throttle", 50), (31,"primary-on",35),(32,"primary-off",35),(41,"salvo-on",35),(42,"salvo-off",35)):
         # Six cells = four data cells + one-cell black border on each side.
         cells = cv2.aruco.generateImageMarker(dictionary, marker_id, 6)
         rects = ['<rect width="8" height="8" fill="white"/>']
@@ -79,6 +84,7 @@ class ArucoTracker:
         parameters = self.cv2.aruco.DetectorParameters()
         parameters.cornerRefinementMethod = self.cv2.aruco.CORNER_REFINE_SUBPIX
         self.detector = self.cv2.aruco.ArucoDetector(dictionary, parameters)
+        self.weapon_observations = {}
         self.previous_pose = None
         self.previous_pose_time = 0.0
 
@@ -88,6 +94,7 @@ class ArucoTracker:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         corners, ids, _ = self.detector.detectMarkers(gray)
         yoke = throttle = None
+        self.weapon_observations = {}
         if ids is None:
             return yoke, throttle
         if draw:
@@ -101,6 +108,15 @@ class ArucoTracker:
         # Duplicated IDs are ambiguous; reject that control instead of choosing
         # whichever marker happens to be enumerated last.
         counts = collections.Counter(int(marker_id) for marker_id in ids.flatten())
+        for marker_corners, marker_id in zip(corners, ids.flatten()):
+            key = int(marker_id)
+            if key in WeaponSwitches.IDS and counts[key] == 1:
+                role, value = WeaponSwitches.IDS[key]
+                other = 32 if key == 31 else 31 if key == 32 else 42 if key == 41 else 41
+                points = marker_corners.reshape(4, 2)
+                side = float(min(np.linalg.norm(points[(i+1)%4]-points[i]) for i in range(4)))
+                if other not in counts and side >= 24:
+                    self.weapon_observations[role] = (value, clamp(side/75,.3,1.0))
         for marker_corners, marker_id in zip(corners, ids.flatten()):
             marker_id = int(marker_id)
             if counts[marker_id] != 1 or marker_id not in (self.yoke_id, self.throttle_id):
@@ -401,6 +417,7 @@ async def run(args):
         source = CameraSource(args.camera, args.width, args.height, args.fps)
 
     controller = ControlFilter(calibration, args.smoothing, args.deadzone)
+    weapon_switches = WeaponSwitches()
     clients = set()
 
     async def handler(connection):
@@ -470,6 +487,9 @@ async def run(args):
                     wizard.observe(yoke, throttle)
                     yoke = throttle = None
                 packet = controller.step(time.monotonic(), int(time.time() * 1000), yoke, throttle)
+                weapons = weapon_switches.step(getattr(detector,"weapon_observations",{}) if frame is not None and not wizard else {}, time.monotonic())
+                if weapon_switches.configured and not wizard:
+                    packet['weapons'] = weapons
                 serialized = json.dumps(packet, allow_nan=False, separators=(",", ":"))
                 for queue in tuple(clients):
                     if queue.full():

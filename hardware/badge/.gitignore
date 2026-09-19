@@ -1,0 +1,9 @@
+.venv/
+.tools/
+.private/
+*.log
+firmware/.pio/
+*.bin
+*.elf
+*.map
+__pycache__/

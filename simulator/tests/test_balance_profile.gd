@@ -17,23 +17,23 @@ func run():
 	app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
 	var target: Dictionary = target_at(400)
-	check(target.health==100,"Reference-normalized target health is 100")
+	check(target.health==900,"Reactive normal target starts with 900 HP")
 	var gun_ttk := 0.0
-	for i in range(240):
+	for i in range(600):
 		app.combat.tick(1.0/120); app.combat.fire_gun()
 		gun_ttk += 1.0/120
 		if app.combat.kills>0: break
-	check(app.combat.kills==1 and app.combat.rounds_hit==20,"Five four-round Gatling packets clear a fresh target")
-	check(gun_ttk>.35 and gun_ttk<.8,"At 400 metres gun travel plus tracking yields a short readable burst")
+	check(app.combat.kills==1 and app.combat.rounds_hit>=40,"Sustained primary clears a durable target after visible hits")
+	check(gun_ttk>1 and gun_ttk<5,"At 400 metres gun travel plus tracking yields a sustained readable burst")
 	target = target_at(600)
 	for i in range(18): app.combat.tick(1.0/120)
 	app.combat.fire_missile()
 	var missile_ttk := 0.0
 	for i in range(480):
-		app.combat.tick(1.0/120); missile_ttk += 1.0/120
+		app.combat.tick(1.0/120); app.combat.fire_missile(); missile_ttk += 1.0/120
 		if app.combat.kills>0: break
-	check(app.combat.kills==1 and app.combat.missiles_fired==1,"One heavy guided missile clears a fresh target")
-	check(missile_ttk>.7 and missile_ttk<2.5,"Missile launch, ignition, guidance and hit remain visible and responsive")
+	check(app.combat.kills==1 and app.combat.missiles_fired>=8,"Repeated four-missile salvos clear a fresh durable target")
+	check(missile_ttk>1 and missile_ttk<4,"Missile launch, ignition, guidance and hit remain visible and responsive")
 	app.start_flight("combat"); app.combat.spawn_clock = 999
 	app.combat.spawn_shot(Vector3(0,500,-3500),Vector3(0,0,-185),"missile",-1,100)
 	var shot: Dictionary = app.combat.shots[0]

@@ -49,3 +49,9 @@ With the actual projectile simulation, a stationary 100-HP target at 400 m clear
 The same full-throttle two-second test at 60 Hz and 120 Hz reaches **348.67 m/s** from 185 m/s. Narrow-aim tests acquire a target at 4° within 0.2 s, retain a brief 6.8° drift, and release a 12° target. Pacing peaks at four contacts with a minimum measured arrival gap of 1.817 s.
 
 `test_balance_profile.gd` measures damage-to-kill, actual time-to-hit, motor acceleration and timestep consistency. `test_combat_feel.gd` checks forgiving acquisition, exact crosshair convergence, no off-screen targeting, persistent trails, encounter pacing and sustained airbraking. Both run in the standard verification suite. Human preference and long-term replayability cannot be established by these tests alone.
+
+## 0.11.0 spectral demo override
+
+The latest user specification supersedes the earlier six-degree/single-missile/100-HP profile. Normal contacts now have 900 HP, elites 2,400, boss 16,000. Primary combines four-round Gatling packets (20 damage every 0.05 seconds) and a 220 DPS beam. A salvo launches four 130-damage missiles at 85 ms spacing and repeats every 1.25 seconds. Ammunition remains unlimited. Acquisition adapts between 8–12 degrees (+2 during the opening), with a larger retained envelope and extra roll margin. The new TargetIntent system owns these dynamic angles; legacy constants remain for historical fixtures only.
+
+Both physical switches latch. Camera loss releases their firing state. Keyboard Space/T mirror switch behavior. This profile is our own adaptation; these values are not claimed as Sky Rogue retail values.

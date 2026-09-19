@@ -1,0 +1,4 @@
+esptool==4.12.0
+pyserial==3.5
+capstone==5.0.9
+littlefs-python==0.15.0

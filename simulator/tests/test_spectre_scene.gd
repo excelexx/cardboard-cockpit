@@ -36,10 +36,10 @@ func run_tests() -> void:
 	var enemy: Dictionary = app.combat.enemies[0]
 	enemy.position = app.flight.position+app.flight.forward()*1000
 	app.combat.target_id = enemy.id; app.combat.lock_progress = 1
-	check(app.combat.fire_missile() and app.combat.launch_queue.size()==1,"Missile begins a controlled bay-launch sequence")
+	check(app.combat.fire_missile() and app.combat.launch_queue.size()==4,"Quad salvo begins a staggered hardpoint sequence")
 	check(app.aircraft_visuals.bay_doors.size()==4,"Four authored weapon-bay doors are animated")
-	app.combat.tick(.25)
-	check(is_instance_valid(app.combat.last_missile) and app.combat.missiles==-1 and app.combat.missiles_fired==1,"Missile leaves the bay after its opening interval")
+	app.combat.tick(.35)
+	check(is_instance_valid(app.combat.last_missile) and app.combat.missiles==-1 and app.combat.missiles_fired==4,"Four missiles leave separate hardpoints after their stagger")
 	var hold := InputEventKey.new(); hold.physical_keycode = KEY_X; hold.keycode = KEY_X; hold.pressed = true
 	Input.parse_input_event(hold); Input.flush_buffered_events(); app.camera_rig.update(.016)
 	check(app.camera_rig.missile_link and app.camera_rig.pip_camera.transform.is_finite(),"Held missile view preserves a valid separate camera")
@@ -49,7 +49,7 @@ func run_tests() -> void:
 	check(not app.camera_rig.missile_link,"Toggling X off stops missile viewport rendering")
 	var angle := deg_to_rad(4)
 	enemy.position = app.flight.position+Vector3(sin(angle),0,-cos(angle))*1000
-	app.combat.target_id = enemy.id
+	app.combat.target_id = enemy.id;app.combat.intent.confidence=1;enemy.velocity=app.flight.velocity
 	for i in range(24): app.combat.update_aim(1.0/120)
 	check(app.combat.assisted_direction().angle_to(app.flight.forward())>deg_to_rad(3),"Narrow assistance corrects a near-centre shot")
 	check(app.combat.assisted_direction().angle_to((enemy.position-app.flight.position).normalized())<deg_to_rad(2),"Assisted shots converge on the visible goose")

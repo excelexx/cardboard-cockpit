@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "board": "Hack the North 2026 Hacker Badge",
+  "scope": "standalone research; no game integration",
+  "observed_at": "2026-09-19",
+  "soc": {
+    "model": "ESP32-C3",
+    "package": "QFN32",
+    "revision": "0.4",
+    "crystal_mhz": 40,
+    "observed_cpu_mhz": 160,
+    "flash_bytes": 4194304,
+    "jtag_verified": true,
+    "secure_boot_enabled": false,
+    "flash_encryption_enabled": false
+  },
+  "usb": {
+    "vid": "0x303a",
+    "pid": "0x1001",
+    "product": "USB JTAG/serial debug unit",
+    "speed_mbps": 12,
+    "interfaces": {
+      "0": "CDC control",
+      "1": "CDC data",
+      "2": "vendor JTAG"
+    },
+    "d_minus_gpio": 18,
+    "d_plus_gpio": 19
+  },
+  "display": {
+    "driver_family": "ST7789",
+    "width": 320,
+    "height": 240,
+    "pixel_format": "RGB565, high byte first",
+    "sclk": 1,
+    "mosi": 10,
+    "miso": null,
+    "cs": 2,
+    "dc": 0,
+    "reset": 4,
+    "madctl": "0x60",
+    "inversion": true,
+    "status": "retained code plus human-visible pattern"
+  },
+  "leds": {
+    "gpio": 3,
+    "count": 6,
+    "implemented_wire_order": "GRB",
+    "green_channel_confirmed": true,
+    "red_blue_order_individually_confirmed": false,
+    "positions_source": "maker SDK; not individually calibrated",
+    "status": "human-confirmed green output"
+  },
+  "buttons": {
+    "parallel_load_gpio": 20,
+    "clock_gpio": 21,
+    "serial_data_gpio": 7,
+    "start_gpio": 9,
+    "active_low": true,
+    "resting_shift_byte": "0xfe",
+    "physical_mask": "0x17f",
+    "unused_code": 7,
+    "codes": {
+      "A": 0,
+      "B": 1,
+      "HOME": 2,
+      "DOWN": 3,
+      "LEFT": 4,
+      "RIGHT": 5,
+      "UP": 6,
+      "START": 8
+    },
+    "status": "all eight physical labels calibrated"
+  },
+  "i2c": {
+    "sda": 5,
+    "scl": 6,
+    "observed_addresses": [
+      "0x19",
+      "0x26"
+    ],
+    "stock_nfc_hz": 100000
+  },
+  "accelerometer": {
+    "family": "SC7A20-compatible",
+    "address": "0x19",
+    "who_am_i_register": "0x0f",
+    "who_am_i_value": "0x11",
+    "ctrl1": "0x57",
+    "ctrl4": "0x88",
+    "output_burst_register": "0xa8",
+    "sample_bytes": 6,
+    "format": "three little-endian signed int16, arithmetic right shift 4 gives mg at tested range",
+    "status": "identity and gravity vector measured"
+  },
+  "nfc": {
+    "family": "RC522-compatible",
+    "exact_silicon": "unknown",
+    "address": "0x26",
+    "version_register": "0x37",
+    "version_value": "0x82",
+    "register_write_read_verified": true,
+    "fifo_write_read_verified": true,
+    "crc_engine_verified": false,
+    "tag_read_verified": false,
+    "tag_write_verified": false,
+    "wake_powerdown_bit_cleared": false
+  },
+  "reserved_gpio": [
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "unassigned_gpio": [
+    8
+  ],
+  "backup_sha256": "40c7491de4f3dbb34f7befce59eaca4db914848c5968c8395b486f83fb21c103",
+  "whole_flash_comparison": "matched after investigation",
+  "optional_firmware": "build-only; not flashed",
+  "unknowns": [
+    "exact LED part",
+    "red/blue wire order and individual LED positions",
+    "exact NFC silicon and CRC/RF behavior",
+    "power/current/battery measurements",
+    "regulator/backlight/test-pad wiring",
+    "Wi-Fi/BLE physical acceptance",
+    "full original stock image"
+  ],
+  "filesystem": {
+    "format": "LittleFS 2.1",
+    "offset": "0x2b0000",
+    "size": "0x140000",
+    "block_size": 4096,
+    "block_count": 320,
+    "file_count": 12,
+    "total_file_bytes": 9395,
+    "installed_lua_sources": 0,
+    "status": "mounted offline with writes disabled; input unchanged"
+  }
+}

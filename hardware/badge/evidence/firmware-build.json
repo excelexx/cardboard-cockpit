@@ -1,0 +1,45 @@
+{
+  "built_at_utc": "2026-09-19T07:09:13.144467+00:00",
+  "build_status": "passed",
+  "hardware_flash_status": "not_flashed",
+  "platform": "espressif32@6.12.0",
+  "framework": "Arduino ESP32 2.0.17 / ESP-IDF 4.4.7",
+  "used_static_ram_bytes": 61108,
+  "used_program_bytes": 1431950,
+  "app_partition_bytes": 2621440,
+  "artifacts": {
+    "firmware.bin": {
+      "bytes": 1467392,
+      "sha256": "f51f7acfbea9a8e5b968b5890be885a8659a4f719cbc42722af61d83d59d5660"
+    },
+    "bootloader.bin": {
+      "bytes": 13248,
+      "sha256": "30d47ab1f344cfa69f6b2f718ffa72fc7baea6db047eaabefea162db29e6821c"
+    },
+    "partitions.bin": {
+      "bytes": 3072,
+      "sha256": "da70c64bd8e61ac556c0ace284e6dd586c849733714c0df868177385744abdbd"
+    },
+    "firmware.elf": {
+      "bytes": 22475400,
+      "sha256": "56465b68a33a54586f9f24a2aaac001b97efea296d8f51f55cd2ff5cec2e40c9"
+    }
+  },
+  "dependency_versions": {
+    "ArduinoJson": "6.21.5",
+    "Adafruit NeoPixel": "1.12.3",
+    "Adafruit ST7735/ST7789": "1.10.4",
+    "Adafruit GFX": "1.11.11",
+    "Adafruit BusIO": "1.17.4",
+    "PlatformIO": "6.1.19",
+    "framework-arduinoespressif32": "3.20017.241212",
+    "toolchain-riscv32-esp": "8.4.0+2021r2-patch5",
+    "tool-esptoolpy": "2.40900.250804"
+  },
+  "filesystem_partition": {
+    "label": "littlefs",
+    "offset": "0x2b0000",
+    "size": "0x140000",
+    "source": "offline mounted original volume"
+  }
+}
