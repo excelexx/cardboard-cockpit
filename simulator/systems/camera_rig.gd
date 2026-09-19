@@ -13,6 +13,7 @@ var last_speed := 0.0
 var acceleration := 0.0
 var initialized := false
 var missile_link := false
+var missile_requested := false
 var pip_texture: Texture2D
 func _ready() -> void:
 	camera = Camera3D.new()
@@ -35,7 +36,7 @@ func _ready() -> void:
 func impulse(amount: float) -> void: trauma = minf(1,trauma+amount)
 func reset() -> void:
 	initialized = false; trauma = 0; last_speed = app.flight.speed; acceleration = 0
-	missile_link = false
+	missile_link = false; missile_requested = false
 	if is_instance_valid(pip_viewport): pip_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 func update(dt: float) -> void:
 	if app.mode=="paused": return
@@ -51,6 +52,7 @@ func update(dt: float) -> void:
 	var ground: float = app.world.ground_height(f.position.x,f.position.z)
 	var proximity: float = (1-clampf((f.position.y-ground)/150,0,1))*speed_fraction
 	var shake: float = trauma*trauma*0.006+proximity*0.0012
+	shake += f.wind.length()*.00009*clampf(f.speed/220,0,1)
 	var angular := Vector3(sin(clock*37)*shake,sin(clock*43+0.4)*shake*0.55,sin(clock*31)*shake*0.45)
 	if app.pilot_ejected and is_instance_valid(app.fighter_fx.parachute):
 		app.cockpit_frame.set_presentation_visible(false)
@@ -81,7 +83,7 @@ func update(dt: float) -> void:
 		camera.rotate_object_local(Vector3.FORWARD,bank)
 		camera.basis *= Basis.from_euler(angular)
 	app.cockpit_frame.set_presentation_visible(app.cockpit)
-	missile_link = Input.is_physical_key_pressed(KEY_X) and is_instance_valid(app.combat.last_missile) and app.mode=="flight"
+	missile_link = missile_requested and is_instance_valid(app.combat.last_missile) and app.mode=="flight"
 	pip_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if missile_link else SubViewport.UPDATE_DISABLED
 	if missile_link:
 		var missile: Node3D = app.combat.last_missile

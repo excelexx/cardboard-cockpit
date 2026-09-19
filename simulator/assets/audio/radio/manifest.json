@@ -127,27 +127,26 @@
     },
     "landed": {
       "speaker": "CONTROL",
-      "text": "Congratulations.",
+      "text": "Mission completed.",
       "file": "landed.wav",
-      "duration": 1.879092970521542,
+      "duration": 1.6075283446712019,
       "priority": 2,
       "cooldown": 15,
-      "sha256": "4b4371339384ab48a44b94ce24fe698410cc198b2f46d0405b2d270bd01ecbcd",
+      "sha256": "46174e97f1843ce2e040d5604d0681d16f68cfc3e843044fd3c2f51cb28240eb",
       "source_files": [
-        "Male/congratulations.ogg"
+        "Male/mission_completed.ogg"
       ]
     },
     "success": {
       "speaker": "CONTROL",
-      "text": "Mission completed. Congratulations.",
+      "text": "Mission completed.",
       "file": "success.wav",
-      "duration": 3.2616780045351472,
+      "duration": 1.6075283446712019,
       "priority": 3,
       "cooldown": 15,
-      "sha256": "19f1933d8532c35cadc98b2b55da1cee096c1c261d8a3a7fb82136901054a6e4",
+      "sha256": "622693aa0814afd34cfe1dada041b587b6e5d36545217d0e4cbd2758492eab80",
       "source_files": [
-        "Male/mission_completed.ogg",
-        "Male/congratulations.ogg"
+        "Male/mission_completed.ogg"
       ]
     },
     "failure": {

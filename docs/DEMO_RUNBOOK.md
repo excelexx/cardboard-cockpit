@@ -1,13 +1,15 @@
-# SPECTRE demo runbook
+# Relaxed arcade demo — version 0.8
 
-1. Open the native app. On the flight deck, choose **Guided flight** for a hands-free combat demonstration, or **Launch sortie** for manual control.
-2. Show the single SPECTRE airframe and permanent cannon/missile loadout. There are no upgrade screens.
-3. For manual flight, make small arrow-key corrections. W/S controls power; Shift engages afterburner. Follow the lead diamond for cannon shots, and wait for the green lock before pressing T.
-4. Press V for cockpit/chase. Hold X after launching a missile to show its datalink view. Watch the primary flight view throughout.
-5. Red directional warnings indicate incoming missiles. Z deploys a limited countermeasure burst; maneuver and use acceleration as well.
-6. Escape pauses. The pause panel contains sound and quality settings. Returning to the flight deck allows landing practice or cardboard setup.
-7. For landing practice, H can demonstrate approach and rollout. Manual landing requires gentle descent, wings near level and Space to brake after touchdown.
+**Goal:** take off, enjoy clearing large flocks with unlimited weapons, then land. The geese never attack. No reload, heat, steady-lock or aircraft-upgrade systems interrupt play.
 
-Keyboard controls immediately take over from the guided pilot. A guided sortie can take damage and lose; it does not use an invulnerability mode. R restarts the current mode. If performance is poor, F10 selects Balanced fidelity.
+- **Play / Enter:** assisted flight with player-controlled shooting. Hold Space + T, or both mouse buttons, to fire Gatling and missiles together. Aim generally toward a goose; missiles select targets immediately and Gatling assistance is generous.
+- **Watch demo:** the same complete flight with automatic shooting, useful for an uninterrupted judge demonstration. It takes approximately 2 minutes 22 seconds and ends stopped on North Field's runway.
+- **Arrows:** optional manual steering. Hold for a smooth bank/pitch; release to level. H resumes route assistance.
+- **X / V:** missile inset / cockpit or chase view. Q performs a quick roll when altitude permits.
+- **Escape / R / F1:** pause / restart the current style of demo / controls. F10 changes quality.
 
-For cardboard demonstration, start `tools/tracker.sh --camera 0 --calibrate` and complete the seven poses before enabling tracking in the C panel. Synthetic mode is available for connection demonstrations. Do not describe synthetic validation as a successful physical-prop test.
+Successful clears build a five-second streak, rising point rewards and confirmation tones. Play runs can set a local personal best. Watch demo does not overwrite the player's record.
+
+The game launches in a larger window with automatic internal render scaling. The UI remains at window resolution. If another app gains focus, resume with Escape before continuing.
+
+Cardboard controls remain optional. Use the setup guide, complete calibration in the tracker preview and enable it with C. Physical printed-prop testing is separate from synthetic software verification.
