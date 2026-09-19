@@ -15,7 +15,7 @@ func run() -> void:
 	app.on_action("guided")
 	app.capture_file="city-review"
 	var city: Node3D=app.world.metropolis
-	check(app.world.village_home_count==60,"Five countryside settlements contain sixty assembled homes")
+	check(app.world.village_home_count==0 and app.world.urban_expansion!=null,"City districts replace legacy countryside clearings")
 	if city.photo_tiles>0:
 		check(city.photo_tiles==128,"Both photograph-derived districts are loaded completely")
 		check(city.photo_tiles<=256,"Photogrammetry remains bounded")

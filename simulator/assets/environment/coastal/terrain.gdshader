@@ -49,6 +49,21 @@ void fragment() {
 	float snow = smoothstep(snowline - 150.0, snowline + 120.0, world_position.y) * (1.0 - smoothstep(0.30, 0.62, slope));
 	vec3 snow_color = vec3(0.78, 0.83, 0.84) * (0.88 + rock_macro.r * 0.3);
 	ALBEDO = mix(terrain, snow_color, snow);
+	// Streets and sidewalks now exist as fitted geometry; no infinite painted grid.
+	float metro=(1.0-smoothstep(4800.0,5200.0,abs(world_position.x-1300.0)))*(1.0-smoothstep(10100.0,10500.0,abs(world_position.z+7500.0)));
+	metro*=smoothstep(3.0,9.0,world_position.y)*(1.0-smoothstep(30.0,70.0,world_position.y));
+	vec3 urban_soil=mix(vec3(.075,.095,.054),vec3(.15,.16,.10),noise2(world_position.xz/90.0));
+	urban_soil*=.8+grass_detail*.65;
+	ALBEDO=mix(ALBEDO,urban_soil,metro);
+	// Fine, varied airfield turf rather than a stretched green smear.
+	vec3 turf=texture(grass_texture,world_position.xz/7.0).rgb;
+	vec3 turf_far=texture(grass_texture,world_position.xz/37.0+vec2(0.31,0.72)).rgb;
+	// At flying height small repeating textures average into a single flat color.
+	// Preserve broad moisture patches and subtle maintained mowing lanes instead.
+	float turf_moisture=noise2(world_position.xz/210.0)*0.65+noise2(world_position.xz/65.0)*0.35;
+	float mowing=sin(world_position.x*0.19)*0.035;
+	vec3 turf_tint=mix(vec3(.30,.39,.25),vec3(.49,.51,.32),turf_moisture)+vec3(mowing);
+	ALBEDO=mix(ALBEDO,mix(turf,turf_far,0.38)*turf_tint,airfield*0.85);
 	vec3 micro=texture(rock_normal,world_position.xz/90.0).rgb*2.0-1.0;
 	vec3 detailed_normal=normalize(world_normal+vec3(micro.x,0.0,micro.y)*rocky*0.16);
 	NORMAL=normalize((VIEW_MATRIX*vec4(detailed_normal,0.0)).xyz);
