@@ -3,6 +3,11 @@ var failures: Array[String] = []
 func _initialize() -> void: call_deferred("run")
 func run() -> void:
 	var source := "res://assets/san_francisco/"
+	var vegetation: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(source+"trees.json"))
+	var points := FileAccess.get_file_as_bytes(source+"tree_positions.f32").to_float32_array()
+	if points.size()!=int(vegetation.count)*3: failures.append("Tree coordinate stream length does not match the index")
+	for chunk: Dictionary in vegetation.chunks:
+		if int(chunk.offset)+int(chunk.count)*3>points.size(): failures.append("Tree chunk exceeds the coordinate stream")
 	var photos: Array = JSON.parse_string(FileAccess.get_file_as_string(source+"aerial/manifest.json"))
 	for photo: Dictionary in photos:
 		var path := source+"aerial/"+str(photo.tile)+".jpg"
