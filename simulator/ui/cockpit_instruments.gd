@@ -87,8 +87,8 @@ func _draw() -> void:
 		_panel_transform(Vector2(1138,12), 0.60)
 		_engines()
 		draw_set_transform(Vector2.ZERO)
-		_text("TACTICAL FLIGHT SYSTEM  /  TRAINING", Vector2(40,620), 21, MUTED)
-		_text("F-35   •   SYSTEMS NORMAL", Vector2(1140,620), 21, GREEN)
+		_text("TACTICAL FLIGHT SYSTEM  /  X–26", Vector2(40,620), 21, MUTED)
+		_text("X–26   •   SYSTEMS NORMAL", Vector2(1140,620), 21, GREEN)
 	else:
 		_panel_transform(Vector2.ZERO, size.x / 768.0)
 		match display_mode:

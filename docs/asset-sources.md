@@ -1,3 +1,5 @@
+> Historical aircraft import record. Version 0.6 uses only the F-35B-derived SPECTRE; the other scenes are excluded from the executable. Current modifications are documented in [SPECTRE asset credits](demo-assets.md).
+
 # Aircraft assets used in the playable client
 
 The first playable client uses actual FlightGear exterior meshes and original textures for all five aircraft. The earlier Sketchfab shortlist was not used because its downloads require authentication. No downloaded model here is a procedural placeholder.
