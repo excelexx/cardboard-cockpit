@@ -1,8 +1,10 @@
 # Goose Protocol — SPECTRE X-26
 
-Version **0.11.1**: one San Francisco map, one fighter, two latched weapon switches, and a giant goose boss. A complete demo lasts **at most 150 seconds**. The game has unlimited ammunition and forgiving flight assistance.
+Version **0.12.0**: one San Francisco map, one fighter, two latched weapon switches, and a giant goose boss. A complete demo lasts **at most 150 seconds**. The game has unlimited ammunition and forgiving flight assistance.
 
 Open **Launch Cardboard Cockpit.command** or **build/Cardboard Cockpit.app**. **Play / Enter** guides takeoff and the SF route while you shoot. Tap **Space** to switch the minigun and continuous energy cannon on; tap **T** to switch repeated four-missile salvos on. Tap either again to stop. **Watch demo** flies and shoots automatically. Keyboard steering takes over from route assistance; **H** rejoins it. **R** immediately replays.
+
+**Play teaches you during the mission:** spoken tips guide the first three geese, then the instructor hands the rest to you. Flight never pauses for lessons. Crashes recover to stable flight; landing mishaps retry final approach. [Coaching and voice details](docs/TUTORIAL.md).
 
 ## Controls
 
