@@ -18,6 +18,9 @@ fi
 "$engine" --headless --path simulator --script res://tests/test_camera.gd
 "$engine" --headless --path simulator --fixed-fps 60 -- --kind=campaign --autotest
 "$engine" --headless --path simulator --script res://tests/test_landing.gd
+"$engine" --headless --path simulator --script res://tests/test_landing_continuity.gd
+"$engine" --headless --path simulator --script res://tests/test_weapon_control.gd
+"$engine" --headless --path simulator --script res://tests/test_radio.gd
 "$engine" --headless --path simulator --script res://tests/test_weather.gd
 "$engine" --headless --path simulator --script res://tests/test_aircraft_visuals.gd
 for aircraft in 0 1 2 3 4 5; do

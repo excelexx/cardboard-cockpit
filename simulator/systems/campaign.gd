@@ -16,6 +16,16 @@ var transition_time := 0.0
 var stage_clear_clock := 0.0
 var total_shots := 0
 var unlimited := false
+var beam_active := false
+var beam_overheated := false
+var course_recovery := false
+var course_target := Vector3.ZERO
+var beam_requested_at := -100.0
+var beam_nodes: Array[MeshInstance3D] = []
+var plasma_emitters: Array[Node3D] = []
+var beam_contacts: Array[Sprite3D] = []
+var beam_energy_fraction := 0.0
+var beam_spark_clock := 0.0
 func reset(enabled: bool) -> void:
 	super.reset(enabled)
 	automatic_waves = false
@@ -23,6 +33,7 @@ func reset(enabled: bool) -> void:
 	developer = app.developer_mode
 	wave_counts = [3,5,7,9,12,16]
 	stage_clock = 0
+	course_recovery = false
 	transition_time = 0
 	total_shots = 0
 	if enabled:
@@ -63,8 +74,9 @@ func plane_profile(index: int) -> Dictionary:
 		profile.roll_rate = 1.2
 	return profile
 func clear_encounter() -> void:
+	clear_beams()
 	for enemy: Dictionary in enemies: enemy.node.queue_free()
-	for shot: Dictionary in shots: shot.node.queue_free()
+	for shot: Dictionary in shots: free_shot(shot)
 	for effect: Dictionary in bursts: effect.node.queue_free()
 	enemies.clear()
 	shots.clear()
@@ -83,7 +95,14 @@ func spawn_wave() -> void:
 	hull = minf(100,hull+30)
 	base_health = minf(100,base_health+25)
 	app.apply_campaign_aircraft(plane_profile(wave-1))
+	if wave==6:
+		for side in [-1,1]:
+			var emitter: Node3D = WeaponArt.plasma_emitter()
+			app.aircraft.add_child(emitter)
+			emitter.position = Vector3(side*5.0,2.2,-10.0)
+			plasma_emitters.append(emitter)
 	spawn_flock(int(stage().count))
+	app.audio.radio.say("intro" if wave==1 else "stage_%d" % wave)
 	announce("LEVEL %d  /  %s" % [wave,stage().weapon])
 	app.audio.ping()
 func goose() -> Node3D:
@@ -120,7 +139,8 @@ func tick(dt: float) -> void:
 		hull = maxf(hull,35)
 		base_health = maxf(base_health,35)
 	for enemy: Dictionary in enemies:
-		enemy.position += forward()*app.flight.speed*cos(app.flight.pitch)*dt
+		enemy.inherited_velocity = forward()*app.flight.speed*cos(app.flight.pitch)
+		enemy.position += enemy.inherited_velocity*dt
 	super.tick(dt)
 	if not active: return
 	stage_clock += dt
@@ -131,6 +151,7 @@ func tick(dt: float) -> void:
 		enemy.node.get_node("WingR").rotation.z = -flap
 	if assist and lock_progress>=1:
 		fire_weapon()
+	tick_beams(dt)
 	if showcase:
 		if stage_clock>=30:
 			if wave>=STAGES.size():
@@ -150,6 +171,12 @@ func fire_gun() -> bool:
 func fire_missile() -> bool:
 	return fire_weapon()
 func fire_weapon() -> bool:
+	if wave==6:
+		if beam_overheated and gun_heat>0.35: return false
+		beam_overheated = false
+		if not active or ammo<=0 or gun_heat>0.95: return false
+		beam_requested_at = elapsed
+		return true
 	if not active or gun_cooldown>0 or ammo<=0 or gun_heat>0.95: return false
 	var spec: Dictionary = stage()
 	var enemy: Dictionary = target()
@@ -158,20 +185,15 @@ func fire_weapon() -> bool:
 	gun_heat = minf(1,gun_heat+(0.036 if wave==1 else 0.02))
 	ammo -= 1
 	total_shots += 1
-	var direction: Vector3 = forward()
-	if not enemy.is_empty(): direction = (enemy.position-app.flight.position).normalized()
-	var count: int = 3 if wave==4 else 2 if wave==6 else 1
+	var direction: Vector3 = assisted_direction()
+	var count: int = 3 if wave==4 else 1
 	for index in range(count):
-		var kind: String = "missile" if wave in [2,4] else "cannon"
+		var kind: String = "missile" if wave in [2,4] else "plasma" if wave==5 else "cannon"
 		var target_value: int = target_id
 		if wave==4 and not enemies.is_empty(): target_value = enemies[(index)%enemies.size()].id
-		spawn_shot(app.flight.position+direction*18+Vector3((index-(count-1)*0.5)*3,0,0),direction*(400 if kind=="missile" else 1150),kind,target_value,float(spec.damage))
-		if wave>=5:
-			var node: Node3D = shots.back().node
-			node.scale = Vector3(4,4,1.6)
-			for child: Node in node.get_children():
-				if child is MeshInstance3D:
-					child.material_override = material(spec.color,5)
+		var muzzle: Vector3 = app.flight.position+direction*(float(app.profile().length)*0.48+2)+Vector3((index-(count-1)*0.5)*3,1,0)
+		spawn_shot(muzzle,direction*(400 if kind=="missile" else 1150),kind,target_value,float(spec.damage),"battery" if wave==4 else "heavy" if wave==3 else "gatling")
+		burst(muzzle,spec.color,1.0 if wave==1 else 1.8)
 	app.audio.play_effect("missile" if wave in [2,4] else "plasma" if wave>=5 else "cannon",-18)
 	return true
 func cardboard_controls() -> void:
@@ -189,4 +211,110 @@ func skip_to(index: int) -> bool:
 	spawn_wave()
 	return true
 func complete(success: bool, reason: String) -> void:
+	clear_beams()
+	app.audio.radio.say("success" if success else "failure")
 	super.complete(success,reason)
+
+func pilot_controls() -> Vector3:
+	var input: Vector3 = super.pilot_controls()
+	var at: Vector3 = app.flight.position
+	if not course_recovery and (at.z < -15500 or at.z > 3500 or absf(at.x)>2300):
+		course_recovery = true
+		course_target = Vector3(0,at.y,-9500 if at.z < -15500 else -4000)
+	if course_recovery:
+		var offset: Vector3 = course_target-at
+		if Vector2(offset.x,offset.z).length()<1000:
+			course_recovery = false
+		else:
+			var error: float = wrapf(atan2(offset.x,-offset.z)-app.flight.heading,-PI,PI)
+			input.x = clampf((clampf(error*2,-0.9,0.9)-app.flight.roll)*5,-1,1)
+			input.z = clampf(error*2,-1,1)
+			app.flight.throttle = clampf(0.12+(110-app.flight.speed)*0.05,0,1)
+	# Aircraft no longer jump back to the start at upgrades. The guided pilot
+	# must anticipate rising terrain along its now-continuous flight path.
+	var terrain_ahead: float = app.world.ground_height(app.flight.position.x,app.flight.position.z)
+	for angle in [-0.45,0.0,0.45]:
+		var heading: float = app.flight.heading+angle
+		for distance in [900.0,1800.0,3000.0]:
+			var probe: Vector3 = app.flight.position+Vector3(sin(heading),0,-cos(heading))*distance
+			terrain_ahead = maxf(terrain_ahead,app.world.ground_height(probe.x,probe.z))
+	var clearance: float = terrain_ahead+250-app.flight.position.y
+	if clearance>0:
+		var desired_pitch: float = clampf(atan2(clearance,1800.0),0.05,0.30)
+		input.y = maxf(input.y,clampf((desired_pitch-app.flight.pitch)*6,-1,1))
+		app.flight.throttle = maxf(app.flight.throttle,0.55)
+	return input
+
+func clear_beams() -> void:
+	for node: MeshInstance3D in beam_nodes:
+		if is_instance_valid(node): node.queue_free()
+	beam_nodes.clear()
+	for emitter: Node3D in plasma_emitters:
+		if is_instance_valid(emitter): emitter.queue_free()
+	plasma_emitters.clear()
+	for contact: Sprite3D in beam_contacts:
+		if is_instance_valid(contact): contact.queue_free()
+	beam_contacts.clear()
+	beam_active = false
+	beam_overheated = false
+	beam_energy_fraction = 0
+	beam_requested_at = -100
+
+func tick_beams(dt: float) -> void:
+	beam_active = wave==6 and active and elapsed-beam_requested_at<0.09 and ammo>0 and gun_heat<0.98
+	for emitter: Node3D in plasma_emitters:
+		if not is_instance_valid(emitter): continue
+		var rings: Array = emitter.get_meta("rings",[])
+		for i in range(rings.size()): rings[i].emission_energy_multiplier = 4.0+sin(elapsed*9-i)*0.6 if beam_active else 0.6
+		emitter.get_node("Corona").modulate = Color(0.1,0.8,1,0.95 if beam_active else 0.25)
+		emitter.get_node("PlasmaLight").light_energy = 3.0 if beam_active else 0.15
+	if not beam_active:
+		for contact: Sprite3D in beam_contacts: contact.visible = false
+		for node: MeshInstance3D in beam_nodes:
+			if is_instance_valid(node): node.visible = false
+		return
+	if beam_nodes.is_empty():
+		for barrel in range(2):
+			beam_nodes.append(WeaponArt.beam(self,Color(0.86,1,1),0.30,1))
+			beam_nodes.append(WeaponArt.energy_sheath(self,1.25,float(barrel)*2.0))
+			beam_nodes.append(WeaponArt.energy_sheath(self,2.0,float(barrel)*2.0+1.0))
+			var contact := Sprite3D.new()
+			contact.texture = load("res://assets/vfx/spark.png")
+			contact.pixel_size = 0.04
+			contact.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			contact.modulate = Color(0.25,0.82,1,0.9)
+			add_child(contact)
+			beam_contacts.append(contact)
+	beam_energy_fraction += dt*18
+	while beam_energy_fraction>=1:
+		ammo -= 1
+		beam_energy_fraction -= 1
+	gun_heat = minf(1,gun_heat+dt*0.42)
+	if gun_heat>0.95:
+		beam_overheated = true
+		beam_requested_at = -100
+	beam_spark_clock -= dt
+	var direction: Vector3 = assisted_direction()
+	var basis: Basis = Basis.from_euler(Vector3(app.flight.pitch,-app.flight.heading,-app.flight.roll))
+	for barrel in range(2):
+		var start: Vector3 = app.flight.position+basis*Vector3(-5 if barrel==0 else 5,3.1,-13.7)
+		var length := 2200.0
+		var hit: Dictionary = {}
+		for enemy: Dictionary in enemies:
+			var along: float = (enemy.position-start).dot(direction)
+			if along>0 and along<length and Vector3(enemy.position).distance_to(start+direction*along)<14:
+				length = along
+				hit = enemy
+		var end: Vector3 = start+direction*length
+		if not hit.is_empty():
+			hit.health -= dt*180
+			if beam_spark_clock<=0:
+				burst(end,Color(0.45,0.9,1),4.0)
+		beam_contacts[barrel].visible = not hit.is_empty()
+		beam_contacts[barrel].position = end
+		beam_contacts[barrel].rotation.z = elapsed*0.9
+		for layer in range(3):
+			var node: MeshInstance3D = beam_nodes[barrel*3+layer]
+			node.visible = true
+			WeaponArt.align_beam(node,start,end)
+	if beam_spark_clock<=0: beam_spark_clock = 0.16

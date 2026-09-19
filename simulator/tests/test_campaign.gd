@@ -40,7 +40,7 @@ func run_tests() -> void:
 		planes.append(str(app.profile().id))
 		check(campaign.enemies.size()>last_count, "Each stage increases flock size")
 		last_count = campaign.enemies.size()
-		check(app.aircraft.get_child_count()==2 and app.flight.airborne, "Upgrade replaces aircraft without leaving duplicate models")
+		check(app.aircraft.get_child_count()==(4 if index==5 else 2) and app.flight.airborne, "Upgrade replaces aircraft without leaving duplicate models")
 	check(weapons.size()==6 and planes==["trainer","f35","b2","an225","vx9","falcon"], "Every stage has a distinct aircraft and weapon")
 	check(weapons[-1]=="TWIN PLASMA CANNONS", "Final loadout is plasma, with no reality-warping systems")
 	app.vision.enabled = true

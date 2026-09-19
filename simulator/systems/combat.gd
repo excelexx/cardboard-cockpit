@@ -1,5 +1,7 @@
 extends Node3D
 class_name CombatDirector
+const WeaponArt = preload("res://systems/weapon_visuals.gd")
+var flash_texture: Texture2D
 ## Fictional arcade interception. All tuning is game balance, not weapon performance.
 var wave_counts: Array[int] = [3, 4, 5]
 var automatic_waves := true
@@ -161,13 +163,16 @@ func tick(dt: float) -> void:
 			wave_delay = 4.0
 	var aim: Vector3 = forward()
 	var best := -1
-	var best_dot := 0.82
+	var current_alignment := -1.0
+	var best_dot: float = cos(deg_to_rad(12.0))
 	for enemy: Dictionary in enemies:
+		if enemy.health<=0: continue
 		enemy.age += dt
 		var toward: Vector3 = (app.flight.position-enemy.position).normalized()
 		var distance: float = app.flight.position.distance_to(enemy.position)
 		var sideways: Vector3 = toward.cross(Vector3.UP).normalized()
 		var velocity: Vector3 = toward*(80.0 if distance>700 else -25.0)+sideways*sin(enemy.age*0.35+enemy.phase)*28.0
+		enemy.velocity = velocity+enemy.get("inherited_velocity",Vector3.ZERO)
 		enemy.position += velocity*dt
 		enemy.position.y = maxf(enemy.position.y,250)
 		enemy.node.position = enemy.position
@@ -178,22 +183,28 @@ func tick(dt: float) -> void:
 			enemy.cooldown = 9.5-float(wave)
 			spawn_shot(enemy.position,toward*210.0,"hostile",-1,14.0)
 		var alignment: float = aim.dot((enemy.position-app.flight.position).normalized())
+		if enemy.id==target_id and distance<3500: current_alignment = alignment
 		if alignment>best_dot and distance<3500:
 			best_dot = alignment
 			best = enemy.id
 		if enemy.age>55.0:
 			enemy.age = 35.0
 			base_health = maxf(0,base_health-8)
+	# Retain a near-centre track rather than hopping between geese every frame.
+	if current_alignment>cos(deg_to_rad(10)) and acos(clampf(current_alignment,-1,1))-acos(clampf(best_dot,-1,1))<deg_to_rad(3):
+		best = target_id
+		best_dot = current_alignment
 	if best != target_id:
 		target_id = best
 		lock_progress = 0.0
-	if target_id>=0:
+	if target_id>=0 and best_dot>=cos(deg_to_rad(6.0)):
 		var was_locked: bool = lock_progress>=1
 		lock_progress = minf(1,lock_progress+dt/0.85)
 		if not was_locked and lock_progress>=1:
 			app.audio.ping()
+			app.audio.radio.say("target_locked")
 	else:
-		lock_progress = 0
+		lock_progress = move_toward(lock_progress,0,dt*3)
 	update_shots(dt)
 	update_bursts(dt)
 	if hull<=0 or base_health<=0:
@@ -205,10 +216,7 @@ func fire_gun() -> bool:
 	gun_cooldown = 0.09
 	gun_heat = minf(1,gun_heat+0.038)
 	ammo -= 1
-	var direction: Vector3 = forward()
-	var enemy: Dictionary = target()
-	if not enemy.is_empty() and direction.dot((enemy.position-app.flight.position).normalized())>0.94:
-		direction = (enemy.position-app.flight.position).normalized()
+	var direction: Vector3 = assisted_direction()
 	spawn_shot(app.flight.position+direction*14.0,direction*950.0,"cannon",-1,26)
 	app.audio.play_effect("cannon",-19,1.0+rng.randf_range(-0.12,0.12))
 	return true
@@ -240,28 +248,64 @@ func deploy_flares() -> bool:
 	announce("COUNTERMEASURES DEPLOYED")
 	return true
 
-func spawn_shot(at: Vector3, velocity: Vector3, kind: String, target_value: int, damage: float) -> void:
-	var node := Node3D.new()
+func assisted_direction() -> Vector3:
+	var direction: Vector3 = forward()
+	var enemy: Dictionary = target()
+	if enemy.is_empty(): return direction
+	var wanted: Vector3 = (enemy.position-app.flight.position).normalized()
+	var angle: float = direction.angle_to(wanted)
+	if angle>deg_to_rad(12) or angle<0.0001: return direction
+	# A small nudge, never target snapping. Ten degrees of poor aim still misses.
+	return direction.slerp(wanted,minf(0.12,deg_to_rad(2.0)/angle)).normalized()
+
+func spawn_shot(at: Vector3, velocity: Vector3, kind: String, target_value: int, damage: float, variant: String = "gatling") -> void:
+	var node: Node3D = WeaponArt.projectile(kind,variant)
 	add_child(node)
-	if kind=="missile":
-		var body := CapsuleMesh.new()
-		body.radius = 0.22
-		body.height = 3.2
-		mesh(node,body,Vector3.ZERO,Color(0.85,0.89,0.92)).rotation.x = PI/2
-		box(node,Vector3(1.0,0.08,0.55),Vector3(0,0,0.9),Color(0.62,0.67,0.7))
-		box(node,Vector3(0.08,1.0,0.55),Vector3(0,0,0.9),Color(0.62,0.67,0.7))
-		var flame := SphereMesh.new()
-		flame.radius = 0.35
-		flame.height = 0.7
-		mesh(node,flame,Vector3(0,0,1.65),Color(1,0.63,0.15),5)
-	else:
-		var tracer := CylinderMesh.new()
-		tracer.top_radius = 0.15
-		tracer.bottom_radius = 0.15
-		tracer.height = 9.0
-		mesh(node,tracer,Vector3.ZERO,Color(1,0.3,0.12) if kind=="hostile" else Color(1,0.82,0.35),4).rotation.x = PI/2
-	shots.append({"node":node,"position":at,"velocity":velocity,"kind":kind,"target":target_value,"damage":damage,"life":12.0 if kind!="cannon" else 3.5,"trail":0.0})
 	node.position = at
+	node.look_at(at+velocity,Vector3.UP)
+	var shot: Dictionary = {"node":node,"position":at,"velocity":velocity,"kind":kind,"target":target_value,"damage":damage,"life":12.0 if kind=="missile" or kind=="hostile" else 2.5,"trail_points":[at],"trail_node":null}
+	if kind=="missile":
+		var trail := MeshInstance3D.new()
+		trail.mesh = ImmediateMesh.new()
+		var smoke := StandardMaterial3D.new()
+		smoke.albedo_color = Color.WHITE
+		smoke.albedo_texture = load("res://assets/vfx/smoke.png")
+		smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		smoke.vertex_color_use_as_albedo = true
+		smoke.cull_mode = BaseMaterial3D.CULL_DISABLED
+		trail.material_override = smoke
+		trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(trail)
+		shot.trail_node = trail
+	shots.append(shot)
+
+func update_trail(shot: Dictionary) -> void:
+	var points: Array = shot.trail_points
+	if Vector3(points.back()).distance_to(shot.position)>7:
+		points.append(shot.position)
+		if points.size()>25: points.pop_front()
+	var ribbon: ImmediateMesh = shot.trail_node.mesh
+	ribbon.clear_surfaces()
+	if points.size()<2: return
+	ribbon.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in range(points.size()-1):
+		var a: Vector3 = points[i]
+		var b: Vector3 = points[i+1]
+		var width: float = lerpf(1.5,0.22,float(i)/maxf(points.size()-1,1))
+		var side: Vector3 = (b-a).normalized().cross((app.camera.global_position-a).normalized()).normalized()
+		if side.length()<0.1: side = Vector3.RIGHT
+		side *= width
+		var alpha: float = float(i)/maxf(points.size()-1,1)*0.34
+		for vertex: Array in [[a-side,Vector2(0,0)],[a+side,Vector2(1,0)],[b-side,Vector2(0,1)],[b-side,Vector2(0,1)],[a+side,Vector2(1,0)],[b+side,Vector2(1,1)]]:
+			ribbon.surface_set_color(Color(0.76,0.79,0.82,alpha))
+			ribbon.surface_set_uv(vertex[1])
+			ribbon.surface_add_vertex(vertex[0])
+	ribbon.surface_end()
+
+func free_shot(shot: Dictionary) -> void:
+	shot.node.queue_free()
+	if is_instance_valid(shot.get("trail_node")): shot.trail_node.queue_free()
 
 func segment_distance(point: Vector3, a: Vector3, b: Vector3) -> float:
 	var delta := b-a
@@ -271,20 +315,23 @@ func segment_distance(point: Vector3, a: Vector3, b: Vector3) -> float:
 func update_shots(dt: float) -> void:
 	for shot: Dictionary in shots:
 		shot.life -= dt
+		if shot.life<=0: continue
 		var previous: Vector3 = shot.position
 		if shot.kind=="missile":
 			for enemy: Dictionary in enemies:
 				if enemy.id==shot.target:
-					var wanted: Vector3 = (enemy.position-shot.position).normalized()*460
-					shot.velocity = shot.velocity.lerp(wanted,1-exp(-dt*4.5))
+					var wanted: Vector3 = (enemy.position-shot.position).normalized()
+					var current: Vector3 = shot.velocity.normalized()
+					var angle: float = current.angle_to(wanted)
+					if angle>deg_to_rad(65):
+						shot.target = -1
+					else:
+						shot.velocity = current.slerp(wanted,minf(1,deg_to_rad(45)*dt/maxf(angle,0.0001)))*460
 		shot.position += shot.velocity*dt
 		shot.node.position = shot.position
 		if shot.velocity.length()>0.1:
 			shot.node.look_at(shot.position+shot.velocity,Vector3.UP)
-		shot.trail -= dt
-		if shot.kind=="missile" and shot.trail<=0:
-			shot.trail = 0.075
-			burst(shot.position,Color(0.7,0.76,0.81,0.45),3.5)
+		if shot.kind=="missile": update_trail(shot)
 		if shot.kind=="hostile":
 			if segment_distance(app.flight.position,previous,shot.position)<17:
 				hull = maxf(0,hull-shot.damage)
@@ -300,29 +347,31 @@ func update_shots(dt: float) -> void:
 					break
 	for index in range(shots.size()-1,-1,-1):
 		if shots[index].life<=0:
-			shots[index].node.queue_free()
+			free_shot(shots[index])
 			shots.remove_at(index)
 	for index in range(enemies.size()-1,-1,-1):
 		var enemy: Dictionary = enemies[index]
 		if enemy.health<=0:
 			kills += 1
+			app.audio.radio.say("target_down" if kills%2 else "target_down_alt")
 			score += 100+wave*25
-			burst(enemy.position,Color(1,0.39,0.09),40)
+			burst(enemy.position,Color(1,0.39,0.09),18)
 			app.audio.play_effect("explosion",-11)
 			enemy.node.queue_free()
 			enemies.remove_at(index)
 
 func burst(at: Vector3, color: Color, radius: float) -> void:
-	if bursts.size()>100:
-		return
-	var sphere := SphereMesh.new()
-	sphere.radius = 1
-	sphere.height = 2
-	var node: MeshInstance3D = mesh(self,sphere,at,color,1.5)
-	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var mat: StandardMaterial3D = node.material_override
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	bursts.append({"node":node,"life":0.65,"radius":radius,"material":mat,"color":color})
+	if bursts.size()>100: return
+	if flash_texture==null: flash_texture = load("res://assets/vfx/flash.png")
+	var node := Sprite3D.new()
+	node.texture = flash_texture
+	node.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	node.shaded = false
+	node.pixel_size = radius/maxf(flash_texture.get_width(),1)
+	node.modulate = color
+	node.position = at
+	add_child(node)
+	bursts.append({"node":node,"life":0.40,"color":color})
 
 func update_bursts(dt: float) -> void:
 	for index in range(bursts.size()-1,-1,-1):
@@ -332,11 +381,11 @@ func update_bursts(dt: float) -> void:
 			effect.node.queue_free()
 			bursts.remove_at(index)
 		else:
-			var progress: float = 1-effect.life/0.65
-			effect.node.scale = Vector3.ONE*maxf(0.1,effect.radius*(0.3+progress))
+			var progress: float = 1-effect.life/0.40
+			effect.node.scale = Vector3.ONE*(0.65+progress*1.6)
 			var color: Color = effect.color
-			color.a = (1-progress)*0.8
-			effect.material.albedo_color = color
+			color.a = (1-progress)*(1-progress)
+			effect.node.modulate = color
 
 func cardboard_controls() -> void:
 	if not assist or not app.vision.enabled or not app.vision.tracking:
@@ -406,10 +455,12 @@ func complete(success: bool, reason: String) -> void:
 func pilot_controls() -> Vector3:
 	if enemies.is_empty():
 		return Vector3(-app.flight.roll*3,-app.flight.pitch*4,0)
-	var nearest: Dictionary = enemies[0]
-	for enemy: Dictionary in enemies:
-		if enemy.position.distance_to(app.flight.position)<nearest.position.distance_to(app.flight.position):
-			nearest = enemy
+	var nearest: Dictionary = target()
+	if nearest.is_empty():
+		nearest = enemies[0]
+		for enemy: Dictionary in enemies:
+			if enemy.position.distance_to(app.flight.position)<nearest.position.distance_to(app.flight.position):
+				nearest = enemy
 	var delta: Vector3 = nearest.position-app.flight.position
 	var heading: float = atan2(delta.x,-delta.z)
 	var error: float = wrapf(heading-app.flight.heading,-PI,PI)

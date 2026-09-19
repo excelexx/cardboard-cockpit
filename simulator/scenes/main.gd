@@ -47,6 +47,8 @@ var used_copilot := false
 var camera_view := "cockpit"
 var camera_menu_open := false
 var camera_snap := true
+var cockpit_eye_offset := Vector3.ZERO
+var cockpit_eye_ready := false
 # Keep the legacy boolean API for cockpit-only instruments and existing integrations.
 var cockpit: bool:
 	get:
@@ -265,6 +267,7 @@ func start_flight() -> void:
 	var tune: Dictionary = profile().duplicate()
 	tune.clearance = 3.0
 	flight.reset(tune)
+	audio.reset_flight()
 	audio.set_aircraft(profile())
 	mode = "flight"
 	ring_index = 0
@@ -325,7 +328,7 @@ func _input(event: InputEvent) -> void:
 		if mode == "flight":
 			if event.keycode == KEY_SHIFT:
 				if flight.start_barrel_roll(-1 if control.x<0 else 1): show_toast("BARREL ROLL")
-			if flight_kind == "combat":
+			if flight_kind in ["combat","campaign"]:
 				if event.keycode == KEY_T: combat.fire_missile()
 				if event.keycode == KEY_Z: combat.deploy_flares()
 				if event.keycode == KEY_J: combat.assist = not combat.assist
@@ -471,7 +474,10 @@ func _process(dt: float) -> void:
 	if cockpit and mode not in ["hangar","briefing"]:
 		cockpit_frame.set_navigation(flight_kind,ring_index)
 		cockpit_frame.update_instruments(flight,control,dt if active else 0.0)
-	audio.update(flight.engine,flight.speed,active)
+	audio.beam_wanted = combat is GooseCampaign and combat.beam_active and mode=="flight"
+	audio.set_context(mode,cockpit,flight.contact,mode=="paused" or overlay_visible())
+	audio.observe_flight(flight)
+	audio.update(flight.engine,flight.speed,active,dt)
 	audio.campaign_audio(flight_kind=="campaign" and mode in ["flight","results"])
 	if capture_at>0 and runtime>=capture_at:
 		capture_at = -1
@@ -496,7 +502,7 @@ func _physics_process(dt: float) -> void:
 		flight.rollout_step(dt,brakes,steering,is_on_runway(flight.position))
 		if not is_on_runway(flight.position): flight.contact = "overrun"
 		aircraft.position = flight.position
-		aircraft.rotation = Vector3(0,-flight.heading,0)
+		aircraft.rotation = Vector3(flight.pitch,-flight.heading,-flight.roll)
 		if flight.contact=="overrun" or flight.speed<=0.1:
 			if flight.speed<=0.1: flight.speed = 0.0
 			finish_mission()
@@ -541,22 +547,22 @@ func _physics_process(dt: float) -> void:
 	flight.step(dt,control,Input.is_physical_key_pressed(KEY_SPACE),ground,on_runway,false)
 	# Resolve against the surface reached by this frame, including runway edges
 	# and rising terrain, rather than the point the aircraft just left.
-	if combat is GooseCampaign and combat.showcase:
-		var safe_floor: float = world.ground_height(flight.position.x,flight.position.z)+100.0
-		if flight.position.y<safe_floor:
-			flight.position.y = safe_floor
-			flight.vertical_speed = maxf(0,flight.vertical_speed)
-			flight.pitch = maxf(0.03,flight.pitch)
+	# No altitude clamp here: a gear-down approach must reach the runway
+	# continuously, including in the showcase. Terrain never teleports a pilot.
 	flight.resolve_contact(world.ground_height(flight.position.x, flight.position.z), world.is_runway(flight.position.x, flight.position.z))
 	if flight.airborne and not was_airborne:
+		audio.radio.say("cleared")
 		show_toast("Positive climb. Welcome to the sky.")
 		audio.ping()
 	if flight.airborne and world.obstacle_collision(flight.position,2.5):
 		flight.contact = "obstacle"
 	if flight.contact == "landed":
-		touchdown_valid = (flight_kind=="free" or ring_index==5) and (flight_kind=="free" or absf(flight.position.z+15000)<1600)
+		touchdown_valid = (flight_kind in ["free","campaign"] or ring_index==5) and (flight_kind in ["free","campaign"] or absf(flight.position.z+15000)<1600)
 		mode = "rollout"
 		flight.throttle = 0.0
+		audio.play_effect("touchdown_tires",-17)
+		audio.play_effect("touchdown_thump",-15)
+		audio.radio.say("touchdown")
 		show_toast("Touchdown. Hold SPACE to brake to a stop.")
 		audio.ping()
 	elif flight.contact != "":
@@ -568,6 +574,7 @@ func _physics_process(dt: float) -> void:
 			var crossing: Vector3 = prior.lerp(flight.position,clampf(fraction,0,1))
 			if Vector2(crossing.x-target.x,crossing.y-target.y).length()<RING_RADIUS:
 				ring_index += 1
+				audio.radio.say("checkpoint")
 				show_toast("Checkpoint %d / 5  ·  Nice flying." % ring_index if ring_index<5 else "All checkpoints cleared. North Field is ahead.")
 				audio.ping()
 				update_rings()
@@ -650,11 +657,13 @@ func flight_prompt() -> String:
 	return "Follow the amber rings  ·  Checkpoint %d of 5" % (ring_index+1)
 
 func finish_mission() -> void:
+	audio.radio.say("landed" if flight.contact=="landed" else "failure")
 	mission_success = flight.contact=="landed" and touchdown_valid and flight.speed<=0.1 and is_on_runway(flight.position)
 	if mission_success:
 		result_reason = "Landing complete. Aircraft stopped safely."
 		if flight_kind=="valley": result_reason += " Five checkpoints cleared."
 		elif flight_kind=="free": result_reason = "Scenic flight complete. Parked safely after landing."
+		elif flight_kind=="campaign": result_reason = "Smooth landing. Goose patrol ended safely."
 	elif flight.contact=="overrun": result_reason = "Runway overrun. Touch down earlier and hold SPACE to brake."
 	elif flight.contact=="obstacle": result_reason = "Aircraft contacted an airport building. Keep clear of structures."
 	elif flight.contact=="landed": result_reason = "Safe touchdown. Complete all checkpoints and land at North Field."
@@ -726,7 +735,10 @@ func update_camera(dt: float) -> void:
 		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 		if cockpit:
 			camera.near = 0.05
-			camera.position = flight.position+plane_basis*Vector3(0,3.0,-float(profile().length)*0.29)
+			var desired_eye := Vector3(0,3.0,-float(profile().length)*0.29)
+			cockpit_eye_offset = desired_eye if camera_snap or not cockpit_eye_ready else cockpit_eye_offset.lerp(desired_eye,1-exp(-dt*6))
+			cockpit_eye_ready = true
+			camera.position = flight.position+plane_basis*cockpit_eye_offset
 			camera.basis = plane_basis * Basis.from_euler(Vector3(look.y,look.x,0))
 			cockpit_frame.basis = Basis.from_euler(Vector3(look.y,look.x,0)).inverse()
 			camera.fov = 77
@@ -794,6 +806,7 @@ func load_settings() -> void:
 		conditions = str(settings.get_value("world","conditions","golden"))
 
 func save_settings() -> void:
+	if DisplayServer.get_name()=="headless": return
 	var settings := ConfigFile.new()
 	settings.set_value("flight","aircraft",selected)
 	settings.set_value("video","high_quality",high_quality)
@@ -802,6 +815,12 @@ func save_settings() -> void:
 	settings.save("user://settings.cfg")
 
 func apply_campaign_aircraft(tune: Dictionary) -> void:
+	# Stage changes replace the airframe, never the pilot's location or motion.
+	var continuing: bool = not campaign_profile.is_empty()
+	var state: Dictionary = {}
+	if continuing:
+		for field: String in ["position","speed","pitch","roll","heading","vertical_speed","throttle","engine","airborne","ever_airborne","airborne_time","gear","flaps","elapsed","distance","contact","touchdown_speed","touchdown_sink","touchdown_bank","touchdown_center","rollout_elapsed"]:
+			state[field] = flight.get(field)
 	campaign_profile = tune.duplicate(true)
 	for child: Node in aircraft.get_children():
 		aircraft.remove_child(child)
@@ -821,7 +840,12 @@ func apply_campaign_aircraft(tune: Dictionary) -> void:
 	flight.ever_airborne = true
 	flight.airborne_time = 30
 	flight.gear = false
-	control = Vector3.ZERO
-	cockpit = false
+	if continuing:
+		for field: String in state:
+			flight.set(field,state[field])
+	else:
+		control = Vector3.ZERO
+		cockpit = false
 	audio.set_aircraft(profile())
-	update_camera(1.0)
+	# Normal camera smoothing accommodates the new size over subsequent frames.
+	if not continuing: update_camera(1.0)
