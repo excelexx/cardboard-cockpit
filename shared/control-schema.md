@@ -52,7 +52,7 @@ Use a local monotonic timeout of roughly 350 ms to detect a stopped service. `ti
 
 ## Loss and ownership
 
-The tracker smooths valid input with a 0.10 s exponential time constant, uses a 6% yoke dead zone, and limits yoke changes to 3.5 units/second and throttle changes to 1.5 units/second. Values are bounded before serialization. Low confidence (<0.25), invalid numbers, duplicated marker IDs, and detection failure count as loss.
+The tracker smooths valid input with a 0.10 s exponential time constant, uses a 6% yoke dead zone, and limits yoke changes to 3.5 units/second and throttle changes to 1.5 units/second. Values are bounded before serialization. Low confidence (<0.25), invalid numbers, duplicated marker IDs, and detection failure count as loss. Yoke pitch comes from one of two mirrored planar-pose solutions; the tracker follows one branch over time and uses the calibrated pitch travel to discard the other, so receivers do not need their own flip rejection.
 
 Yoke loss sets confidence to zero immediately, holds its last target for 250 ms, then eases toward roll/pitch zero. Throttle loss sets its confidence to zero immediately and holds the last smoothed power setting. It does **not** cut power during a camera interruption. At first startup all outputs are zero. During calibration, confidence is zero for both controls and the same loss policies apply.
 
@@ -60,7 +60,7 @@ The receiver owns keyboard takeover and decides whether vision is selected. A us
 
 ## Calibration
 
-Calibration is a local seven-step screen in the tracker, launched with `--camera 0 --calibrate`. Its preview accepts **Space** to capture each endpoint, **C** to restart calibration, and **Q/Escape** to stop the tracker. No socket command is needed. Values are stored atomically in the ignored `vision/calibration.local.json` by default:
+Calibration is a local seven-step screen in the tracker, launched with `--camera 0 --calibrate`. Its preview accepts **Space** to capture each endpoint, **C** to restart calibration, **N** to re-center roll and pitch for a new pilot while keeping the calibrated travel, and **Q/Escape** to stop the tracker. `--camera 0 --check` measures camera placement without serving controls or saving anything. No socket command is needed. Values are stored atomically in the ignored `vision/calibration.local.json` by default:
 
 ```json
 {

@@ -88,6 +88,25 @@ class Calibration:
         if self.width <= 0 or self.height <= 0 or self.camera_index < 0:
             raise ValueError("Camera index and frame dimensions are invalid.")
 
+    def recentered(self, roll: float, pitch: float) -> "Calibration":
+        """Same travel around a new neutral, for the next pilot's grip.
+
+        A freely held yoke rests at a different angle in every pair of hands,
+        while the camera, the travel and the taped-down throttle do not change.
+        """
+        if not finite_number(roll) or not finite_number(pitch):
+            raise ValueError("Re-center needs finite angles.")
+        roll_shift = wrap_degrees(roll - self.roll.neutral)
+        pitch_shift = pitch - self.pitch.neutral
+        if abs(roll_shift) > 25 or abs(pitch_shift) > 25:
+            raise ValueError("That is over 25 degrees from the calibrated neutral. Run the full calibration (C).")
+        result = Calibration(
+            AxisCalibration(self.roll.negative + roll_shift, self.roll.neutral + roll_shift, self.roll.positive + roll_shift),
+            AxisCalibration(self.pitch.negative + pitch_shift, self.pitch.neutral + pitch_shift, self.pitch.positive + pitch_shift),
+            self.throttle, self.camera_index, self.width, self.height, self.version)
+        result.validate()
+        return result
+
     def save(self, path: Path) -> None:
         self.validate()
         path.parent.mkdir(parents=True, exist_ok=True)

@@ -18,10 +18,12 @@ if __package__:
     from .calibration import (AxisCalibration, Calibration, ControlFilter, ThrottleCalibration,
                               ThrottleObservation, YokeObservation, clamp, simulated_calibration,
                               simulated_observations, wrap_degrees)
+    from .placement import PlacementCheck, format_report
 else:
     from calibration import (AxisCalibration, Calibration, ControlFilter, ThrottleCalibration,
                              ThrottleObservation, YokeObservation, clamp, simulated_calibration,
                              simulated_observations, wrap_degrees)
+    from placement import PlacementCheck, format_report
 
 # Change these IDs and regenerate BOTH markers if another booth uses the same IDs.
 YOKE_ID = 7
@@ -33,6 +35,12 @@ else:
 
 DEFAULT_CALIBRATION = Path(__file__).resolve().with_name("calibration.local.json")
 PREVIEW_TITLE = "Cardboard Cockpit - private local tracker"
+# Planar-pose branch tracking: smoothed reprojection-error advantage (pixels at a
+# 64 px marker side) the other solution needs before pitch is allowed to jump to it.
+BRANCH_EVIDENCE_RATE = 0.12
+BRANCH_SWITCH_PIXELS = 0.15
+BRANCH_MERGE_DEGREES = 8.0
+PITCH_RANGE_MARGIN = 8.0
 
 
 def load_cv():
@@ -87,24 +95,146 @@ class ArucoTracker:
         self.weapon_observations = {}
         self.previous_pose = None
         self.previous_pose_time = 0.0
+        self.branch_evidence = 0.0
+        self.last_corners = {}
+        self.rescue_calls = 0
+        # Optional (low, high) raw pitch degrees from calibration. The mirrored
+        # planar-pose solution usually falls outside it and can be discarded.
+        self.pitch_range = None
+
+    def set_pitch_range(self, calibration) -> None:
+        """Use a saved calibration's pitch endpoints as a prior. None clears it."""
+        if calibration is None:
+            self.pitch_range = None
+            return
+        axis = calibration.pitch
+        ends = [axis.neutral + wrap_degrees(v - axis.neutral) for v in (axis.negative, axis.positive)]
+        self.pitch_range = (min(ends) - PITCH_RANGE_MARGIN, max(ends) + PITCH_RANGE_MARGIN)
+
+    def _outside_range(self, pitch: float) -> float:
+        if self.pitch_range is None:
+            return 0.0
+        return max(self.pitch_range[0] - pitch, pitch - self.pitch_range[1], 0.0)
+
+    def _choose_pose(self, candidates, now: float, side: float):
+        """Pick one of the two planar-pose solutions without frame-to-frame flips.
+
+        Each candidate is (error, roll, pitch, rvec, tvec). With a small or
+        noisy marker the wrong solution often has the lower reprojection error
+        in a single frame, so error alone makes pitch jump by 40+ degrees. The
+        correct branch still wins on average: follow the previous branch and
+        change only on sustained evidence or when the calibrated range says so.
+        """
+        best = min(candidates, key=lambda value: value[0])
+        recent = self.previous_pose is not None and now - self.previous_pose_time < 0.4
+        if len(candidates) == 1:
+            self.branch_evidence = 0.0
+            return best
+        if not recent:
+            self.branch_evidence = 0.0
+            return min(candidates, key=lambda value: value[0] + 0.05 * self._outside_range(value[2]))
+        stay = min(candidates, key=lambda value: abs(value[2] - self.previous_pose))
+        other = candidates[1] if stay is candidates[0] else candidates[0]
+        if abs(stay[2] - other[2]) < BRANCH_MERGE_DEGREES:
+            # Near head-on both solutions agree; nothing to disambiguate.
+            self.branch_evidence *= 1 - BRANCH_EVIDENCE_RATE
+            return best
+        # Reprojection error grows with marker size in pixels; compare it at a
+        # reference 64 px side so one threshold serves every distance and resolution.
+        advantage = (stay[0] - other[0]) * 64.0 / side
+        self.branch_evidence += BRANCH_EVIDENCE_RATE * (advantage - self.branch_evidence)
+        out_of_range = self._outside_range(stay[2]) > 0 and self._outside_range(other[2]) == 0
+        if out_of_range or self.branch_evidence > BRANCH_SWITCH_PIXELS:
+            self.branch_evidence = 0.0
+            return other
+        return stay
+
+    def _detect_wanted(self, image, offset=(0.0, 0.0), scale: float = 1.0):
+        """Map wanted marker ID -> 4x2 corners in frame pixels; None marks a duplicated ID."""
+        corners, ids, _ = self.detector.detectMarkers(image)
+        found = {}
+        if ids is None:
+            return found
+        for marker_corners, marker_id in zip(corners, ids.flatten()):
+            marker_id = int(marker_id)
+            if marker_id not in (self.yoke_id, self.throttle_id):
+                continue
+            # Duplicated IDs are ambiguous; reject that control instead of
+            # choosing whichever marker happens to be enumerated last.
+            found[marker_id] = None if marker_id in found else marker_corners.reshape(4, 2) / scale + offset
+        return found
+
+    def _rescue(self, gray, marker_id: int, now: float):
+        """Second chance for one missing marker, near where it was last seen.
+
+        Measured on physically sized synthetic frames: sharpening recovers
+        motion/defocus blur and small markers, contrast stretch recovers dark
+        rooms, and both are harmful as a first pass because they amplify noise.
+        Without a recent position the whole frame is searched only on every
+        sixth call, so a permanently absent marker cannot cost the frame rate.
+        """
+        cv2, np = self.cv2, self.np
+        height, width = gray.shape
+        x0, y0, x1, y1 = 0, 0, width, height
+        last = self.last_corners.get(marker_id)
+        if last is not None and now - last[1] < 1.0:
+            points = last[0]
+            reach = 1.5 * float(max(points[:, 0].max() - points[:, 0].min(), points[:, 1].max() - points[:, 1].min()))
+            x0, y0 = max(int(points[:, 0].min() - reach), 0), max(int(points[:, 1].min() - reach), 0)
+            x1, y1 = min(int(points[:, 0].max() + reach), width), min(int(points[:, 1].max() + reach), height)
+        else:
+            self.rescue_calls += 1
+            if self.rescue_calls % 6:
+                return None
+        crop = gray[y0:y1, x0:x1]
+        if crop.shape[0] < 24 or crop.shape[1] < 24:
+            return None
+        # Small crops are doubled so a distant 50 mm marker keeps whole-pixel cells.
+        scale = 2.0 if max(crop.shape) <= 360 else 1.0
+        if scale != 1.0:
+            crop = cv2.resize(crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+        sharpened = cv2.addWeighted(crop, 2.5, cv2.GaussianBlur(crop, (0, 0), 3 * scale), -1.5, 0)
+        low, high = np.percentile(crop[::2, ::2], (1, 99))
+        stretched = np.clip((crop.astype(np.float32) - low) * (255.0 / max(high - low, 8.0)), 0, 255).astype(np.uint8)
+        for enhanced in (sharpened, cv2.GaussianBlur(stretched, (0, 0), 1.5 * scale)):
+            points = self._detect_wanted(enhanced, (x0, y0), scale).get(marker_id)
+            if points is not None:
+                return points
+        return None
 
     def detect(self, frame, now: float, draw: bool = True):
         cv2, np = self.cv2, self.np
         height, width = frame.shape[:2]
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        corners, ids, _ = self.detector.detectMarkers(gray)
+        # Thresholds are tuned at 1280 px wide and follow the actual frame size.
+        frame_scale = width / 1280.0
+        # Light denoising first: sensor noise otherwise produces thousands of
+        # candidate contours, which is both slower and less reliable in dim rooms.
+        found = self._detect_wanted(cv2.GaussianBlur(gray, (0, 0), max(1.1 * frame_scale, 0.5)))
+        for marker_id in (self.yoke_id, self.throttle_id):
+            if marker_id not in found:
+                points = self._rescue(gray, marker_id, now)
+                if points is not None:
+                    found[marker_id] = points
+        found = {marker_id: points.astype(np.float32) for marker_id, points in found.items() if points is not None}
         yoke = throttle = None
+<<<<<<< HEAD
         self.weapon_observations = {}
         if ids is None:
+=======
+        if not found:
+>>>>>>> 8d00bab (Harden cardboard tracker for real desks: placement check, robust detection, next-pilot re-center)
             return yoke, throttle
         if draw:
-            cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+            cv2.aruco.drawDetectedMarkers(frame, [points.reshape(1, 4, 2) for points in found.values()],
+                                          np.array([[marker_id] for marker_id in found], dtype=np.int32))
         # Approximate ~70-degree horizontal field of view. Recalibrate physical
         # ranges whenever camera placement, resolution or zoom changes.
         focal = width * 0.72
         matrix = np.array([[focal, 0, width / 2], [0, focal, height / 2], [0, 0, 1]], dtype=np.float64)
         distortion = np.zeros((5, 1), dtype=np.float64)
         object_points = np.array([[-.5, .5, 0], [.5, .5, 0], [.5, -.5, 0], [-.5, -.5, 0]], dtype=np.float32)
+<<<<<<< HEAD
         # Duplicated IDs are ambiguous; reject that control instead of choosing
         # whichever marker happens to be enumerated last.
         counts = collections.Counter(int(marker_id) for marker_id in ids.flatten())
@@ -122,18 +252,24 @@ class ArucoTracker:
             if counts[marker_id] != 1 or marker_id not in (self.yoke_id, self.throttle_id):
                 continue
             points = marker_corners.reshape(4, 2)
+=======
+        for marker_id, points in found.items():
+>>>>>>> 8d00bab (Harden cardboard tracker for real desks: placement check, robust detection, next-pilot re-center)
             side = float(min(np.linalg.norm(points[(i + 1) % 4] - points[i]) for i in range(4)))
-            if side < 24:
+            # The throttle needs only a centre, so it may be smaller than the
+            # yoke, whose corners must also carry an orientation estimate.
+            if side < (14 if marker_id == self.throttle_id else max(24 * frame_scale, 16)):
                 continue
-            confidence = clamp(side / 85, 0.25, 1.0)
+            self.last_corners[marker_id] = (points, now)
+            confidence = clamp(side / (85 * frame_scale), 0.25, 1.0)
             center = points.mean(axis=0)
             if marker_id == self.throttle_id:
                 throttle = ThrottleObservation((float(center[0] / width), float(center[1] / height)), confidence)
                 if draw:
                     cv2.circle(frame, tuple(center.astype(int)), 5, (50, 210, 255), -1)
                 continue
-            # IPPE provides both planar pose solutions; prioritize reprojection
-            # error, with a small continuity preference near ambiguous head-on views.
+            # IPPE provides both planar pose solutions; _choose_pose keeps the
+            # branch stable over time instead of trusting one frame's error.
             result = cv2.solvePnPGeneric(object_points, points, matrix, distortion, flags=cv2.SOLVEPNP_IPPE_SQUARE)
             if not result[0]:
                 continue
@@ -148,13 +284,10 @@ class ArucoTracker:
                 roll = math.degrees(math.atan2(float(edge[1]), float(edge[0])))
                 # Local marker Y axis out-of-plane tilt, independent of image roll.
                 pitch = math.degrees(math.asin(clamp(float(rotation[2, 1]), -1, 1)))
-                continuity = 0.0
-                if self.previous_pose is not None and now - self.previous_pose_time < 0.4:
-                    continuity = min(abs(wrap_degrees(pitch - self.previous_pose)), 45) * 0.01
-                candidates.append((error + continuity, error, roll, pitch, rvec, tvec))
+                candidates.append((error, roll, pitch, rvec, tvec))
             if not candidates:
                 continue
-            _, error, roll, pitch, rvec, tvec = min(candidates, key=lambda value: value[0])
+            error, roll, pitch, rvec, tvec = self._choose_pose(candidates, now, side)
             if not math.isfinite(error) or error > 4.0:
                 continue
             confidence *= clamp(1 - error / 6, 0, 1)
@@ -312,13 +445,17 @@ class CalibrationWizard:
         ("FULL", "Slide throttle to FULL. Keep marker visible.", "throttle"),
     )
 
-    def __init__(self, camera_index: int, width: int, height: int):
+    def __init__(self, camera_index: int, width: int, height: int, base=None):
+        # With a base calibration only NEUTRAL is captured and the saved travel
+        # is kept: a two-second handover between pilots instead of seven poses.
+        self.base = base
+        self.steps = self.STEPS if base is None else self.STEPS[:1]
         self.index = 0
         self.samples = collections.deque(maxlen=24)
         self.values = {}
         self.camera_index, self.width, self.height = camera_index, width, height
         self.message = "Hold still for a second, then press SPACE to capture."
-        print("Calibration: " + self.STEPS[0][1], flush=True)
+        print("%s: %s" % ("Calibration" if base is None else "Re-center", self.STEPS[0][1]), flush=True)
 
     def observe(self, yoke, throttle):
         kind = self.STEPS[self.index][2]
@@ -348,6 +485,13 @@ class CalibrationWizard:
         self.values[key] = tuple(statistics.median(axis) for axis in rows)
         self.samples.clear()
         self.index += 1
+        if self.base is not None:
+            self.index = 0
+            try:
+                return self.base.recentered(*self.values["NEUTRAL"])
+            except ValueError as error:
+                self.message = str(error)
+                return None
         if self.index < len(self.STEPS):
             self.message = "Captured %s. Hold next position, then press SPACE." % key
             print("Calibration: " + self.STEPS[self.index][1], flush=True)
@@ -373,18 +517,69 @@ def draw_preview(frame, packet, wizard, fps: float):
     cv2, _ = load_cv()
     cv2.rectangle(frame, (0, 0), (frame.shape[1], 150 if wizard else 122), (26, 30, 32), -1)
     if wizard:
-        title, instruction, _ = wizard.STEPS[wizard.index]
-        lines = ["CALIBRATION %d/7 - %s" % (wizard.index + 1, title), instruction,
+        title, instruction, _ = wizard.steps[wizard.index]
+        heading = "RE-CENTER FOR NEW PILOT" if wizard.base is not None else "CALIBRATION %d/7 - %s" % (wizard.index + 1, title)
+        lines = [heading, instruction,
                  wizard.message, "SPACE: capture  |  Q / ESC: quit  |  %d/18 samples" % len(wizard.samples)]
     else:
         yoke, throttle = packet["yoke"], packet["throttle"]
         lines = ["CARDBOARD COCKPIT  |  %.1f FPS  |  local camera only" % fps,
                  "YOKE %s  ROLL %+.2f  PITCH %+.2f" % ("TRACKED" if yoke["confidence"] else "LOST", yoke["roll"], yoke["pitch"]),
-                 "THROTTLE %3.0f%% %s  |  C: calibrate  Q: quit" % (throttle["value"] * 100, "TRACKED" if throttle["confidence"] else "HOLDING / LOST")]
+                 "THROTTLE %3.0f%% %s  |  N: new pilot  C: calibrate  Q: quit" % (throttle["value"] * 100, "TRACKED" if throttle["confidence"] else "HOLDING / LOST")]
+    draw_lines(frame, lines)
+
+
+def draw_lines(frame, lines):
+    cv2, _ = load_cv()
     for index, line in enumerate(lines):
         cv2.putText(frame, line, (18, 28 + index * 32), cv2.FONT_HERSHEY_SIMPLEX, .62,
                     (115, 226, 247) if index == 0 else (235, 239, 240), 1, cv2.LINE_AA)
     cv2.imshow(PREVIEW_TITLE, frame)
+
+
+def run_check(args) -> int:
+    """Measure what this camera position can see; no socket, nothing saved."""
+    detector = ArucoTracker()
+    source = CameraSource(args.camera, args.width, args.height, args.fps)
+    check = None
+    # Without a window nobody can press Q, so a headless check is always bounded.
+    duration = args.duration if args.duration > 0 else (15.0 if args.no_preview else 0.0)
+    print("Placement check: hold the yoke still for two seconds, then bank fully left and right, tilt fully forward and back, slide the throttle "
+          "IDLE to FULL, then %s." % ("wait %.0f s" % duration if args.no_preview else "press Q"), flush=True)
+    try:
+        start = time.monotonic()
+        while duration <= 0 or time.monotonic() - start < duration:
+            frame_start = time.monotonic()
+            frame = source.read()
+            if frame is None:
+                if frame_start - start > 3 and check is None:
+                    raise RuntimeError("Camera %d opened but delivers no frames." % args.camera)
+                time.sleep(0.02)
+                continue
+            if check is None:
+                check = PlacementCheck(frame.shape[1])
+            yoke, throttle = detector.detect(frame, frame_start, not args.no_preview)
+            sides = {}
+            for marker_id, (points, seen) in detector.last_corners.items():
+                if seen == frame_start:
+                    sides[marker_id] = float(min(math.dist(points[i], points[(i + 1) % 4]) for i in range(4)))
+            check.add(frame_start, yoke, throttle, sides.get(detector.yoke_id), sides.get(detector.throttle_id))
+            if not args.no_preview:
+                detector.cv2.rectangle(frame, (0, 0), (frame.shape[1], 122), (26, 30, 32), -1)
+                draw_lines(frame, check.live_lines())
+                key = detector.cv2.waitKey(1) & 0xFF
+                try:
+                    closed = detector.cv2.getWindowProperty(PREVIEW_TITLE, detector.cv2.WND_PROP_VISIBLE) < 1
+                except detector.cv2.error:
+                    closed = True
+                if closed or key in (27, ord("q")):
+                    break
+            time.sleep(max(0.0, 1.0 / args.fps - (time.monotonic() - frame_start)))
+    finally:
+        source.close()
+    rows = check.report() if check else [("FAIL", "Frames", "No camera frames arrived.")]
+    print(format_report(rows), flush=True)
+    return 1 if any(row[0] == "FAIL" for row in rows) else 0
 
 
 async def run(args):
@@ -414,6 +609,8 @@ async def run(args):
             raise RuntimeError("Calibration needs its window. Remove --no-preview for the first run.")
         if args.calibrate:
             wizard = CalibrationWizard(args.camera, args.width, args.height)
+        else:
+            detector.set_pitch_range(calibration)
         source = CameraSource(args.camera, args.width, args.height, args.fps)
 
     controller = ControlFilter(calibration, args.smoothing, args.deadzone)
@@ -480,6 +677,7 @@ async def run(args):
                                     raise RuntimeError("Camera resolution changed. Restart without --no-preview to recalibrate.")
                                 print("Camera resolution changed. Recalibration is required.", flush=True)
                                 wizard = CalibrationWizard(args.camera, frame.shape[1], frame.shape[0])
+                                detector.set_pitch_range(None)
                         if wizard:
                             wizard.width, wizard.height = frame.shape[1], frame.shape[0]
                         yoke, throttle = detector.detect(frame, frame_start, not args.no_preview)
@@ -522,6 +720,9 @@ async def run(args):
                         detector.recenter()
                     elif not args.paper_test and key == ord("c"):
                         wizard = CalibrationWizard(args.camera, frame.shape[1], frame.shape[0])
+                        detector.set_pitch_range(None)
+                    elif key == ord("n") and not wizard:
+                        wizard = CalibrationWizard(args.camera, frame.shape[1], frame.shape[0], base=controller.calibration)
                     elif key == 32 and wizard:
                         calibrated = wizard.capture()
                         if calibrated is not None:
@@ -531,8 +732,11 @@ async def run(args):
                             next_controller.sequence = controller.sequence
                             next_controller.throttle = controller.throttle
                             controller = next_controller
+                            detector.set_pitch_range(calibrated)
+                            print("%s Cleared for takeoff. Saved to %s" % (
+                                "Re-centered for the new pilot." if wizard.base is not None else "Cockpit calibrated.",
+                                args.calibration), flush=True)
                             wizard = None
-                            print("Cockpit calibrated. Cleared for takeoff. Saved to %s" % args.calibration, flush=True)
                 previous = frame_start
                 frame_number += 1
                 await asyncio.sleep(max(0.0, 1.0 / args.fps - (time.monotonic() - frame_start)))
@@ -548,7 +752,11 @@ def parser():
     mode.add_argument("--camera", type=int, metavar="INDEX", help="Explicitly open this webcam, usually 0")
     mode.add_argument("--markers", type=Path, metavar="DIRECTORY", help="Generate printable marker SVG/PNG files; no camera")
     result.add_argument("--calibrate", action="store_true", help="Run the seven-step calibration before camera control")
+<<<<<<< HEAD
     result.add_argument("--paper-test", action="store_true", help="Control with marker 7 only: auto-center, rotate to bank, tilt to pitch; no throttle marker")
+=======
+    result.add_argument("--check", action="store_true", help="Measure camera placement and print PASS/WARN/FAIL advice; serves no controls")
+>>>>>>> 8d00bab (Harden cardboard tracker for real desks: placement check, robust detection, next-pilot re-center)
     result.add_argument("--calibration", type=Path, default=DEFAULT_CALIBRATION)
     result.add_argument("--no-preview", action="store_true", help="Hide camera/debug window after calibration")
     result.add_argument("--print-json", action="store_true", help="Print every normalized packet for inspection")
@@ -574,13 +782,20 @@ def main():
         argument_parser.error("Camera index cannot be negative.")
     if args.calibrate and args.camera is None:
         argument_parser.error("--calibrate requires an explicit --camera INDEX.")
+<<<<<<< HEAD
     if args.paper_test and (args.camera is None or args.calibrate or args.no_preview):
         argument_parser.error("--paper-test needs --camera and its preview; omit --calibrate.")
+=======
+    if args.check and (args.camera is None or args.calibrate):
+        argument_parser.error("--check requires --camera INDEX and cannot be combined with --calibrate.")
+>>>>>>> 8d00bab (Harden cardboard tracker for real desks: placement check, robust detection, next-pilot re-center)
     if args.loss_demo and not args.simulate:
         argument_parser.error("--loss-demo requires --simulate.")
     try:
         if args.markers is not None:
             generate_markers(args.markers)
+        elif args.check:
+            return run_check(args)
         else:
             asyncio.run(run(args))
     except KeyboardInterrupt:

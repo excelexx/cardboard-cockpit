@@ -48,6 +48,18 @@ To regenerate the originals without opening a webcam:
 
 The dictionary is `DICT_4X4_50`; **ID 7 is the yoke** and **ID 23 is the throttle**. Do not exchange them or display spare copies in the camera view. Follow the [cardboard build guide](cardboard-build-guide.md) for cut sizes and placement.
 
+## Check the camera position first
+
+Before calibrating, let the tracker measure what this camera position can actually see:
+
+```sh
+.venv/bin/python vision/tracker.py --camera 0 --check
+```
+
+Hold the yoke still for two seconds, bank fully left and right, tilt fully forward and back, slide the throttle from IDLE to FULL, then press **Q**. The terminal prints one PASS / WARN / FAIL line per item with the fix beside it: real frame rate, how often each marker was seen, marker size in pixels, yoke jitter at rest, sudden pitch flips, whether the pitch travel crosses the head-on angle, and how much of the image the throttle travels through. Nothing is saved or served while checking. `--check --no-preview --duration 15` runs the same measurement without a window. Move the camera or props and repeat until nothing says FAIL; that is much quicker than discovering a bad position halfway through calibration.
+
+The most common WARN is **Pitch geometry**. A flat square marker seen exactly head-on has two mirrored pose solutions, so keep the yoke's whole pitch travel on one side of head-on: mount the webcam higher and aim it down, or lean the yoke's marker plate back 10–15° (top edge away from the camera). Leaning further than about 15° starts to cost detection range at the nose-up end, especially at 640×480.
+
 ## First camera run and calibration
 
 Mount the webcam in front of the controls, about 70–100 cm away and 25–40 cm above the desk, angled slightly downward. A completely level camera looking directly along the throttle's travel cannot measure enough screen movement: raise it or shift it to the side. Keep both markers clearly visible and avoid bright windows behind the pilot. Marker faces point toward the webcam, not the pilot. The preview is intentionally **not mirrored**.
@@ -76,18 +88,21 @@ Later runs load the saved calibration:
 .venv/bin/python vision/tracker.py --camera 0
 ```
 
+**Next pilot:** press **N** in the tracker preview, hold the yoke centered for a second, and press **Space**. This re-centers roll and pitch around the new pilot's natural grip and keeps the calibrated travel and throttle, so a handover takes two seconds rather than seven poses. It refuses shifts over 25°, which mean the camera or props moved: use **C** then.
+
 Press **C** in the tracker preview to recalibrate; press **Q** or **Escape**, or close the window, to stop the service and release the camera. Recalibrate whenever the webcam or prop mounting moves. Changing camera index or actual frame dimensions requires recalibration. Use `--no-preview` only after calibration to keep the spectator display unobtrusive. A webcam or permission change requires stopping and restarting the service.
 
 ## Tuning and recovery
 
 | Symptom | Action |
 | --- | --- |
+| Not sure what is wrong | Run `--camera 0 --check`; it measures each of the rows below and names the fix. |
 | Marker remains LOST | Improve light; flatten the paper; move the camera closer; keep the whole white margin visible. Hands must not cover any corner. |
 | Roll/pitch jitters | Try `--smoothing 0.16 --deadzone 0.09`; shorten the camera distance and avoid nearly edge-on yoke angles. |
 | Pitch range fails calibration | Tilt the actual marker plane forward/backward, rather than translating the whole yoke. Keep each pose still. |
-| Pitch occasionally flips near neutral | Tilt the neutral marker 10–15° relative to the camera, then recalibrate; a single nearly head-on planar marker has pose ambiguity. |
+| Pitch occasionally flips or sticks at the nose-down end | The marker passes head-on to the lens there. Raise the camera or lean the marker plate back 10–15°, confirm with `--check`, then recalibrate. The tracker already holds its pose branch over time and discards solutions outside the calibrated travel, so what remains is geometry. |
 | Throttle calibration fails | Raise or offset the webcam so the marker visibly travels at least 6% of the image; keep the grip from occluding it. |
-| Tracker below 24 FPS | Increase diffuse light, close other heavy apps, or use `--width 640 --height 480 --fps 24` and recalibrate. |
+| Tracker below 24 FPS | Increase diffuse light (webcams lengthen exposure in dim rooms), close other heavy apps, or use `--width 640 --height 480 --fps 24` and recalibrate. Size and confidence thresholds follow the frame width, so in good light 640×480 works out to the full 100 cm. |
 | Markers become hidden | Yoke returns toward neutral after 250 ms. Throttle holds its last setting; take over with keyboard and show the marker again. |
 | Service disconnects | Keyboard remains available. Restart the tracker and reselect vision in the simulator if needed. |
 
@@ -100,6 +115,8 @@ Default smoothing is 0.10 seconds and the yoke dead zone is 6%. The target captu
 ```
 
 Tests cover sign and range mapping, reversed mounting, angle wrapping, bad calibration rejection, seven-stage calibration, packet shape, clipping, smoothing, independent marker loss, synthetic marker detection, projected yoke pose, duplicate marker rejection, and a real loopback WebSocket service with two clients and reconnection. Synthetic tests do not open a webcam.
+
+`vision/tests/test_physical_robustness.py` renders both markers at their printed size and distance through a pinhole camera (`vision/tests/synthetic.py`): grey background, paper-like contrast, sensor noise, dimness and blur. It covers the 50 mm throttle at 100 cm in 640×480, confidence at low resolution, a blurred throttle recovered near its last position, dim and very dim rooms without pitch bucking, the bounded cost of an absent marker, pose-branch selection, next-pilot re-centering, and every placement-check verdict including a full `--check` run on a fake camera. Detection first runs on a lightly denoised frame, which measured several times faster than the raw frame because sensor noise otherwise produces thousands of candidate contours; a marker that is still missing gets a sharpened and then a contrast-stretched second look around its last position.
 
 The camera-mode pipeline is also exercised with rendered marker frames: detection → calibration/filtering → live WebSocket packets, independent marker loss, resolution-change rejection, preview closure, and capture cleanup. A fake camera supplies those frames; this is software coverage, not physical-camera validation.
 
