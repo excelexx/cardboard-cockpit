@@ -46,3 +46,7 @@ The concurrent `integration/coastal-sortie` merge is reconciled as well: its upd
 - **Packaged app launch verified:** `build/Cardboard Cockpit.app` started through native UI and displayed **BADGE CONNECTED**; its own bundled helper ran with the app's parent PID, with no standalone relay process required. App signature and source-inclusive archive were verified by packaging.
 
 The user explicitly deferred the webcam/printed-marker test and the design polish. Steering/throttle/switch software paths are tested with synthetic observations; that is not physical cardboard validation. Basic rendering uses composed existing systems rather than every optional renderer technique in the supplied vision documents.
+
+Claude's work from `origin/main` through `0a1a4ef` was merged, including perspective yoke input, printable marker sheets and cockpit/instrument refinements. Legacy coastal scenery remains available only as source/test fixtures; the SF combat menu and timed boss flow are preserved. The integrated tracker handles the single-card detector without requiring weapon-switch observations.
+
+Final integrated verification: `tools/verify.sh` passed after the merge, including Claude's sticker input and urban fixture checks. The combined Python suite now contains **41 passing tests**. Camera access remains deferred by the user; no webcam tracker is running.

@@ -487,7 +487,7 @@ async def run(args):
                     wizard.observe(yoke, throttle)
                     yoke = throttle = None
                 packet = controller.step(time.monotonic(), int(time.time() * 1000), yoke, throttle)
-                weapons = weapon_switches.step(detector.weapon_observations if frame is not None and not wizard else {}, time.monotonic())
+                weapons = weapon_switches.step(getattr(detector,"weapon_observations",{}) if frame is not None and not wizard else {}, time.monotonic())
                 if weapon_switches.configured and not wizard:
                     packet['weapons'] = weapons
                 serialized = json.dumps(packet, allow_nan=False, separators=(",", ":"))
