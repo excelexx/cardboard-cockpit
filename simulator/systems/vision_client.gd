@@ -6,6 +6,7 @@ const STALE_AFTER_MS: int = 350
 const MAX_JSON_INTEGER: float = 9007199254740991.0
 
 var socket := WebSocketPeer.new()
+var endpoint := "ws://127.0.0.1:8765"
 var connected := false
 # Yoke availability for input merging. Throttle confidence is independent.
 var tracking := false
@@ -51,7 +52,7 @@ func poll(dt: float) -> void:
 			socket = WebSocketPeer.new()
 			socket.inbound_buffer_size = 8192
 			socket.max_queued_packets = 8
-			socket.connect_to_url("ws://127.0.0.1:8765")
+			socket.connect_to_url(endpoint)
 			retry_at = now + 3000
 			# A restarted tracker begins again at zero; a handshake cannot
 			# make old confidence or controls valid again by itself.

@@ -10,11 +10,19 @@ var begun: int = 0
 var observed_sequence: int = -1
 var held_throttle: float = -1.0
 var failure := false
+var test_port := 0
 
 func _initialize() -> void:
 	if not _validation_tests():
 		return
 	client = Client.new()
+	var probe := TCPServer.new()
+	if probe.listen(0,"127.0.0.1")!=OK:
+		_fail("Cannot reserve local integration-test port")
+		return
+	test_port=probe.get_local_port()
+	probe.stop()
+	client.endpoint="ws://127.0.0.1:"+str(test_port)
 	client.enabled = true
 	begun = Time.get_ticks_msec()
 	_start_tracker(2.0)
@@ -102,7 +110,7 @@ func _start_tracker(duration: float) -> void:
 	if not FileAccess.file_exists(interpreter):
 		_fail("Install vision/requirements.txt in .venv before integration test")
 		return
-	child = OS.create_process(interpreter, PackedStringArray([root.path_join("vision/tracker.py"), "--simulate", "--duration", str(duration)]))
+	child = OS.create_process(interpreter, PackedStringArray([root.path_join("vision/tracker.py"), "--simulate", "--port",str(test_port), "--duration", str(duration)]))
 	if child <= 0:
 		_fail("Could not start simulated tracker")
 

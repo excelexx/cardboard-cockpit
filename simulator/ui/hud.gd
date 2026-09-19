@@ -88,6 +88,11 @@ func draw_title() -> void:
 	text(Vector2(74,915),app.badge.status,11,GREEN if app.badge.connected else MUTED,true)
 	button("credits",Rect2(74,927,140,34),"Credits")
 func draw_flight() -> void:
+	if app.paper_test or (app.cockpit and not app.combat.active):
+		draw_clear_flight()
+		return
+	if app.paper_test:
+		text(Vector2(460,150),"YOKE LIVE  /  ROTATE TO BANK  /  TILT TO PITCH" if app.vision.tracking else "HOLD MARKER 7 STEADY TO CENTER  /  FLIGHT HELD",16,CYAN,true)
 	var f: FlightDynamics = app.flight
 	var c: CombatDirector = app.combat
 	text(Vector2(42,49),"SPECTRE / X–26",14,WHITE,true)
@@ -226,6 +231,47 @@ func draw_flight() -> void:
 		text(Vector2(800-width/2,644),caption,17,WHITE)
 	if app.vision.tracking or app.developer_mode: draw_control_feedback()
 	if app.developer_mode: text(Vector2(610,960),"%d FPS / %.1f M/S / %s" % [Engine.get_frames_per_second(),f.speed,"HIGH" if app.high_quality else "BALANCED"],11,MUTED,true)
+func draw_clear_flight() -> void:
+	var f: FlightDynamics=app.flight
+	var c: CombatDirector=app.combat
+	text(Vector2(52,64),"%d KNOTS" % int(f.speed*1.94384),24,WHITE,true)
+	text(Vector2(1280,64),"%d FT" % int(f.position.y*3.28084),24,WHITE,true)
+	text(Vector2(740,64),"%03d°" % int(f.get_heading_degrees()),23,CYAN,true)
+	var instruction: String=""
+	if app.paper_test:
+		instruction="ROTATE TO BANK  ·  TILT TOP TOWARD YOU TO CLIMB" if app.vision.tracking else "SHOW MARKER 7 AND HOLD STILL — FLIGHT HELD"
+	elif app.mission.active: instruction=app.mission.instruction()
+	var width: float=font.get_string_size(instruction,HORIZONTAL_ALIGNMENT_LEFT,-1,19).x
+	text(Vector2(800-width/2,122),instruction,19,CYAN)
+	if app.mission.active:
+		var target: Vector3=app.mission.route_target()
+		if not app.camera.is_position_behind(target):
+			var nav: Vector2=app.camera.unproject_position(target).clamp(Vector2(170,160),Vector2(1430,550))
+			draw_polyline(PackedVector2Array([nav+Vector2(0,-9),nav+Vector2(9,0),nav+Vector2(0,9),nav+Vector2(-9,0),nav+Vector2(0,-9)]),CYAN,2,true)
+	var center: Vector2=app.camera.unproject_position(c.reticle_point())
+	line(center-Vector2(16,0),center-Vector2(5,0),WHITE)
+	line(center+Vector2(5,0),center+Vector2(16,0),WHITE)
+	if c.active and c.engagement_enabled:
+		for enemy: Dictionary in c.enemies:
+			if enemy.id!=c.target_id or app.camera.is_position_behind(enemy.position): continue
+			var at: Vector2=app.camera.unproject_position(enemy.position)
+			brackets(at,24,GREEN if c.lock_progress>=1 else AMBER)
+			text(at+Vector2(34,0),"%d M" % int(f.position.distance_to(enemy.position)),16,WHITE,true)
+	if app.paper_test:
+		text(Vector2(52,920),"BANK  %+.0f%%     PITCH  %+.0f%%" % [app.control.x*100,app.control.y*100],21,WHITE,true)
+		text(Vector2(52,957),"R  RESET FLIGHT   ·   SPACE IN CAMERA WINDOW  RECENTER",15,MUTED)
+	else:
+		text(Vector2(52,951),"POWER %d%%  ·  GEAR %s" % [int(f.throttle*100),"DOWN" if f.gear else "UP"],17,MUTED)
+		if c.active and c.engagement_enabled:
+			text(Vector2(1090,951),"SPACE  FIRE    T  MISSILE",17,MUTED)
+			text(Vector2(680,170),"MISSILE LOCK" if c.lock_progress>=1 else "",20,GREEN)
+	if c.incoming_distance<2200: text(Vector2(610,210),"MISSILE INBOUND — Z FLARES",20,DANGER)
+	if f.stall_time>.6: text(Vector2(660,250),"STALL — LOWER NOSE",20,AMBER)
+	if not app.audio.radio.caption.is_empty():
+		var caption: String=app.audio.radio.caption
+		var caption_width: float=font.get_string_size(caption,HORIZONTAL_ALIGNMENT_LEFT,-1,18).x
+		text(Vector2(800-caption_width/2,880),caption,18,WHITE)
+
 func draw_scope(center: Vector2,c: CombatDirector) -> void:
 	draw_circle(center,79,Color(0.015,0.035,0.045,0.50))
 	for radius in [38.0,76.0]: draw_arc(center,radius,0,TAU,64,Color(0.34,0.65,0.63,0.35),1,true)

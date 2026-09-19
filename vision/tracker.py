@@ -166,6 +166,118 @@ class ArucoTracker:
         return yoke, throttle
 
 
+class PaperController:
+    """Single-marker yoke test using rotation and perspective tilt.
+
+    The first stable second establishes neutral; space recenters. Rotation banks
+    and forward/backward tilt pitches. Image translation is not an input.
+    """
+    def __init__(self):
+        self.cv2, self.np = load_cv()
+        parameters = self.cv2.aruco.DetectorParameters()
+        parameters.cornerRefinementMethod = self.cv2.aruco.CORNER_REFINE_SUBPIX
+        self.detector = self.cv2.aruco.ArucoDetector(
+            self.cv2.aruco.getPredefinedDictionary(self.cv2.aruco.DICT_4X4_50), parameters)
+        self.samples = collections.deque(maxlen=24)
+        self.motion = collections.deque(maxlen=3)
+        self.axis_active = [False, False]
+        self.neutral = None
+        self.message = "Show marker 7 and hold still for one second to center."
+
+    def recenter(self):
+        self.neutral = None
+        self.samples.clear()
+        self.motion.clear()
+        self.axis_active = [False, False]
+
+    def stable_axis(self, value, index, enter, leave, full):
+        # Schmitt neutral zone: don't repeatedly change signs at rest.
+        # Do not move the neutral anchor while the user is deliberately steering.
+        if abs(value) <= leave:
+            self.axis_active[index] = False
+        elif abs(value) >= enter:
+            self.axis_active[index] = True
+        if not self.axis_active[index]:
+            return 0.0
+        return math.copysign(clamp((abs(value)-leave)/(full-leave), 0, 1), value)
+
+    def map_observation(self, roll, tilt, confidence):
+        if self.neutral is None:
+            self.samples.append((roll, tilt))
+            if len(self.samples) < 20:
+                return None
+            angles = [wrap_degrees(x[0] - self.samples[0][0]) for x in self.samples]
+            heights = [x[1] for x in self.samples]
+            if statistics.pstdev(angles) > 2 or statistics.pstdev(heights) > 2:
+                self.message = "Hold marker 7 steady to center."
+                return None
+            self.neutral = (self.samples[0][0] + statistics.median(angles), statistics.median(heights))
+            print("YOKE READY: centered marker 7; rotate to bank, tilt to pitch.", flush=True)
+        # Camera sees the opposite face from the person holding the card.
+        # Full steering at 20 degrees bank / 25 degrees tilt; preserve the
+        # downstream calibrated output ranges and existing jitter filtering.
+        self.motion.append((wrap_degrees(roll-self.neutral[0]), wrap_degrees(tilt-self.neutral[1])))
+        bank_delta = statistics.median(x[0] for x in self.motion)
+        pitch_delta = statistics.median(x[1] for x in self.motion)
+        bank = -self.stable_axis(bank_delta, 0, 1.8, 1.0, 20) * 35
+        pitch = self.stable_axis(pitch_delta, 1, 5.0, 3.0, 25) * 25
+        self.message = "LIVE: rotate to bank; tilt top toward you to climb. SPACE centers."
+        return YokeObservation(bank, pitch, confidence)
+
+    def perspective_angles(self, points, width, height):
+        cv, np = self.cv2, self.np
+        # Decompose the signed projective square, not its bounding-box aspect
+        # ratio. Intrinsics are approximate; this is a relative controller,
+        # not a calibrated metric pose measurement.
+        square = np.array([[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]], np.float32)
+        h = cv.getPerspectiveTransform(square, points.astype(np.float32))
+        focal = width * .72
+        k = np.array([[focal,0,width/2],[0,focal,height/2],[0,0,1]],float)
+        basis = np.linalg.solve(k,h)
+        scale = 2 / (np.linalg.norm(basis[:,0])+np.linalg.norm(basis[:,1]))
+        if basis[2,2] < 0: scale = -scale
+        x, y = basis[:,0]*scale, basis[:,1]*scale
+        u, _, vt = np.linalg.svd(np.column_stack((x,y,np.cross(x,y))))
+        rotation = u @ np.diag([1,1,np.linalg.det(u @ vt)]) @ vt
+        roll = math.degrees(math.atan2(rotation[1,0],rotation[0,0]))
+        # The face normal does not depend on which way the sticker was taped
+        # (including upside down). Positive: top away from camera/toward pilot.
+        tilt = math.degrees(math.atan2(rotation[1,2],rotation[2,2]))
+        return roll, tilt
+
+    def detect(self, frame, now, draw=True):
+        cv, np = self.cv2, self.np
+        corners, ids, _ = self.detector.detectMarkers(frame)
+        mirrored = False
+        if ids is None or YOKE_ID not in ids:
+            corners, ids, _ = self.detector.detectMarkers(cv.flip(frame, 1))
+            mirrored = True
+        if ids is None or list(ids.flatten()).count(YOKE_ID) != 1:
+            self.samples.clear()
+            self.motion.clear()
+            self.axis_active = [False, False]
+            self.message = "Marker 7 not visible - flight holds. Keep all four black corners clear."
+            return None, None
+        points = corners[list(ids.flatten()).index(YOKE_ID)].reshape(4, 2).copy()
+        side = min(float(np.linalg.norm(points[(i + 1) % 4] - points[i])) for i in range(4))
+        if side < 70:
+            self.samples.clear()
+            self.message = "Move marker 7 closer."
+            return None, None
+        try:
+            roll, tilt = self.perspective_angles(points,frame.shape[1],frame.shape[0])
+        except (ValueError, np.linalg.LinAlgError, cv.error):
+            return None, None
+        if not math.isfinite(tilt) or abs(tilt)>65:
+            self.message = "Face marker toward camera; avoid edge-on angles."
+            return None, None
+        if mirrored:
+            points[:, 0] = frame.shape[1] - 1 - points[:, 0]
+        if draw:
+            cv.polylines(frame, [points.astype(np.int32)], True, (60,240,90), 3)
+        return self.map_observation(roll, tilt, clamp(side / 120, .4, 1)), None
+
+
 class CameraSource:
     def __init__(self, camera_index: int, width: int, height: int, fps: int):
         # This is the only VideoCapture call in the project. Construction is
@@ -285,8 +397,13 @@ async def run(args):
     source = detector = wizard = None
     calibration = simulated_calibration()
     if args.camera is not None:
-        detector = ArucoTracker()
-        if args.calibration.exists() and not args.calibrate:
+        detector = PaperController() if args.paper_test else ArucoTracker()
+        if args.paper_test:
+            args.calibrate = False
+            # Relative image-space units, not a fabricated saved physical calibration.
+            calibration = Calibration(AxisCalibration(-35,0,35), AxisCalibration(-25,0,25),
+                                      ThrottleCalibration((.75,.8),(.75,.4)))
+        elif args.calibration.exists() and not args.calibrate:
             calibration = Calibration.load(args.calibration)
             if calibration.camera_index != args.camera:
                 print("Camera settings changed. Recalibration is required.", flush=True)
@@ -358,7 +475,7 @@ async def run(args):
                         failure_count = 0
                         if not checked_frame_size:
                             checked_frame_size = True
-                            if not wizard and (frame.shape[1], frame.shape[0]) != (calibration.width, calibration.height):
+                            if not args.paper_test and not wizard and (frame.shape[1], frame.shape[0]) != (calibration.width, calibration.height):
                                 if args.no_preview:
                                     raise RuntimeError("Camera resolution changed. Restart without --no-preview to recalibrate.")
                                 print("Camera resolution changed. Recalibration is required.", flush=True)
@@ -384,6 +501,12 @@ async def run(args):
                     interval = max(frame_start - previous, 0.001)
                     fps_estimate += .08 * ((1.0 / interval) - fps_estimate)
                     draw_preview(frame, packet, wizard, fps_estimate)
+                    if args.paper_test:
+                        detector.cv2.rectangle(frame, (0,0), (frame.shape[1],122), (26,30,32), -1)
+                        for row, line in enumerate(["YOKE CONTROLLER - ID 7 - KEEP OPEN WHILE PLAYING", detector.message,
+                                "BANK %+.2f  PITCH %+.2f   |   Q quits" % (packet["yoke"]["roll"], packet["yoke"]["pitch"]) ]):
+                            detector.cv2.putText(frame,line,(16,28+row*33),detector.cv2.FONT_HERSHEY_SIMPLEX,.55,(110,240,160),1,detector.cv2.LINE_AA)
+                        detector.cv2.imshow(PREVIEW_TITLE,frame)
                     key = detector.cv2.waitKey(1) & 0xFF
                     if key in (27, ord("q")):
                         break
@@ -395,7 +518,9 @@ async def run(args):
                     except detector.cv2.error:
                         # Some backends destroy the window before it can be queried.
                         break
-                    if key == ord("c"):
+                    if args.paper_test and key in (32, ord("c")):
+                        detector.recenter()
+                    elif not args.paper_test and key == ord("c"):
                         wizard = CalibrationWizard(args.camera, frame.shape[1], frame.shape[0])
                     elif key == 32 and wizard:
                         calibrated = wizard.capture()
@@ -423,6 +548,7 @@ def parser():
     mode.add_argument("--camera", type=int, metavar="INDEX", help="Explicitly open this webcam, usually 0")
     mode.add_argument("--markers", type=Path, metavar="DIRECTORY", help="Generate printable marker SVG/PNG files; no camera")
     result.add_argument("--calibrate", action="store_true", help="Run the seven-step calibration before camera control")
+    result.add_argument("--paper-test", action="store_true", help="Control with marker 7 only: auto-center, rotate to bank, tilt to pitch; no throttle marker")
     result.add_argument("--calibration", type=Path, default=DEFAULT_CALIBRATION)
     result.add_argument("--no-preview", action="store_true", help="Hide camera/debug window after calibration")
     result.add_argument("--print-json", action="store_true", help="Print every normalized packet for inspection")
@@ -448,6 +574,8 @@ def main():
         argument_parser.error("Camera index cannot be negative.")
     if args.calibrate and args.camera is None:
         argument_parser.error("--calibrate requires an explicit --camera INDEX.")
+    if args.paper_test and (args.camera is None or args.calibrate or args.no_preview):
+        argument_parser.error("--paper-test needs --camera and its preview; omit --calibrate.")
     if args.loss_demo and not args.simulate:
         argument_parser.error("--loss-demo requires --simulate.")
     try:
