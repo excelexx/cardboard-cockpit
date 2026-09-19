@@ -1,0 +1,192 @@
+{
+  "source": "https://kenney.nl/assets/voiceover-pack",
+  "license": "CC0",
+  "provider": "licensed recordings; not ElevenLabs",
+  "cues": {
+    "intro": {
+      "speaker": "CONTROL",
+      "text": "Ready? Go!",
+      "file": "intro.wav",
+      "duration": 1.8035374149659864,
+      "priority": 2,
+      "cooldown": 10,
+      "sha256": "cb0ad4b49fbfb44187f67a14e7040e13847a4045678aeacc320682e912e96de1",
+      "source_files": [
+        "Male/ready.ogg",
+        "Male/go.ogg"
+      ]
+    },
+    "target_locked": {
+      "speaker": "PILOT",
+      "text": "Target engaged.",
+      "file": "target_locked.wav",
+      "duration": 1.4202267573696146,
+      "priority": 0,
+      "cooldown": 16,
+      "sha256": "991de8f98bf8b10e056cc6beb43be425fafb31cfd10ef3c7ea7c4db6838f9aff",
+      "source_files": [
+        "Female/war_target_engaged.ogg"
+      ]
+    },
+    "target_down": {
+      "speaker": "PILOT",
+      "text": "Target destroyed.",
+      "file": "target_down.wav",
+      "duration": 1.631156462585034,
+      "priority": 0,
+      "cooldown": 10,
+      "sha256": "7e9277e11b711304c4cf3994b8cc4aabba56ba03401da3de7911bb0ce117908c",
+      "source_files": [
+        "Female/war_target_destroyed.ogg"
+      ]
+    },
+    "target_down_alt": {
+      "speaker": "CONTROL",
+      "text": "Target destroyed.",
+      "file": "target_down_alt.wav",
+      "duration": 1.6864399092970521,
+      "priority": 0,
+      "cooldown": 10,
+      "sha256": "a97250fd459f0a358a6faf8cb5e91f8c3e2ed20c3434c5cb718f522d2973c6c9",
+      "source_files": [
+        "Male/war_target_destroyed.ogg"
+      ]
+    },
+    "warning": {
+      "speaker": "CONTROL",
+      "text": "Look out!",
+      "file": "warning.wav",
+      "duration": 0.952562358276644,
+      "priority": 3,
+      "cooldown": 8,
+      "sha256": "9f5ae084277c0ec5ab3f1f4732d6af03fb5db74b49f61ed9dcb86b4dd7b41248",
+      "source_files": [
+        "Male/war_look_out.ogg"
+      ]
+    },
+    "reload": {
+      "speaker": "PILOT",
+      "text": "Reloading.",
+      "file": "reload.wav",
+      "duration": 1.056734693877551,
+      "priority": 1,
+      "cooldown": 12,
+      "sha256": "8ce00409e3ace66d95e3520de22330b92b5e81d3f7c2e366df2e7c963478e4f2",
+      "source_files": [
+        "Female/war_reloading.ogg"
+      ]
+    },
+    "cleared": {
+      "speaker": "CONTROL",
+      "text": "Ready? Go!",
+      "file": "cleared.wav",
+      "duration": 1.8035374149659864,
+      "priority": 1,
+      "cooldown": 15,
+      "sha256": "b2f19109ed8bf00943165a2802527a5c1ab09830c3262eaa4781fee661899379",
+      "source_files": [
+        "Male/ready.ogg",
+        "Male/go.ogg"
+      ]
+    },
+    "checkpoint": {
+      "speaker": "CONTROL",
+      "text": "Objective achieved.",
+      "file": "checkpoint.wav",
+      "duration": 1.7695691609977324,
+      "priority": 0,
+      "cooldown": 14,
+      "sha256": "ef1089a824a2901546f1df8be42029379ea24864c625b1c4c9cb03257b7ccb35",
+      "source_files": [
+        "Male/objective_achieved.ogg"
+      ]
+    },
+    "approach": {
+      "speaker": "CONTROL",
+      "text": "Hold.",
+      "file": "approach.wav",
+      "duration": 1.039546485260771,
+      "priority": 1,
+      "cooldown": 25,
+      "sha256": "8010f70cd15208901816301e09c9faa847d40c748b3ff43816d7c28fa0fa5b01",
+      "source_files": [
+        "Male/hold.ogg"
+      ]
+    },
+    "touchdown": {
+      "speaker": "CONTROL",
+      "text": "Objective achieved.",
+      "file": "touchdown.wav",
+      "duration": 1.596235827664399,
+      "priority": 2,
+      "cooldown": 15,
+      "sha256": "66ef6499c576f91e86061bff009cd68e73d8abadb0ab0db672dfacee4a82d745",
+      "source_files": [
+        "Female/objective_achieved.ogg"
+      ]
+    },
+    "landed": {
+      "speaker": "CONTROL",
+      "text": "Congratulations.",
+      "file": "landed.wav",
+      "duration": 1.879092970521542,
+      "priority": 2,
+      "cooldown": 15,
+      "sha256": "4b4371339384ab48a44b94ce24fe698410cc198b2f46d0405b2d270bd01ecbcd",
+      "source_files": [
+        "Male/congratulations.ogg"
+      ]
+    },
+    "success": {
+      "speaker": "CONTROL",
+      "text": "Mission completed. Congratulations.",
+      "file": "success.wav",
+      "duration": 3.2616780045351472,
+      "priority": 3,
+      "cooldown": 15,
+      "sha256": "19f1933d8532c35cadc98b2b55da1cee096c1c261d8a3a7fb82136901054a6e4",
+      "source_files": [
+        "Male/mission_completed.ogg",
+        "Male/congratulations.ogg"
+      ]
+    },
+    "failure": {
+      "speaker": "CONTROL",
+      "text": "Mission failed.",
+      "file": "failure.wav",
+      "duration": 1.452108843537415,
+      "priority": 3,
+      "cooldown": 15,
+      "sha256": "9cdd6ecab0d212554daf4a3e2fd48f2e6c07d5f10dbaa2de24537169f7e9ebfc",
+      "source_files": [
+        "Male/mission_failed.ogg"
+      ]
+    },
+    "eject": {
+      "speaker": "CONTROL",
+      "text": "Look out!",
+      "file": "eject.wav",
+      "duration": 0.9924263038548753,
+      "priority": 3,
+      "cooldown": 15,
+      "sha256": "12ffbaeb4f4b47b0d4eaed9a4b22162b2a2a21bd913d44b0c701b97a4f316e55",
+      "source_files": [
+        "Female/war_look_out.ogg"
+      ]
+    },
+    "countdown": {
+      "speaker": "CONTROL",
+      "text": "Three. Two. One.",
+      "file": "countdown.wav",
+      "duration": 2.6387755102040815,
+      "priority": 2,
+      "cooldown": 30,
+      "sha256": "a766e0a3aaca6096d989758d824fcff2cc0ad0c15878c36d3bb947dc2fc7a4be",
+      "source_files": [
+        "Male/3.ogg",
+        "Male/2.ogg",
+        "Male/1.ogg"
+      ]
+    }
+  }
+}

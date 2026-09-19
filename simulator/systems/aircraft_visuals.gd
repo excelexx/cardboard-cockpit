@@ -22,6 +22,10 @@ var _engine_material: StandardMaterial3D
 var _clock := 0.0
 var _control := Vector3.ZERO
 var _origin_removed := Vector3.ZERO
+var bay_doors: Array[Dictionary] = []
+var bay_amount := 0.0
+var bay_timer := 0.0
+var bay_side := -1.0
 
 func initialize(model: Node3D, profile: Dictionary) -> void:
 	# Reinitializing on an existing aircraft restores every captured transform.
@@ -67,6 +71,7 @@ func initialize(model: Node3D, profile: Dictionary) -> void:
 	_build_gear_groups()
 	_build_lights()
 	_build_control_surfaces()
+	_build_weapon_bays()
 	_build_engine_glow()
 	reset()
 
@@ -75,6 +80,12 @@ func update_visuals(delta: float, flight: FlightDynamics, controls: Vector3) -> 
 		return
 	var dt := maxf(delta, 0.0)
 	_clock += dt
+	bay_timer = maxf(0,bay_timer-dt)
+	bay_amount = move_toward(bay_amount,1.0 if bay_timer>0.2 else 0.0,dt*5)
+	for door: Dictionary in bay_doors:
+		var amount: float = bay_amount if door.side==bay_side else 0.0
+		if door.inner: amount = clampf((amount-0.3)/0.7,0,1)
+		_apply_rotation(door,door.angle*smoothstep(0,1,amount))
 	gear_progress = move_toward(gear_progress, 1.0 if flight.gear else 0.0, dt / GEAR_TRAVEL_SECONDS)
 	_apply_gear()
 	_control = _control.lerp(controls.clamp(Vector3(-1, -1, -1), Vector3.ONE), 1.0 - exp(-dt * 9.0))
@@ -95,6 +106,9 @@ func update_visuals(delta: float, flight: FlightDynamics, controls: Vector3) -> 
 
 func reset() -> void:
 	gear_progress = 1.0
+	bay_amount = 0; bay_timer = 0
+	for door: Dictionary in bay_doors:
+		if is_instance_valid(door.node): door.node.transform = door.original
 	_clock = 0.0
 	_control = Vector3.ZERO
 	for group in _gear_groups:
@@ -341,20 +355,38 @@ func _build_engine_glow() -> void:
 		found = true
 	if not found:
 		return
-	var shape := CylinderMesh.new()
-	shape.top_radius = minf(bounds.size.x, bounds.size.y) * 0.34
-	shape.bottom_radius = shape.top_radius
-	shape.height = 0.015
-	shape.radial_segments = 24
+	var shape := TorusMesh.new()
+	shape.inner_radius = minf(bounds.size.x, bounds.size.y) * 0.20
+	shape.outer_radius = minf(bounds.size.x, bounds.size.y) * 0.245
+	shape.rings = 40
+	shape.ring_segments = 12
 	_engine_glow = MeshInstance3D.new()
 	_engine_glow.name = "EngineCoreGlow"
 	_engine_glow.mesh = shape
 	_engine_glow.rotation.x = PI / 2.0
-	_engine_glow.position = Vector3(bounds.get_center().x, bounds.get_center().y, bounds.end.z - 0.06)
+	_engine_glow.position = Vector3(bounds.get_center().x, bounds.get_center().y, bounds.end.z - 0.38)
 	_engine_glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_engine_material = StandardMaterial3D.new()
-	_engine_material.albedo_color = Color(0.22, 0.055, 0.008)
+	_engine_material.albedo_color = Color(0.07, 0.025, 0.008)
 	_engine_material.emission_enabled = true
 	_engine_material.emission = Color(1.0, 0.21, 0.035)
 	_engine_glow.material_override = _engine_material
 	_effects.add_child(_engine_glow)
+
+func open_weapon_bay(side: float) -> void:
+	bay_side = -1.0 if side<0 else 1.0
+	bay_timer = 1.0
+func _build_weapon_bays() -> void:
+	bay_doors.clear()
+	for spec: Array in [
+		["door bayLI",Vector3(-1.48,-0.32,-0.74),Vector3(1.82,-0.31,-0.73),110.0,-1.0,true],
+		["door bayLO",Vector3(-1.94,-1.45,-0.49),Vector3(0.40,-1.44,-0.69),-100.0,-1.0,false],
+		["door bayRI",Vector3(-1.48,0.32,-0.74),Vector3(1.82,0.31,-0.73),-110.0,1.0,true],
+		["door bayRO",Vector3(-1.94,1.45,-0.49),Vector3(0.40,1.44,-0.69),100.0,1.0,false]]:
+		var node: MeshInstance3D = _find_mesh(spec[0])
+		if node==null: continue
+		var record: Dictionary = _record(node)
+		record.pivot = _source_point(spec[1])
+		record.axis = _source_axis(spec[2]-spec[1])
+		record.angle = deg_to_rad(spec[3]); record.side = spec[4]; record.inner = spec[5]
+		bay_doors.append(record)

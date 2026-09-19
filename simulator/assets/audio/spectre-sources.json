@@ -1,0 +1,20 @@
+[
+  {
+    "source": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Sounds/sonicboom.wav",
+    "license": "GPL-3.0",
+    "source_path": "assets/aircraft/f35/source/Sounds/sonicboom.wav",
+    "source_sha256": "a0e1a2777217fe65ec181f5947000402447cae155ebf53e6d2797a67bafea755",
+    "output": "sonic.wav",
+    "output_sha256": "b6186a3b0ca38ec5dd6ccebe15a4ffeabdfdc6fb1a2301733709da49c97769bd",
+    "processing": "ffmpeg -i sonicboom.wav -af alimiter=limit=0.8 sonic.wav"
+  },
+  {
+    "source": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Sounds/reheat.wav",
+    "license": "GPL-3.0",
+    "source_path": "assets/aircraft/f35/source/Sounds/reheat.wav",
+    "source_sha256": "0acd4a7cd7023ed916f69bfc89e501a5d25bf9f656716da7efa1a11ca27244ae",
+    "output": "afterburner.wav",
+    "output_sha256": "473a08f010c246e07e924c66a9171078a55ec5e70c56cc6e5148bdbb9b6e2c83",
+    "processing": "ffmpeg -i reheat.wav -ac 1 -ar 22050 afterburner.wav"
+  }
+]

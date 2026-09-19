@@ -1,0 +1,14 @@
+Missile (seeker.glb): Jarlan Perez, CC BY 3.0.
+https://poly.pizza/m/1Xid2Qhqn2s
+https://static.poly.pizza/bae77cff-57c6-4cb4-8ccf-7bc61a9b1d20.glb
+
+Missile (battery.glb): Poly by Google, CC BY 3.0.
+https://poly.pizza/m/dPVCvXP-S58
+https://static.poly.pizza/908a29de-a70c-467a-ad90-0348e0a5e1cb.glb
+License for both: https://creativecommons.org/licenses/by/3.0/
+Adaptations: scale/orientation, animated exhaust, smoke trails.
+
+Blaster chassis and optics: Kenney Blaster Kit 2.1, CC0.
+https://kenney.nl/assets/blaster-kit
+Adaptations: ship mounting, industrial material palette, glowing coils and plasma emitters.
+KENNEY-BLASTER-LICENSE.txt is included.
