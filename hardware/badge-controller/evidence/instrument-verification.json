@@ -1,8 +1,8 @@
 {
-  "firmware": "instrument-2",
+  "firmware": "instrument-2.1",
   "backup_sha256": "aa8bce2fc8bcbff9e43f9b4fe9b42d5d227b9b318e07f699ec2c10749032ab85",
-  "application_sha256": "a75515a2e1b9f1e05449fdbb60b8f4f6f56170a4b24e237b9543926de2741f4c",
-  "application_bytes": 650064,
+  "application_sha256": "f54c769b7781a22c249b5d049c1796f5144f66037351a980fb9cd9c931a1e4d9",
+  "application_bytes": 651152,
   "write_offset": "0x10000",
   "flash_verified": true,
   "preserved": {
@@ -25,18 +25,32 @@
   },
   "physical_lcd_visual_confirmation": "User confirmed moving horizon/radar and physical LEFT control on instrument-1; instrument-2 bezel refinement awaiting final visual feedback",
   "live_ble_acceptance": {
-    "firmware": "instrument-2",
-    "duration_seconds": 25,
-    "packets_sent": 490,
-    "packets_accepted": 490,
+    "firmware": "instrument-2.1",
+    "duration_seconds": 60,
+    "packets_sent": 1106,
+    "packets_accepted": 1106,
     "bad_packets": 0,
-    "fps": 15.0,
-    "free_heap_bytes": 93440,
-    "payload_bits_per_second": 9388,
-    "legacy_phase_readbacks": "all four passed"
+    "fps": 14.9,
+    "sampled_fps_range": [
+      14.8,
+      15.0
+    ],
+    "free_heap_bytes": 93300,
+    "payload_bits_per_second": 9524,
+    "observed_resets": 0,
+    "legacy_phase_readbacks": "all four passed",
+    "patterns_exercised": "ready, takeoff, flight, target lock, missile warning, landing and successful results"
   },
   "software_acceptance": {
     "original_game_full_suite": "passed, including 63 Python tests",
-    "competing_source_regression": "passed; unrelated results/phase cannot override the owning game"
+    "competing_source_regression": "passed; unrelated results/phase cannot override the owning game",
+    "integration_full_suite": "passed, including 70 Python tests",
+    "plasma_shader": "native Metal render compiled and visually inspected"
+  },
+  "led_configuration": {
+    "maximum_raw_channel": 64,
+    "rainbow_level": 48,
+    "total_raw_channel_budget": 240,
+    "electrical_current": "not measured"
   }
 }

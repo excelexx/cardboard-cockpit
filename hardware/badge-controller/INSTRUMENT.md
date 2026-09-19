@@ -11,7 +11,7 @@ The existing 320×240 ST7789 now renders a flight instrument locally. Bluetooth 
 - **Results:** score, geese cleared and actual landing/mission result. Safe landing without the boss remains MISSION INCOMPLETE.
 - **Link loss:** retain the last valid page with LINK LOST - DATA HELD after stale telemetry or disconnect; WAITING FOR COCKPIT appears only before the first valid state. Buttons and BLE reconnect remain available.
 
-Buttons retain their existing eight-bit physical mapping (`0x17f`, code 7 unused). Button sampling runs in a separate 5 ms task so screen transfers do not block debouncing. UART0 stays unused because GPIO20/21 are the shift-register load/clock. The LED level stays low (14 peak): idle button rainbow, red departure/landing sweep, blue flight indication. No NFC or accelerometer behavior is changed.
+Buttons retain their existing eight-bit physical mapping (`0x17f`, code 7 unused). Button sampling runs in a separate 5 ms task so screen transfers do not block debouncing. UART0 stays unused because GPIO20/21 are the shift-register load/clock. LED firmware 2.1 uses brighter concentrated highlights: peak raw channel 64 (formerly 14), a raw-channel total budget of 240 across all six RGB pixels, and rainbow level 48. These are software output limits, not measured current ratings. Blue flight LEDs carry a cyan bank indicator; a brief cyan lock pulse and alternating red real-missile warning take priority. Takeoff/landing uses a red chase, successful results a green sweep, and readiness a restrained blue breath. The button rainbow remains available in idle. No NFC or accelerometer behavior is changed.
 
 ## Transport
 

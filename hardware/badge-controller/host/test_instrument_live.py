@@ -14,7 +14,7 @@ async def main(seconds):
   if c is None:raise RuntimeError('Instrument characteristic missing')
   print('CONNECTED instrument; write payload',c.max_write_without_response_size,flush=True)
   await client.start_notify(BUTTON_UUID,lambda _,data:print('BUTTON MASK',int.from_bytes(data[:2],'little'),flush=True))
-  seq=0;began=time.monotonic();bytes_sent=0
+  seq=0;began=time.monotonic();bytes_sent=0;last_phase=-1;last_phase_at=0.;last_health=0.;last_frames=0
   d=disconnected();d.update(mode=0,name='PILOT',pilot=1)
   while time.monotonic()-began<seconds:
    elapsed=time.monotonic()-began
@@ -22,6 +22,13 @@ async def main(seconds):
    elif elapsed<seconds-7:
     d.update(mode=1,roll=math.sin(elapsed*1.2)*55,pitch=math.sin(elapsed*.7)*18,heading=(elapsed*8)%360,speed=345,altitude=1250,flags=33 if int(elapsed)%8<4 else 35,range=740,contacts=[dict(x=600,y=1100,kind=2,selected=1),dict(x=-800,y=1900,kind=1,selected=0),dict(x=200,y=500,kind=3,selected=0)])
    else:d.update(mode=2,flags=64,score=4200,kills=18,landing=1,roll=0,pitch=0,contacts=[])
+   phase=0 if d['mode'] in (0,2) else 1 if elapsed<8 else 3 if elapsed>seconds-12 else 2
+   if phase!=last_phase or elapsed-last_phase_at>=1:
+    await client.write_gatt_char(PHASE_UUID,bytes([phase]),response=True);last_phase=phase;last_phase_at=elapsed
+   if elapsed-last_health>=5:
+    health=json.loads((await client.read_gatt_char(INFO_UUID)).decode())
+    if health['frames']<=last_frames or health['bad']!=0:raise RuntimeError('Reset or invalid packet during combined LED/display/BLE load')
+    print('HEALTH',json.dumps(health),flush=True);last_frames=health['frames'];last_health=elapsed
    seq+=1
    for part in fragments(encode(d,seq),seq,c.max_write_without_response_size):
     await client.write_gatt_char(INSTRUMENT_UUID,part,response=False);bytes_sent+=len(part)

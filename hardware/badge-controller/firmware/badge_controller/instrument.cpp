@@ -16,7 +16,7 @@ const int TFT_SCLK=1,TFT_MOSI=10,TFT_CS=2,TFT_DC=0,TFT_RST=4;
 const int PIN_LOAD=20,PIN_CLOCK=21,PIN_DATA=7,PIN_START=9;
 const uint16_t PHYSICAL_MASK=0x17f;
 const int LED_PIN=3,LED_COUNT=6;
-const uint8_t RAINBOW_LEVEL=14;
+const uint8_t RAINBOW_LEVEL=48;
 const unsigned long LED_STEP_MS=40,SEQUENCE_X_MS=3000;
 const float ROTATIONS_PER_SEC=.30f;
 #define SERVICE_UUID "5f1d0000-9c2b-4e7a-a3d6-0b8e1c4f2a71"
@@ -83,7 +83,7 @@ class PhaseCallbacks:public NimBLECharacteristicCallbacks {
 class InfoCallbacks:public NimBLECharacteristicCallbacks {
  void onRead(NimBLECharacteristic*c,NimBLEConnInfo&) override {
   char b[220];Telemetry t;portENTER_CRITICAL(&stateMux);t=latest;portEXIT_CRITICAL(&stateMux);
-  snprintf(b,sizeof(b),"{\"fw\":\"instrument-2\",\"packets\":%lu,\"bad\":%lu,\"frames\":%lu,\"fps10\":%u,\"heap\":%lu,\"seq\":%u,\"age\":%lu,\"buttons\":%u,\"mode\":%u,\"roll\":%d,\"pitch\":%d}",(unsigned long)goodPackets,(unsigned long)badPackets,(unsigned long)renderFrames,fps10,(unsigned long)ESP.getFreeHeap(),t.sequence,(unsigned long)(millis()-lastPacketAt),heldMask,t.mode,t.roll,t.pitch);
+  snprintf(b,sizeof(b),"{\"fw\":\"instrument-2.1\",\"packets\":%lu,\"bad\":%lu,\"frames\":%lu,\"fps10\":%u,\"heap\":%lu,\"seq\":%u,\"age\":%lu,\"buttons\":%u,\"mode\":%u,\"roll\":%d,\"pitch\":%d}",(unsigned long)goodPackets,(unsigned long)badPackets,(unsigned long)renderFrames,fps10,(unsigned long)ESP.getFreeHeap(),t.sequence,(unsigned long)(millis()-lastPacketAt),heldMask,t.mode,t.roll,t.pitch);
   c->setValue((uint8_t*)b,strlen(b));
  }
 };
@@ -105,13 +105,44 @@ void buttonTask(void*){
   }vTaskDelay(pdMS_TO_TICKS(5));
  }
 }
+// Sum of the 18 raw channel values, not a measured electrical current limit.
+// Concentrated highlights can be brighter without making all six LEDs full-on.
+const uint16_t LED_CHANNEL_BUDGET=240;
 void ledTick(uint32_t now){
- static uint32_t last=0;if(now-last<LED_STEP_MS)return;last=now;
+ static uint32_t last=0,lockedUntil=0;static bool wasLocked=false;
+ if(now-last<LED_STEP_MS)return;last=now;
+ Telemetry t;uint32_t received;bool fresh;
+ portENTER_CRITICAL(&stateMux);t=latest;received=lastPacketAt;fresh=telemetryFresh;portEXIT_CRITICAL(&stateMux);
+ bool live=clientConnected&&fresh&&goodPackets>0&&now-received<1500;
+ bool flying=live&&(t.mode==1||t.mode==3),locked=flying&&(t.flags&1);
+ if(locked&&!wasLocked)lockedUntil=now+1600;wasLocked=locked;
  uint8_t phase=(now-phaseAt<5000)?currentPhase:0;
  strip.clear();
- if(phase==2){for(int i=0;i<6;i++)strip.setPixelColor(i,0,3,10);}
- else if(phase==1||phase==3){int head=(now/140)%6;for(int i=0;i<6;i++)strip.setPixelColor(i,i==head?14:1,0,0);}
- else if((int32_t)(buttonSequenceUntil-now)>0){for(int i=0;i<6;i++){uint16_t h=(uint16_t)(now*19.66f+i*10922);uint32_t rgb=strip.ColorHSV(h,255,RAINBOW_LEVEL);strip.setPixelColor(i,rgb);}}
+ if(flying&&(t.flags&2)){
+  // Three red lights alternate across the panel; a threat is never decorative.
+  int half=(now/250)%2;for(int i=0;i<6;i++)if(i/3==half)strip.setPixelColor(i,64,2,0);
+ }else if(flying&&now<lockedUntil){
+  int v=24+int(16*(.5f+.5f*sinf(now*.010f)));
+  for(int i=0;i<6;i++)strip.setPixelColor(i,0,v/2,v);
+ }else if(live&&t.mode==2){
+  int head=(now/180)%6;
+  for(int i=0;i<6;i++)strip.setPixelColor(i,(t.flags&64)?0:10,(t.flags&64)?(i==head?48:18):5,(t.flags&64)?4:0);
+ }else if(phase==1||phase==3){
+  int head=(now/115)%6;
+  for(int i=0;i<6;i++){int trail=(head-i+6)%6;strip.setPixelColor(i,trail==0?64:trail==1?24:4,0,0);}
+ }else if(phase==2){
+  // A brighter cyan highlight follows bank across the six blue cruise lights.
+  int head=constrain(3+t.roll/1800,0,5);
+  for(int i=0;i<6;i++)strip.setPixelColor(i,0,i==head?22:4,i==head?44:24);
+ }else if((int32_t)(buttonSequenceUntil-now)>0){
+  for(int i=0;i<6;i++){uint16_t h=(uint16_t)(now*19.66f+i*10922);strip.setPixelColor(i,strip.ColorHSV(h,255,RAINBOW_LEVEL));}
+ }else{
+  int glow=8+int(8*(.5f+.5f*sinf(now*.0018f)));
+  for(int i=0;i<6;i++)strip.setPixelColor(i,0,live?glow/3:0,glow);
+ }
+ uint16_t total=0;
+ for(int i=0;i<6;i++){uint32_t c=strip.getPixelColor(i);total+=((c>>16)&255)+((c>>8)&255)+(c&255);}
+ if(total>LED_CHANNEL_BUDGET)for(int i=0;i<6;i++){uint32_t c=strip.getPixelColor(i);strip.setPixelColor(i,((c>>16)&255)*LED_CHANNEL_BUDGET/total,((c>>8)&255)*LED_CHANNEL_BUDGET/total,(c&255)*LED_CHANNEL_BUDGET/total);}
  strip.show();
 }
 void txt(int x,int y,const char*s,int size=1,Ink color=WHITE){canvas.setTextSize(size);canvas.setTextColor(color);canvas.setCursor(x,y);canvas.print(s);}
@@ -228,7 +259,7 @@ void setup(){
  auto info=service->createCharacteristic(INFO_UUID,NIMBLE_PROPERTY::READ,220);info->setCallbacks(new InfoCallbacks());
  service->start();auto adv=NimBLEDevice::getAdvertising();adv->addServiceUUID(SERVICE_UUID);adv->enableScanResponse(true);NimBLEDevice::startAdvertising();
  xTaskCreate(buttonTask,"buttons",3072,nullptr,2,nullptr);
- Serial.printf("SPECTRE instrument-2 ready; heap=%u framebuffer=%s\n",ESP.getFreeHeap(),canvas.getBuffer()?"OK":"FAILED");
+ Serial.printf("SPECTRE instrument-2.1 ready; heap=%u framebuffer=%s\n",ESP.getFreeHeap(),canvas.getBuffer()?"OK":"FAILED");
 }
 void loop(){
  static uint32_t last=0,fpsAt=0,lastCount=0;uint32_t now=millis();ledTick(now);
