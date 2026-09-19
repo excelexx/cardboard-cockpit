@@ -2,6 +2,9 @@ extends Control
 class_name CockpitInstruments
 
 # Purpose-built training flight displays; these are artistic interpretations.
+const SFRoute = preload("res://systems/san_francisco_route.gd")
+func route_points() -> Array[Vector3]: return SFRoute.POINTS if navigation_kind=="sf" else ROUTE
+func display_heading() -> float: return fposmod(heading+(298.0 if navigation_kind=="sf" else 0.0),360.0)
 var display_mode: String = "pfd"
 var aircraft_name: String = "737"
 var engine_count: int = 2
@@ -34,7 +37,7 @@ const ROUTE: Array[Vector3] = [Vector3(0,180,-2000),Vector3(-450,420,-4200),Vect
 const NORTH_FIELD_AIM := Vector3(0,3,-14100)
 
 func set_navigation(kind: String, checkpoint: int) -> void:
-	var bounded: int = clampi(checkpoint,0,ROUTE.size())
+	var bounded: int = clampi(checkpoint,0,route_points().size())
 	if navigation_kind == kind and navigation_checkpoint == bounded:
 		return
 	navigation_kind = kind
@@ -43,14 +46,14 @@ func set_navigation(kind: String, checkpoint: int) -> void:
 	_refresh_texture()
 
 func navigation_target() -> Vector3:
-	if navigation_kind == "valley" and navigation_checkpoint < ROUTE.size():
-		return ROUTE[navigation_checkpoint]
-	return NORTH_FIELD_AIM
+	if navigation_kind in ["valley","sf"] and navigation_checkpoint < route_points().size():
+		return route_points()[navigation_checkpoint]
+	return Vector3(0,4,1300) if navigation_kind=="sf" else NORTH_FIELD_AIM
 
 func navigation_target_label() -> String:
-	if navigation_kind == "valley" and navigation_checkpoint < ROUTE.size():
+	if navigation_kind in ["valley","sf"] and navigation_checkpoint < route_points().size():
 		return "CP%02d" % (navigation_checkpoint+1)
-	return "NORTH FIELD"
+	return "SFO / 28R" if navigation_kind=="sf" else "NORTH FIELD"
 
 func update_flight(flight: FlightDynamics, dt: float) -> void:
 	speed = flight.speed * 1.94384
@@ -166,13 +169,13 @@ func _pfd() -> void:
 	_tape(Rect2(615,86,136,425),altitude,200,50,"ALT",true)
 	_text("KT",Vector2(28,545),21,CYAN)
 	_text("FT",Vector2(696,545),21,CYAN)
-	_center("%03d°" % roundi(heading),Vector2(369,557),41,CYAN)
+	_center("%03d°" % roundi(display_heading()),Vector2(369,557),41,CYAN)
 	_center("HEADING",Vector2(369,587),17,MUTED)
 	# Horizontal heading strip follows the live compass.
 	draw_rect(Rect2(120,605,500,71), Color(0.045,0.065,0.085))
 	for offset: int in range(-40,41,10):
-		var absolute: float = floorf(heading/10.0)*10.0 + offset
-		var x: float = 369 + wrapf(absolute-heading,-180,180)*5.5
+		var absolute: float = floorf(display_heading()/10.0)*10.0 + offset
+		var x: float = 369 + wrapf(absolute-display_heading(),-180,180)*5.5
 		if x > 130 and x < 609:
 			_line(Vector2(x,607),Vector2(x,620),WHITE)
 			_center("%02d" % (roundi(fposmod(absolute,360))/10),Vector2(x,647),21)
@@ -200,7 +203,7 @@ func _nav() -> void:
 	draw_rect(Rect2(0,0,768,768),BACK)
 	var map_scale: float = 0.015 if navigation_kind == "free" else 0.039
 	_text("MAP",Vector2(24,40),27,GREEN)
-	_center("%03d°  TRK" % roundi(heading),Vector2(382,40),29,WHITE)
+	_center("%03d°  TRK" % roundi(display_heading()),Vector2(382,40),29,WHITE)
 	_text("12 NM" if navigation_kind == "free" else "4 NM",Vector2(641,40),24,CYAN)
 	_line(Vector2(20,58),Vector2(748,58),MUTED)
 	var center := Vector2(384,466)
@@ -211,12 +214,12 @@ func _nav() -> void:
 		var unit := Vector2(cos(deg_to_rad(actual)),sin(deg_to_rad(actual)))
 		_line(center+unit*330,center+unit*(312 if angle%30==0 else 321),WHITE)
 		if angle%30 == 0:
-			_center("%03d" % roundi(fposmod(heading+angle,360.0)),center+unit*288+Vector2(0,7),22)
+			_center("%03d" % roundi(fposmod(display_heading()+angle,360.0)),center+unit*288+Vector2(0,7),22)
 	# Mission context, rather than position, chooses the active waypoint.
 	var last := Vector2.ZERO
-	if navigation_kind == "valley" and navigation_checkpoint < ROUTE.size():
-		for index: int in ROUTE.size():
-			var diff: Vector3 = ROUTE[index]-position_world
+	if navigation_kind in ["valley","sf"] and navigation_checkpoint < route_points().size():
+		for index: int in route_points().size():
+			var diff: Vector3 = route_points()[index]-position_world
 			var local := Vector2(diff.x,diff.z).rotated(-deg_to_rad(heading))
 			var point: Vector2 = center+local*map_scale
 			var color: Color = MAGENTA if index == navigation_checkpoint else MUTED
@@ -228,17 +231,17 @@ func _nav() -> void:
 				_text("CP%02d" % (index+1),point+Vector2(13,-9),20,color)
 			last = point
 	# Runway centerlines, in world coordinates.
-	for runway_z: float in [0.0,-15000.0]:
+	for runway_z: float in ([0.0] if navigation_kind=="sf" else [0.0,-15000.0]):
 		var diff := Vector2(-position_world.x,runway_z-position_world.z).rotated(-deg_to_rad(heading))
 		var r: Vector2 = center+diff*map_scale
 		if Rect2(40,90,688,550).has_point(r):
 			_line(r+Vector2(0,-1600*map_scale).rotated(-deg_to_rad(heading)),r+Vector2(0,1600*map_scale).rotated(-deg_to_rad(heading)),CYAN,6)
-			_text("ALPINE" if runway_z == 0.0 else "NORTH FIELD",r+Vector2(13,3),19,CYAN)
+			_text("SFO 28R" if navigation_kind=="sf" else "ALPINE" if runway_z == 0.0 else "NORTH FIELD",r+Vector2(13,3),19,CYAN)
 	draw_colored_polygon(PackedVector2Array([center+Vector2(0,-22),center+Vector2(10,17),center,center+Vector2(-10,17)]),WHITE)
 	_line(center+Vector2(-24,6),center+Vector2(24,6),WHITE,3)
 	_text("GS  %03d KT" % roundi(speed),Vector2(24,614),26,GREEN)
-	var checkpoint_active: bool = navigation_kind == "valley" and navigation_checkpoint < ROUTE.size()
-	_text("VALLEY TOUR" if checkpoint_active else ("FREE FLIGHT" if navigation_kind == "free" else "RWY 36"),Vector2(477,614),24,CYAN)
+	var checkpoint_active: bool = navigation_kind in ["valley","sf"] and navigation_checkpoint < route_points().size()
+	_text(("SF BAY TOUR" if navigation_kind=="sf" else "VALLEY TOUR") if checkpoint_active else ("FREE FLIGHT" if navigation_kind == "free" else "RWY 36"),Vector2(477,614),24,CYAN)
 	_line(Vector2(20,650),Vector2(748,650),MUTED)
 	var target: Vector3 = navigation_target()
 	var distance_nm: float = position_world.distance_to(target)/1852.0
@@ -246,12 +249,12 @@ func _nav() -> void:
 	_text("%.1f NM" % distance_nm,Vector2(174 if checkpoint_active else 311,700),29,WHITE)
 	if checkpoint_active:
 		_text("TARGET %04d FT" % roundi(target.y*3.28084),Vector2(405,700),24,CYAN)
-		_text("ACTIVE LEG %02d  /  MOUNTAIN DEPARTURE" % (navigation_checkpoint+1),Vector2(24,746),19,MUTED)
+		_text(("ACTIVE LEG %02d  /  SAN FRANCISCO BAY" if navigation_kind=="sf" else "ACTIVE LEG %02d  /  MOUNTAIN DEPARTURE") % (navigation_checkpoint+1),Vector2(24,746),19,MUTED)
 	elif navigation_kind == "free":
 		_text("AIRPORT REFERENCE  /  NO CHECKPOINTS",Vector2(24,746),19,MUTED)
 	else:
 		_text("3° APPROACH",Vector2(528,700),23,CYAN)
-		_text("NORTH FIELD  /  RUNWAY 36 FINAL",Vector2(24,746),19,MUTED)
+		_text("SFO  /  RUNWAY 28R FINAL" if navigation_kind=="sf" else "NORTH FIELD  /  RUNWAY 36 FINAL",Vector2(24,746),19,MUTED)
 
 func _engines() -> void:
 	draw_rect(Rect2(0,0,768,768),BACK)

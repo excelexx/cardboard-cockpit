@@ -44,7 +44,7 @@ func build() -> void:
 	flash_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	flash_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	flash_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	flash_material.albedo_texture = load("res://assets/vfx/gatling-flash.png")
+	flash_material.albedo_texture = load("res://assets/sourced_flight/muzzle.png")
 	for angle in [0.0,PI/2]:
 		var plane := MeshInstance3D.new(); var quad := QuadMesh.new(); quad.size = Vector2(2.1,.64)
 		plane.mesh = quad; plane.material_override = flash_material
@@ -88,7 +88,7 @@ func build() -> void:
 	add_child(haze)
 	for side in [-1,1]:
 		var vapor := Sprite3D.new()
-		vapor.texture = load("res://assets/vfx/smoke.png")
+		vapor.texture = load("res://assets/sourced_flight/smoke.png")
 		vapor.pixel_size = 0.010
 		vapor.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		vapor.modulate = Color(0.87,0.94,1,0)
@@ -98,7 +98,7 @@ func build() -> void:
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		material.vertex_color_use_as_albedo = true
-		material.albedo_texture = load("res://assets/vfx/smoke.png")
+		material.albedo_texture = load("res://assets/sourced_flight/smoke.png")
 		material.cull_mode = BaseMaterial3D.CULL_DISABLED
 		trail.material_override = material
 		trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -108,7 +108,7 @@ func build() -> void:
 	var wind_material := StandardMaterial3D.new()
 	wind_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	wind_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	wind_material.albedo_texture = load("res://assets/vfx/smoke.png")
+	wind_material.albedo_texture = load("res://assets/sourced_flight/smoke.png")
 	wind_material.vertex_color_use_as_albedo = true
 	wind_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	wind_field.material_override = wind_material

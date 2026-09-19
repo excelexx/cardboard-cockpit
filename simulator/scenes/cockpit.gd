@@ -54,6 +54,31 @@ func build(aircraft: Dictionary) -> void:
 	profile = aircraft
 	airframe = str(profile.get("id","b737"))
 	control_is_stick = airframe in ["a380","f35"]
+	if airframe=="f35":
+		_active_root = load("res://assets/sourced_flight/cockpit.gltf").instantiate()
+		_active_root.name = "SourcedF35Interior"; _active_root.set_meta("cached_interior",true)
+		_active_root.position = Vector3(0,-.07,-.10)
+		add_child(_active_root)
+		var live_panel := _instrument_texture("panorama")
+		for viewport: Node in get_children():
+			if viewport is SubViewport: viewport.reparent(_active_root)
+		for geometry in _active_root.find_children("*","MeshInstance3D",true,false):
+			for surface in range(geometry.mesh.get_surface_count()):
+				var original = geometry.mesh.surface_get_material(surface)
+				if original is StandardMaterial3D and original.albedo_texture==null:
+					var trim_material: StandardMaterial3D = original.duplicate()
+					trim_material.albedo_color = Color(.09,.11,.13)
+					trim_material.roughness = .65; trim_material.metallic = .12
+					geometry.set_surface_override_material(surface,trim_material)
+				if original is StandardMaterial3D and original.albedo_texture!=null:
+					var display_material: StandardMaterial3D = original.duplicate()
+					display_material.albedo_texture = live_panel
+					display_material.uv1_scale = Vector3(1.01046,2.55208,1)
+					display_material.uv1_offset = Vector3(-.005975,-.016487,0)
+					display_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+					geometry.set_surface_override_material(surface,display_material)
+		pilot_control = Node3D.new(); _active_root.add_child(pilot_control); control_rest = Vector3.ZERO
+		return
 	var boeing: bool = airframe in ["b737","b747"]
 	var panel_color := Color(0.24,0.23,0.21) if boeing else Color(0.16,0.20,0.23)
 	if airframe == "f35": panel_color = Color(0.115,0.13,0.145)
@@ -146,7 +171,7 @@ func update_instruments(flight: FlightDynamics, control: Vector3, delta: float) 
 
 func set_navigation(kind: String, checkpoint: int) -> void:
 	navigation_kind = kind
-	navigation_checkpoint = clampi(checkpoint,0,5)
+	navigation_checkpoint = clampi(checkpoint,0,14 if kind=="sf" else 5)
 	for display: CockpitInstruments in displays:
 		display.set_navigation(navigation_kind,navigation_checkpoint)
 

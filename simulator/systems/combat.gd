@@ -97,12 +97,6 @@ func goose_model() -> Node3D:
 		wing.name = "WingL" if side<0 else "WingR"
 		wing.position = Vector3(side*0.65,0,0)
 		root.add_child(wing)
-		for feather in range(7):
-			var color := Color(0.37,0.34,0.28).lerp(Color(0.11,0.13,0.13),float(feather)/7)
-			var feather_mesh := CapsuleMesh.new()
-			feather_mesh.radius = .40; feather_mesh.height = 1.9-feather*.1; feather_mesh.radial_segments = 12; feather_mesh.rings = 4
-			var feather_node := mesh(wing,feather_mesh,Vector3(side*(.65+feather*.42),0,feather*.11),color)
-			feather_node.rotation = Vector3(PI/2,side*feather*.025,0); feather_node.scale = Vector3(1,1,.14)
 	root.scale = Vector3.ONE*Tune.CONTACT_MODEL_SCALE
 	return root
 
@@ -450,7 +444,7 @@ func spawn_shot(at: Vector3, velocity: Vector3, kind: String, target_value: int,
 		trail.mesh = ImmediateMesh.new()
 		var smoke := StandardMaterial3D.new()
 		smoke.albedo_color = Color.WHITE
-		smoke.albedo_texture = load("res://assets/vfx/smoke.png")
+		smoke.albedo_texture = load("res://assets/sourced_flight/smoke.png")
 		if kind=="cannon":
 			smoke.emission_enabled = true; smoke.emission = Color(1,.55,.18); smoke.emission_energy_multiplier = 1.1
 		smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -505,12 +499,12 @@ func burst(at: Vector3, color: Color, radius: float) -> void:
 	if bursts.size()>100: return
 	if flash_texture==null: flash_texture = load("res://assets/vfx/flash.png")
 	var explosion: bool = radius>=10
-	if explosion and detonation_texture==null: detonation_texture = load("res://assets/vfx/detonation.png")
+	if explosion and detonation_texture==null: detonation_texture = load("res://assets/vfx/flash.png")
 	var node := Sprite3D.new()
 	node.texture = detonation_texture if explosion else flash_texture
 	node.billboard = BaseMaterial3D.BILLBOARD_ENABLED; node.shaded = false
 	node.pixel_size = radius/maxf(node.texture.get_width(),1)
-	node.modulate = Color.WHITE if explosion else color
+	node.modulate = Color(1,.62,.28) if explosion else color
 	node.position = at
 	add_child(node)
 	var duration: float = 1.15 if explosion else .075 if radius<1.5 else .30
