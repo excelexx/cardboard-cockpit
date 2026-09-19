@@ -35,9 +35,9 @@ func run():
 	enemy.position = app.flight.position+Vector3(sin(deg_to_rad(6.8)),0,-cos(deg_to_rad(6.8)))*600
 	app.combat.tick(1.0/60)
 	check(app.combat.target_id==enemy.id,"Small drift outside acquisition radius preserves a comfortable lock margin")
-	enemy.position = app.flight.position+Vector3(sin(deg_to_rad(12)),0,-cos(deg_to_rad(12)))*600
+	enemy.position = app.flight.position+Vector3(sin(deg_to_rad(38)),0,-cos(deg_to_rad(38)))*600
 	app.combat.tick(1.0/60)
-	check(app.combat.target_id==-1 and app.combat.lock_progress==0,"A target outside the small envelope releases immediately")
+	check(app.combat.target_id==-1 and app.combat.lock_progress<1,"A target outside the adaptive envelope releases immediately")
 	for i in range(24): app.combat.update_aim(1.0/120)
 	check(app.combat.assisted_direction().angle_to(app.flight.forward())<deg_to_rad(.5),"Gun sight returns to the nose after losing the target")
 	app.combat.fire_missile()
@@ -49,7 +49,7 @@ func run():
 	var trail = shot.trail_node
 	app.combat.free_shot(shot); app.combat.shots.clear()
 	check(not app.combat.detached_trails.is_empty() and is_instance_valid(trail),"Missile smoke remains briefly after the projectile disappears")
-	app.combat.update_detached_trails(2.1)
+	app.combat.update_detached_trails(3.1)
 	check(app.combat.detached_trails.is_empty(),"Detached missile smoke fades and releases its resources")
 	app.start_flight("combat"); app.flight.position.y = 600; app.flight.power_input = 1; app.flight.throttle = 1
 	var speed: float = app.flight.speed

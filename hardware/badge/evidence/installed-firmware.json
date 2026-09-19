@@ -1,0 +1,54 @@
+{
+  "image": "installed Arduino pin-finder",
+  "partition_offset": "0x10000",
+  "entry_point": "0x403807ca",
+  "flash_mode": "DIO",
+  "flash_frequency_mhz": 80,
+  "flash_size_mb": 4,
+  "checksum_valid": true,
+  "appended_hash_valid": true,
+  "appended_validation_hash": "26afe7a8984d27a892771ce86cae14fe44ba4bdbf33b0d69ec29f9e21ac19cf2",
+  "project": "arduino-lib-builder",
+  "version": "ee57070",
+  "compile_timestamp": "Jul 20 2026 10:50:59",
+  "idf": "v5.5.5",
+  "elf_sha256": "348584ebabd95baca0f2da4687110ab5b29cb4a1688a4218486356376e9b3aeb",
+  "segments": [
+    {
+      "load": "0x3c030020",
+      "file_header": "0x18",
+      "length": "0x10974",
+      "type": "DROM"
+    },
+    {
+      "load": "0x3fc8e000",
+      "file_header": "0x10994",
+      "length": "0x1e94",
+      "type": "DRAM"
+    },
+    {
+      "load": "0x40380000",
+      "file_header": "0x12830",
+      "length": "0xd7e0",
+      "type": "IRAM"
+    },
+    {
+      "load": "0x42000020",
+      "file_header": "0x20018",
+      "length": "0x29474",
+      "type": "IROM"
+    },
+    {
+      "load": "0x4038d7e0",
+      "file_header": "0x49494",
+      "length": "0x800",
+      "type": "IRAM"
+    },
+    {
+      "load": "0x50000000",
+      "file_header": "0x49c9c",
+      "length": "0x20",
+      "type": "RTC"
+    }
+  ]
+}

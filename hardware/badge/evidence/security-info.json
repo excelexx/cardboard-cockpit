@@ -1,0 +1,20 @@
+{
+  "tool": "esptool 4.12.0 get_security_info --no-stub",
+  "chip_id": 5,
+  "api_version": 3,
+  "flags": "0x00000000",
+  "key_purposes_raw": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    12
+  ],
+  "key_purposes_note": "Raw tool output retained without interpreting undocumented trailing fields; no key material exported.",
+  "secure_boot": "disabled",
+  "flash_encryption": "disabled",
+  "spi_boot_crypt_count": 0,
+  "efuse_mutations_performed": false
+}

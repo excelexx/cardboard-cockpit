@@ -11,14 +11,14 @@ var gap := 0.0
 var active_id := ""
 var active_priority := -1
 var caption := ""
-var speaker := "CONTROL"
+var speaker := "BASE"
 var muted := false
 var paused := false
 var enabled := true
 var spoken_count := 0
 func _ready() -> void:
 	player = AudioStreamPlayer.new()
-	player.volume_db = -9
+	player.volume_db = -7.5
 	add_child(player)
 	var path := "res://assets/audio/radio/manifest.json"
 	if FileAccess.file_exists(path):
@@ -67,7 +67,7 @@ func tick(dt: float, is_paused: bool, is_muted: bool) -> void:
 		active_id = ""
 		caption = ""
 		active_priority = -1
-		gap = 0.35
+		gap = 0.55
 	gap = maxf(0,gap-dt)
 	if gap>0: return
 	while not queue.is_empty():

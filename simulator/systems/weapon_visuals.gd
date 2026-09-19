@@ -40,3 +40,31 @@ static func projectile(kind: String, _variant: String = "gatling") -> Node3D:
 	cylinder(root,.055,8.5,emissive(Color(1,.66,.25),2.0,.42),Vector3(0,0,2.6))
 	cylinder(root,.032,2.0,emissive(Color(1,.95,.73),2.5,.9),Vector3.ZERO)
 	return root
+
+static func beam(parent: Node3D, color: Color, radius: float, alpha: float) -> MeshInstance3D:
+	var node := MeshInstance3D.new()
+	var shape := CylinderMesh.new()
+	shape.top_radius = radius
+	shape.bottom_radius = radius
+	shape.height = 1.0
+	shape.radial_segments = 16
+	node.mesh = shape
+	node.material_override = emissive(color,3,alpha)
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(node)
+	return node
+
+static func align_beam(node: MeshInstance3D, start: Vector3, end: Vector3) -> void:
+	var direction: Vector3 = end-start
+	node.position = (start+end)*0.5
+	node.basis = Basis(Quaternion(Vector3.UP,direction.normalized()))
+	node.scale = Vector3(1,maxf(direction.length(),0.001),1)
+
+
+static func energy_sheath(parent: Node3D, radius: float, phase: float) -> MeshInstance3D:
+	var node: MeshInstance3D = beam(parent,Color(0.15,0.75,1),radius,0.25)
+	var shader := ShaderMaterial.new()
+	shader.shader = load("res://assets/vfx/plasma_flow.gdshader")
+	shader.set_shader_parameter("phase",phase)
+	node.material_override = shader
+	return node

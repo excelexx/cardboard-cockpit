@@ -13,6 +13,7 @@ var elapsed := 0.0
 var focus := Vector3.ZERO
 var _built := false
 var detailed := true
+var obstacle_cells: Dictionary={}
 
 func _ready() -> void: build()
 func build() -> void:
@@ -31,16 +32,16 @@ func build() -> void:
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.35
+	env.ambient_light_energy = .32
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 1.0
+	env.tonemap_exposure = .83
 	env.fog_enabled = true
 	env.fog_density = 0.000016
 	env.fog_light_color = Color(0.69,0.73,0.78)
 	env.fog_aerial_perspective = 0.5
 	env.fog_sky_affect = 0.08
 	environment = WorldEnvironment.new(); environment.environment = env; add_child(environment)
-	sun = DirectionalLight3D.new(); sun.rotation_degrees = Vector3(-18,-110,0)
+	sun = DirectionalLight3D.new(); sun.rotation_degrees = Vector3(-23,-110,0)
 	sun.light_color = Color(1.0,0.79,0.60); sun.light_energy = 1.0
 	sun.shadow_enabled = true; sun.directional_shadow_max_distance = 2200
 	sun.shadow_bias = 0.025; sun.shadow_normal_bias = 1.0; add_child(sun)
@@ -48,6 +49,12 @@ func build() -> void:
 		var lo: Array = item.bounds[0]; var hi: Array = item.bounds[1]
 		var box := AABB(Vector3(lo[0],lo[1],lo[2]),Vector3(hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2]))
 		chunks.append({"path":ROOT+str(item.file),"kind":item.kind,"box":box,"node":null,"requested":false})
+		# Use conservative source bounds only for compact tall landmarks. A bridge
+		# AABB would incorrectly fill its open span, so bridges are excluded.
+		if item.kind=="landmark" and box.size.y>60 and box.size.x<250 and box.size.z<250:
+			var center: Vector3=box.get_center();var cell:=Vector2i(floori(center.x/512),floori(center.z/512))
+			if not obstacle_cells.has(cell):obstacle_cells[cell]=[]
+			obstacle_cells[cell].append(box)
 	if DisplayServer.get_name()=="headless": return
 	# Airport and terrain are ready before takeoff. City chunks stream ahead.
 	for chunk in chunks:
@@ -104,7 +111,10 @@ func apply_quality(high: bool) -> void:
 		if chunk.has("node"): chunk.node.visibility_range_end = 4200 if detailed else 3000
 	var forward: bool = RenderingServer.get_current_rendering_method()=="forward_plus"
 	environment.environment.ssao_enabled = high and forward
-	environment.environment.glow_enabled = high and forward
+	environment.environment.glow_enabled = forward
+	environment.environment.glow_intensity=.72
+	environment.environment.glow_bloom=.04
+	environment.environment.glow_hdr_threshold=1.6
 func ground_height(x: float,z: float) -> float:
 	var grid: Dictionary = region.grid
 	var gx: float = clampf((x-float(grid.x))/float(grid.step),0,float(grid.size)-1.001)
@@ -113,6 +123,16 @@ func ground_height(x: float,z: float) -> float:
 	return lerpf(lerpf(heights[iz*size+ix],heights[iz*size+ix+1],gx-ix),lerpf(heights[(iz+1)*size+ix],heights[(iz+1)*size+ix+1],gx-ix),gz-iz)
 func is_runway(x: float,z: float) -> bool: return absf(x)<30.4 and absf(z)<1800
 func obstacle_collision(_at: Vector3,_radius: float=2.0) -> bool: return false
+func obstacle_proximity(at: Vector3) -> Dictionary:
+	var cell:=Vector2i(floori(at.x/512),floori(at.z/512));var distance:=INF;var point:=at
+	for x in range(-1,2):
+		for z in range(-1,2):
+			for box: AABB in obstacle_cells.get(cell+Vector2i(x,z),[]):
+				var near: Vector3=at.clamp(box.position,box.end)
+				var d:=at.distance_to(near)
+				if d<distance:distance=d;point=near
+	return {"distance":distance,"point":point}
+
 
 func _stream_trees() -> void:
 	var mounted := 0
@@ -140,3 +160,32 @@ func _stream_trees() -> void:
 		batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(batch); chunk.node = batch; mounted += 1
 		if mounted>=3: return
+
+# Localized marine atmosphere uses Godot's existing Forward+ fog implementation.
+var fog_banks: Array[FogVolume] = []
+var cloud_presence := 0.0
+var atmosphere_clock := 0.0
+func _build_marine_layer() -> void:
+	if RenderingServer.get_current_rendering_method()!="forward_plus":return
+	var env: Environment=environment.environment
+	env.volumetric_fog_enabled=true;env.volumetric_fog_density=.00002;env.volumetric_fog_length=2200
+	env.volumetric_fog_detail_spread=1.6;env.volumetric_fog_ambient_inject=.6
+	for placement: Vector3 in [Vector3(15200,375,-18000),Vector3(17500,350,-12800),Vector3(6500,360,-5000)]:
+		var volume:=FogVolume.new();volume.position=placement;volume.size=Vector3(2600,650,1500)
+		var material:=FogMaterial.new();material.density=.0015;material.albedo=Color(.73,.84,.93);material.height_falloff=0.0;material.edge_fade=.7
+		volume.material=material;add_child(volume);fog_banks.append(volume)
+func update_showcase(at: Vector3,act: int,intensity: float,dt: float) -> void:
+	atmosphere_clock+=dt
+	if fog_banks.is_empty() and DisplayServer.get_name()!="headless":_build_marine_layer()
+	cloud_presence=0
+	for bank in fog_banks:
+		var normalized: Vector3=(at-bank.position)/bank.size
+		cloud_presence=maxf(cloud_presence,clampf(1-normalized.length()*2,0,1))
+	var env: Environment=environment.environment
+	# Broad cloud-light variation; one coherent sun remains the key light.
+	sun.light_energy=1.0-.07*sin(atmosphere_clock*.08)-cloud_presence*.22
+	env.tonemap_exposure=lerpf(env.tonemap_exposure,.83-cloud_presence*.07,1-exp(-dt*2))
+	env.fog_density=lerpf(env.fog_density,.000017+(0.000005 if act==2 else 0),1-exp(-dt))
+	if act==2 and fog_banks.size()>1:
+		fog_banks[1].material.density=.0022
+	elif fog_banks.size()>1:fog_banks[1].material.density=.0012

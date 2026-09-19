@@ -1,0 +1,38 @@
+{
+  "buttons": {
+    "samples": 30,
+    "elapsed_seconds": 0.9416805420000001,
+    "samples_per_second": 31.857937657163568
+  },
+  "accel_including_config_restore": {
+    "samples": 5,
+    "elapsed_seconds": 7.5413080830000006,
+    "samples_per_second": 0.6630149497898453,
+    "last_sample": {
+      "who_am_i": "0x11",
+      "raw_xyz": [
+        -5600,
+        1168,
+        -14656
+      ],
+      "xyz_mg": [
+        -350,
+        73,
+        -916
+      ],
+      "orientation": "sensor axes; board orientation not calibrated"
+    }
+  },
+  "nfc": {
+    "address": "0x26",
+    "family": "RC522-compatible; exact silicon not established",
+    "registers": {
+      "command": "0x30",
+      "error": "0x00",
+      "fifo_level": "0x00",
+      "tx_control": "0x80",
+      "rf_config": "0x44",
+      "version": "0x82"
+    }
+  }
+}

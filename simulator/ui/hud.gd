@@ -25,6 +25,7 @@ func _ready() -> void:
 func _process(dt: float) -> void:
 	clock += dt; queue_redraw()
 func text(at: Vector2, value: String, size: int = 18, color: Color = WHITE, technical: bool = false) -> void:
+	if not app.text_hud and app.mode=="flight" and not app.overlay_visible():return
 	draw_string(mono if technical else font,at+Vector2(0,1),value,HORIZONTAL_ALIGNMENT_LEFT,-1,maxi(size,12),Color(0.005,0.015,0.025,color.a*.85))
 	draw_string(mono if technical else font,at,value,HORIZONTAL_ALIGNMENT_LEFT,-1,maxi(size,12),color)
 func line(a: Vector2,b: Vector2,color: Color=MUTED,width: float=1) -> void:
@@ -75,18 +76,19 @@ func draw_title() -> void:
 	text(Vector2(72,335),"X—26",34,MUTED,true)
 	line(Vector2(74,373),Vector2(478,373),Color(0.4,0.72,0.77,0.4))
 	text(Vector2(74,421),"Clear the flock. Enjoy the flight.",26,WHITE)
-	text(Vector2(74,468),"Take off. Own the valley. Bring it home.",18,MUTED)
+	text(Vector2(74,468),"One city. Two switches. One very large goose.",18,MUTED)
 	button("fly",Rect2(74,571,394,69),"PLAY   →",true)
-	button("route",Rect2(490,582,260,48),"ROUTE: "+("SAN FRANCISCO" if app.route_id=="sf" else "AZURE COAST" if app.route_id=="coast" else "ALPINE VALLEY"))
+	text(Vector2(500,615),"SAN FRANCISCO  /  2:30 MAX",14,CYAN,true)
 	button("guided",Rect2(74,659,187,48),"Watch demo")
 	button("approach",Rect2(279,659,189,48),"Landing practice")
 	button("camera",Rect2(74,737,187,43),"Cardboard setup")
 	button("help",Rect2(279,737,189,43),"Flight controls")
 	text(Vector2(74,846),"ENTER  PLAY    •    F1  CONTROLS",12,CYAN,true)
-	text(Vector2(74,892),"CANNON  /  MISSILES  /  COUNTERMEASURES",11,MUTED,true)
+	text(Vector2(74,892),"SPACE  PRIMARY TOGGLE  /  T  SALVO TOGGLE",11,MUTED,true)
+	text(Vector2(74,915),app.badge.status,11,GREEN if app.badge.connected else MUTED,true)
 	button("credits",Rect2(74,927,140,34),"Credits")
 func draw_flight() -> void:
-	if app.paper_test or app.cockpit:
+	if app.paper_test or (app.cockpit and not app.combat.active):
 		draw_clear_flight()
 		return
 	if app.paper_test:
@@ -96,7 +98,7 @@ func draw_flight() -> void:
 	text(Vector2(42,49),"SPECTRE / X–26",14,WHITE,true)
 	text(Vector2(42,75),app.mission.label() if app.mission.active else "FCS NOMINAL" if c.hull>65 else "AIRFRAME CAUTION",12,CYAN if c.hull>65 else AMBER,true)
 	text(Vector2(1376,49),"%02d:%02d" % [int(app.mission.clock)/60,int(app.mission.clock)%60] if app.mission.active else "%02d:%02d" % [maxi(0,int(ceil(c.duration-c.elapsed)))/60,maxi(0,int(ceil(c.duration-c.elapsed)))%60] if app.flight_kind=="combat" else ("SFO 28R" if app.route_id=="sf" else "RWY 36"),19,WHITE,true)
-	text(Vector2(1376,73),"FLIGHT ASSIST" if app.copilot else "CARDBOARD" if app.vision.tracking else "LEVEL ASSIST",10,CYAN,true)
+	text(Vector2(1376,73),"FCS / GUIDED" if app.copilot else "CARDBOARD" if app.vision.tracking else "FCS / MANUAL",10,CYAN,true)
 	var heading: float = fposmod(f.get_heading_degrees()+(298 if app.route_id=="sf" else 0),360)
 	for index in range(-3,4):
 		var x: float = 800+index*65
@@ -115,7 +117,7 @@ func draw_flight() -> void:
 			line(Vector2(1370,439+i*22),Vector2(1384 if i%2 else 1390,439+i*22),Color(0.45,0.7,0.72,0.38))
 		text(Vector2(44,518),"%.1f G" % f.g_load,12,CYAN,true)
 		text(Vector2(1430,518),"%+d" % int(f.vertical_speed*196.85),12,CYAN,true)
-	if app.route_id in ["coast","sf"] and app.mission.active and app.mission.phase in ["combat","return"]:
+	if app.mission.active and app.mission.phase in ["opening","combat","return"]:
 		var waypoint: Vector3 = app.mission.route_target()
 		if not app.camera.is_position_behind(waypoint):
 			var nav: Vector2 = app.camera.unproject_position(waypoint)
@@ -123,7 +125,7 @@ func draw_flight() -> void:
 			draw_polyline(PackedVector2Array([nav+Vector2(0,-10),nav+Vector2(10,0),nav+Vector2(0,10),nav+Vector2(-10,0),nav+Vector2(0,-10)]),Color(.4,.7,1),2,true)
 			text(nav+Vector2(16,3),"NAV %02d" % (app.mission.route_index+1),11,Color(.5,.75,1),true)
 	var nose: Vector2 = app.camera.unproject_position(f.position+c.forward()*2000)
-	var ring_edge: Vector3 = c.forward().rotated(app.camera.global_basis.x,deg_to_rad(c.ACQUIRE_ANGLE))
+	var ring_edge: Vector3 = c.forward().rotated(app.camera.global_basis.x,deg_to_rad(c.intent.acquire_degrees(c)))
 	var ring_radius: float = clampf(nose.distance_to(app.camera.unproject_position(f.position+ring_edge*1200)),38,115)
 	var tracking: bool = c.target_id>=0 and c.assist
 	var sight_color: Color = GREEN if tracking and c.lock_progress>=1 else AMBER if tracking else WHITE
@@ -140,8 +142,8 @@ func draw_flight() -> void:
 	line(center+Vector2(0,6),center+Vector2(0,12),sight_color,1.8)
 	draw_circle(center,1.3,sight_color)
 	if c.active and c.engagement_enabled:
-		text(nose+Vector2(-50,ring_radius+22),"SEEKER / %.0f°" % Tune.ACQUIRE_DEGREES,11,MUTED,true)
-		if not tracking: text(nose+Vector2(-62,ring_radius+40),"ALIGN TO ACQUIRE",10,MUTED,true)
+		text(nose+Vector2(-50,ring_radius+22),"TRACK",11,MUTED,true)
+		if not tracking: text(nose+Vector2(-62,ring_radius+40),"",10,MUTED,true)
 	for enemy: Dictionary in c.enemies:
 		if app.camera.is_position_behind(enemy.position): continue
 		var point: Vector2 = app.camera.unproject_position(enemy.position)
@@ -180,16 +182,22 @@ func draw_flight() -> void:
 		line(Vector2(20,270),Vector2(20,660),Color(1,0.25,0.15,c.hit_flash*1.7),4)
 		line(Vector2(1580,270),Vector2(1580,660),Color(1,0.25,0.15,c.hit_flash*1.7),4)
 	draw_scope(Vector2(1450,830),c)
-	for i in range(3):
-		var x: float = 47+i*171
-		text(Vector2(x,860),["SPACE / LMB","T / RMB","STREAK"][i],18,WHITE,true)
-		text(Vector2(x,886),["GATLING","MISSILES","KEEP IT GOING"][i],14,CYAN,true)
-		text(Vector2(x,927),"∞" if i<2 else "×%d" % c.combo,36,GREEN if i==1 and c.lock_progress>=1 else WHITE)
-		if i<2: text(Vector2(x+51,920),"INFINITE",11,MUTED,true)
-	var seeker: String = "M-26 / LOCK" if c.lock_progress>=1 else "M-26 / ACQUIRING" if c.target_id>=0 else "M-26 / UNGUIDED"
-	text(Vector2(45,813),seeker,12,GREEN if c.lock_progress>=1 else MUTED,true)
-	var ready: float = 1-clampf(c.missile_cooldown/Tune.MISSILE_INTERVAL,0,1)
-	line(Vector2(218,937),Vector2(218+128*ready,937),GREEN if ready>=.99 else AMBER,2)
+	var primary_color: Color=CYAN if app.primary_latched or c.beam_active else MUTED
+	var salvo_color: Color=CYAN if app.salvo_latched else MUTED
+	text(Vector2(45,907),"PRIMARY  "+("LIVE" if app.primary_latched or c.beam_active else "SAFE"),12,primary_color,true)
+	text(Vector2(235,907),"QUAD SALVO  "+("LIVE" if app.salvo_latched else "SAFE"),12,salvo_color,true)
+	if not c.primary_used and app.mission.clock<25:text(Vector2(45,933),"SPACE / YOKE SWITCH 1",11,WHITE,true)
+	if not c.salvo_used and app.mission.clock<25:text(Vector2(235,933),"T / YOKE SWITCH 2",11,WHITE,true)
+	if c.boss_id>=0 and not c.boss_defeated:
+		for enemy: Dictionary in c.enemies:
+			if enemy.id!=c.boss_id:continue
+			var title: String="UNKNOWN" if enemy.age<4 or app.mission.phase=="anticipation" else "THE FINAL HONK"
+			text(Vector2(690,118),title,15,CYAN,true)
+			var fraction: float=clampf(enemy.health/enemy.max_health,0,1)
+			for segment in range(4):
+				var left: float=665+segment*70
+				line(Vector2(left,131),Vector2(left+62*clampf(fraction*4-segment,0,1),131),CYAN,2)
+			break
 	if f.airborne:
 		text(Vector2(44,550),"AIRBRAKE" if f.airbrake>.1 else "ACCEL" if f.power_input>.1 else "CRUISE",12,AMBER if f.airbrake>.1 else CYAN,true)
 		text(Vector2(44,571),"W / S  SPEED",10,MUTED,true)
@@ -206,7 +214,7 @@ func draw_flight() -> void:
 		text(Vector2(717,760),"SFO 28R / APPROACH" if app.route_id=="sf" else "RWY 36 / APPROACH",11,CYAN,true)
 	if app.mission.active and app.mode in ["flight","rollout"]:
 		var instruction: String = app.mission.instruction()
-		if app.copilot and app.mission.phase!="combat": instruction = "FLIGHT ASSIST ON  /  ENJOY THE RIDE — STEERING IS OPTIONAL"
+		if app.copilot and not app.mission.cinematic and app.mission.phase!="combat": instruction = "FLIGHT ASSIST ON  /  ENJOY THE RIDE — STEERING IS OPTIONAL"
 		var width: float = mono.get_string_size(instruction,HORIZONTAL_ALIGNMENT_LEFT,-1,15).x
 		text(Vector2(800-width/2,595),instruction,15,CYAN,true)
 	elif app.mode=="rollout": text(Vector2(630,739),"TOUCHDOWN / HOLD SPACE TO BRAKE",13,GREEN,true)
@@ -310,7 +318,7 @@ func draw_results() -> void:
 	zones.clear(); dim(); panel(Rect2(380,228,840,547),.95)
 	var c: CombatDirector = app.combat
 	text(Vector2(432,291),"SPECTRE / SORTIE RECORD",13,CYAN,true)
-	text(Vector2(430,347),"AIRCRAFT SECURED" if app.mission_success and app.flight.contact=="landed" else "RETURN VECTOR" if app.mission_success else "SORTIE ENDED",35,WHITE)
+	text(Vector2(430,347),"AIRCRAFT SECURED" if app.mission_success and app.flight.contact=="landed" else "SKY SECURED" if app.mission_success else "SORTIE ENDED",35,WHITE)
 	text(Vector2(433,390),app.result_reason,17,MUTED)
 	line(Vector2(433,420),Vector2(1167,420),Color(0.3,0.5,0.56,0.4))
 	var labels: Array[String] = ["GEESE CLEARED","BEST STREAK","SCORE"]
@@ -318,24 +326,24 @@ func draw_results() -> void:
 	for i in range(3):
 		text(Vector2(433+i*255,466),labels[i],11,MUTED,true)
 		text(Vector2(431+i*255,516),values[i],36,WHITE,true)
-	text(Vector2(433,575),"NEW PERSONAL BEST!" if app.record_broken else "TAKEOFF  /  INTERCEPT  /  LANDING COMPLETE" if app.mission.active and app.mission_success else "Guided pilot used" if app.used_copilot else "Manual sortie",14,MUTED)
+	text(Vector2(433,575),"NEW PERSONAL BEST!" if app.record_broken else "INTERCEPT  /  BOSS  /  SKY SECURED" if app.mission.active and app.mission_success else "Guided pilot used" if app.used_copilot else "Manual sortie",14,MUTED)
 	button("fly",Rect2(433,642,350,62),"PLAY AGAIN",true)
 	button("title",Rect2(816,642,350,62),"FLIGHT DECK")
 func draw_help() -> void:
 	zones.clear(); dim(); panel(Rect2(365,136,870,738),.97)
 	text(Vector2(419,196),"FLIGHT CONTROLS",13,CYAN,true)
 	text(Vector2(417,244),"Precision starts with small inputs.",30,WHITE)
-	var rows: Array[Array] = [["ARROWS / A D","Pitch and roll / rudder"],["W S / SHIFT","Accelerate / airbrake / hold afterburner"],["SPACE / LEFT MOUSE","Hold for Gatling fire; unlimited ammunition"],["T / RIGHT MOUSE","Hold for missiles; fire together with Gatling"],["Z / Q","Countermeasures / barrel roll"],["V / X","Cockpit or chase / missile datalink"],["ALT + MOUSE","Look around without steering"],["G / F","Landing gear / flap detent"],["B / J","Mouse flight / close-range aim assistance"],["H / HOLD E","Flight assist / eject"],["C / ESC / M","Cardboard setup / pause / mute"]]
+	var rows: Array[Array] = [["ARROWS / A D","Pitch and roll / rudder"],["W S / SHIFT","Accelerate / airbrake / hold afterburner"],["SPACE / LEFT MOUSE","Toggle minigun + continuous energy cannon"],["T / RIGHT MOUSE","Toggle repeated four-missile salvos"],["Q","Quick barrel roll"],["V / X","Cockpit or chase / missile datalink"],["ALT + MOUSE","Look around without steering"],["G / F","Landing gear / flap detent"],["B / J","Mouse flight / close-range aim assistance"],["H / HOLD E","Flight assist / eject"],["C / ESC / M","Cardboard setup / pause / mute"]]
 	for i in range(rows.size()):
 		text(Vector2(421,293+i*40),rows[i][0],13,WHITE,true)
 		text(Vector2(707,293+i*40),rows[i][1],16,MUTED)
 	button("help",Rect2(909,787,269,48),"RETURN TO FLIGHT",true)
-	text(Vector2(421,817),"R RESTART / F9 TELEMETRY",10,MUTED,true)
+	text(Vector2(421,817),"R REPLAY / F8 TEXT / F9 TELEMETRY",10,MUTED,true)
 func draw_camera_setup() -> void:
 	zones.clear(); dim(); panel(Rect2(370,175,860,650),.97)
 	text(Vector2(421,236),"CARDBOARD / LOCAL INPUT",13,CYAN,true)
 	text(Vector2(419,291),"Your cockpit. Your aircraft.",32,WHITE)
-	var lines: Array[String] = ["1. Start tools/tracker.sh --camera 0 --calibrate.","2. Capture the seven poses in the tracker preview.","3. Enable tracking below, then centre the yoke.","Aim inside the reticle for assisted cannon fire. T launches a missile.","Keyboard steering immediately gives you control."]
+	var lines: Array[String] = ["1. Start tools/tracker.sh --camera 0 --calibrate.","2. Capture the seven poses in the tracker preview.","3. Enable tracking below, then centre the yoke.","Yoke switches: primary 31/32, salvo 41/42. Flip ON or OFF.","Badge: A gear / B flaps / arrows views, assist, text."]
 	for i in range(lines.size()): text(Vector2(423,345+i*42),lines[i],17,MUTED if i>2 else WHITE)
 	text(Vector2(423,586),app.vision.status,13,CYAN if app.vision.tracking else AMBER,true)
 	text(Vector2(423,626),"ROLL %+.2f / PITCH %+.2f / POWER %03d%%" % [app.vision.yoke.x,app.vision.yoke.y,int(app.vision.throttle*100)],15,WHITE,true)

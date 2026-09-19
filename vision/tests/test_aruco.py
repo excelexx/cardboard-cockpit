@@ -60,6 +60,21 @@ class ArucoTests(unittest.TestCase):
         self.assertIsNone(yoke)
         self.assertIsNone(throttle)
 
+    def test_weapon_faces_and_ambiguity(self):
+        def image_with(ids):
+            frame=np.full((720,1280,3),255,dtype=np.uint8)
+            for i,marker_id in enumerate(ids):
+                m=cv2.aruco.generateImageMarker(self.dictionary,marker_id,100)
+                frame[280:380,100+i*200:200+i*200]=cv2.cvtColor(m,cv2.COLOR_GRAY2BGR)
+            return frame
+        self.tracker.detect(image_with([7,23,31,41]),0,False)
+        self.assertTrue(self.tracker.weapon_observations['primary'][0])
+        self.assertTrue(self.tracker.weapon_observations['salvo'][0])
+        self.tracker.detect(image_with([31,32,42]),1,False)
+        self.assertNotIn('primary',self.tracker.weapon_observations)
+        self.assertFalse(self.tracker.weapon_observations['salvo'][0])
+        self.tracker.detect(image_with([31,31,41]),2,False)
+        self.assertNotIn('primary',self.tracker.weapon_observations)
 
 if __name__ == "__main__":
     unittest.main()
