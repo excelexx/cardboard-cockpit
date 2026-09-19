@@ -229,6 +229,12 @@ func _input(event: InputEvent) -> void:
 		# flight or advance the hangar while the pilot is reading instructions.
 		if overlay_visible() and event.keycode not in [KEY_ESCAPE, KEY_F1, KEY_C, KEY_M, KEY_Q]:
 			return
+		if mode == "flight":
+			var physical: int = event.physical_keycode if event.physical_keycode != 0 else event.keycode
+			if physical in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_A, KEY_D]:
+				take_manual_control(true)
+			elif physical in [KEY_W, KEY_S]:
+				take_manual_control(false)
 		match event.keycode:
 			KEY_F1: on_action("help")
 			KEY_M: on_action("mute")
@@ -327,12 +333,7 @@ func _physics_process(dt: float) -> void:
 	var keyboard := Vector3(float(Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_UP))-float(Input.is_physical_key_pressed(KEY_DOWN)),float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)))
 	var throttle_delta: float = float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
 	if keyboard.length()>0 or throttle_delta!=0:
-		if copilot: show_toast("You have control")
-		copilot = false
-		if keyboard.length() > 0:
-			mouse_yoke = false
-		vision.enabled = false
-		vision.status = "KEYBOARD / MOUSE"
+		take_manual_control(keyboard.length() > 0)
 	if copilot:
 		control = pilot_controls()
 	else:
@@ -380,6 +381,15 @@ func _physics_process(dt: float) -> void:
 	if aircraft.get_child_count()>0:
 		var gear_node: Node3D = aircraft.get_child(aircraft.get_child_count()-1).get_node_or_null("Airframe/LandingGear")
 		if gear_node: gear_node.visible = flight.gear
+
+func take_manual_control(steering: bool) -> void:
+	if copilot:
+		show_toast("You have control")
+	copilot = false
+	if steering:
+		mouse_yoke = false
+	vision.enabled = false
+	vision.status = "KEYBOARD / MOUSE"
 
 func pilot_controls() -> Vector3:
 	var target: Vector3 = target_position()
