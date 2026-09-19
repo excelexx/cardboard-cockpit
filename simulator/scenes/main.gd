@@ -33,7 +33,7 @@ var cockpit_frame: DetailedCockpit
 var combat: CombatDirector
 var audio: EngineAudio
 var hud: CockpitHUD
-var cockpit := false
+var cockpit := true
 var copilot := false
 var used_copilot := false
 var demo_auto_fire := true
