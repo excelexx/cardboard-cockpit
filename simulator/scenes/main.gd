@@ -73,6 +73,8 @@ var pending_capture := false
 var toast := ""
 var toast_time := 0.0
 var near_obstacle_cooldown:=0.0
+var landing_transition:=0.0
+var landing_started:=false
 func profile() -> Dictionary: return Catalog.PROFILE
 func _ready() -> void:
 	get_window().title = "Goose Protocol — SPECTRE X-26"
@@ -142,6 +144,7 @@ func start_flight(kind: String = "demo") -> void:
 	copilot = false; used_copilot = false; mission_success = false; result_reason = ""
 	pilot_ejected = false; record_broken = false; eject_hold = 0; crash_clock = 0; fire_guard = 0.3
 	control = Vector3.ZERO; look = Vector2.ZERO
+	landing_started=false;landing_transition=0
 	primary_latched=false;salvo_latched=false;cv_weapon_revision=-1;gear_override=-1;flaps_override=-1;assisted_yoke_reference=vision.yoke
 	flight.reset(profile())
 	if route_id=="sf": flight.position.y += world.ground_height(flight.position.x,flight.position.z)
@@ -203,6 +206,8 @@ func _input(event: InputEvent) -> void:
 				if mode=="flight": mouse_yoke = not mouse_yoke
 			KEY_G:
 				if mode=="flight": flight.gear = not flight.gear;gear_override=int(flight.gear)
+			KEY_L:
+				begin_landing()
 			KEY_F:
 				if mode=="flight": flight.flaps = (flight.flaps+1)%3;flaps_override=flight.flaps
 			KEY_Q:
@@ -249,6 +254,7 @@ func on_action(action: String) -> void:
 				copilot=false
 			else:
 				start_flight(); copilot = true; used_copilot = true
+		"land": begin_landing()
 		"approach": start_flight("approach")
 		"runway": start_flight("runway")
 		"guided": start_flight(); copilot = true; used_copilot = true; demo_auto_fire = true
@@ -318,7 +324,9 @@ func _physics_process(dt: float) -> void:
 		if mode=="paused":mode=resume_mode
 		else:resume_mode=mode;mode="paused"
 	if badge.tapped(0) and mode=="flight":flight.gear=not flight.gear;gear_override=int(flight.gear)
-	if badge.tapped(1) and mode=="flight":flight.flaps=(flight.flaps+1)%3;flaps_override=flight.flaps
+	if badge.tapped(1) and mode=="flight":
+		if mission.cinematic:begin_landing()
+		else:flight.flaps=(flight.flaps+1)%3;flaps_override=flight.flaps
 	if badge.tapped(4) and mode=="flight":cockpit=not cockpit;camera_rig.reset()
 	if badge.tapped(5) and mode=="flight":camera_rig.missile_requested=not camera_rig.missile_requested
 	if badge.tapped(6) and mode=="flight":copilot=not copilot;assisted_yoke_reference=vision.yoke
@@ -351,9 +359,12 @@ func _physics_process(dt: float) -> void:
 		if not is_on_runway(flight.position): flight.contact = "overrun"
 		apply_aircraft_pose()
 		if flight.contact=="overrun": finish_sortie(false,"Runway excursion. Brake earlier and hold centerline.")
-		elif flight.speed==0: finish_sortie(true,"Aircraft secured. Smooth arrival.")
+		elif flight.speed==0:
+			var success: bool=combat.boss_defeated if mission.cinematic else true
+			finish_sortie(success,"SFO LANDING COMPLETE — AIRCRAFT SECURED" if success else "SFO LANDING COMPLETE — INTERCEPT INCOMPLETE")
 		return
 	if mode!="flight": return
+	landing_transition=maxf(0,landing_transition-dt)
 	fire_guard = maxf(0,fire_guard-dt)
 	eject_hold = eject_hold+dt if not test_mode and Input.is_physical_key_pressed(KEY_E) else 0
 	if eject_hold>0.9 and flight.airborne:
@@ -452,6 +463,23 @@ func finish_sortie(success: bool, reason: String) -> void:
 		test_finished = true
 		print("SORTIE RESULT: ","PASS" if success else "FAIL"," time=",flight.elapsed," contacts=",combat.kills," hull=",combat.hull," position=",flight.position," contact=",flight.contact)
 		get_tree().quit(0 if success else 1)
+func begin_landing() -> void:
+	if mode!="flight" or not flight.airborne or landing_started or route_id!="sf":return
+	landing_started=true;landing_transition=1.2
+	primary_latched=false;salvo_latched=false;combat.active=false;combat.engagement_enabled=false
+	combat.beam_active=false;combat.gun_firing_time=0;combat.visuals.reset()
+	vision.enabled=false;copilot=true;used_copilot=true;control=Vector3.ZERO
+	gear_override=1;flaps_override=2
+	# A deliberate short demo transition to SFO final, retaining sortie score.
+	flight.spawn_airborne(Vector3(0,49,2100),65)
+	flight.heading=0;flight.roll=0;flight.pitch=-atan(Approach.GLIDESLOPE)
+	flight.pitch_velocity=0;flight.roll_velocity=0;flight.yaw_velocity=0;flight.barrel_remaining=0
+	flight.gear=true;flight.flaps=2;flight.throttle=.22;flight.engine=.3;flight.afterburner=false;flight.power_input=0
+	if mission.active:mission.transition("approach")
+	else:flight_kind="approach"
+	fighter_fx.reset();camera_rig.reset();apply_aircraft_pose();camera_rig.update(.016)
+	audio.radio.say("approach",2)
+
 func approach_controls() -> Vector3:
 	if not flight.airborne:
 		flight.throttle = 1
