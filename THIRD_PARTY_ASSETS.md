@@ -1,3 +1,5 @@
+> Version 0.10 adds the sourced San Francisco regional world and restores source aircraft artwork. See [San Francisco source credits](docs/san-francisco.md) for the active assets and included original archives.
+
 > Version 0.6: only the modified F-35B-derived SPECTRE is playable. Other aircraft are retained as licensed source provenance and excluded from the executable. Current art/audio modifications and credits are in [SPECTRE asset credits](docs/demo-assets.md).
 
 # Third-party aircraft assets
