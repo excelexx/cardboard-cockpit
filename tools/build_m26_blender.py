@@ -10,9 +10,9 @@ def material(name, color, metal, rough):
     m=bpy.data.materials.new(name);m.use_nodes=True;p=m.node_tree.nodes.get('Principled BSDF')
     p.inputs['Base Color'].default_value=(*color,1);p.inputs['Metallic'].default_value=metal;p.inputs['Roughness'].default_value=rough
     return m
-bodymat=material('Satin titanium grey',(.36,.41,.43),.38,.43)
-finmat=material('Machined graphite fins',(.12,.17,.19),.42,.38)
-seeker=material('Optical ceramic seeker',(.012,.025,.034),.64,.12)
+bodymat=material('Satin titanium grey',(.51,.55,.57),.65,.29)
+finmat=material('Machined graphite fins',(.065,.085,.10),.72,.28)
+seeker=material('Optical ceramic seeker',(.012,.035,.055),.78,.09)
 amber=material('Identification band',(.60,.36,.08),.22,.48)
 ink=material('Laser etched identification',(.025,.035,.04),.05,.65)
 steel=material('Nozzle and fasteners',(.23,.26,.28),.82,.30)
@@ -34,12 +34,14 @@ def lathe(name,profile,mat):
     return obj_mesh(name,verts,faces,mat,True)
 lathe('M26_ogive_airframe',[(-1.55,.003),(-1.51,.027),(-1.44,.058),(-1.32,.085),(-1.14,.103),(-.94,.110),(1.26,.110),(1.37,.095),(1.44,.075)],bodymat)
 lathe('Optical_seeker',[(-1.553,.0035),(-1.51,.029),(-1.44,.060),(-1.32,.087),(-1.26,.094)],seeker)
-for z in [-.94,.10,1.08]:lathe('Recessed_collar',[(z-.009,.1105),(z,.113),(z+.009,.1105)],finmat)
+lathe('Graphite_motor_sleeve',[(.54,.112),(1.25,.112),(1.39,.091)],finmat)
+for z in [-.94,.10,.55,1.24]:lathe('Recessed_collar',[(z-.009,.1105),(z,.113),(z+.009,.1105)],finmat)
 lathe('Amber_identification',[(-.73,.111),(-.67,.111)],amber)
+lathe('Motor_serial_band',[(.64,.114),(.71,.114)],amber)
 lathe('Exhaust_ring',[(1.40,.078),(1.45,.079),(1.47,.071),(1.47,.048),(1.43,.047)],steel)
 for station in [-.45,.92]:
     for j in range(4):
-        reach=.37 if station>.5 else .235
+        reach=.43 if station>.5 else .27
         outline=[(.092,station-.31),(reach,station+.015),(reach,station+.23),(.092,station+.27)]
         verts=[(x,-z,side*.008) for side in [-1,1] for x,z in outline]
         faces=[(0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)]

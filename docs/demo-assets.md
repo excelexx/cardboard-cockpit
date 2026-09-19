@@ -22,3 +22,5 @@ Earlier aircraft, ships and unused weapon assets remain in source history/proven
 The active missile is now the original project M-26, built in Blender; the older Poly Pizza missile remains historical source and is excluded from export. New generated sky, trees, granite, airframe texture and detonation assets are documented in [art direction](art-direction.md). The airframe atlas remains a derivative of the included GPL source. Countermeasure limits, heat, reloads, steady weapon locks and enemy attacks are absent from the current arcade rules.
 
 The original CG-26 rotary cannon source is included as `docs/source/CG26.blend`. `tools/build_gatling_audio.py` derives `gatling_loop.wav` from the included GPL FlightGear `cannon.wav`, retaining the original recording and applying a circular crossfade and level normalization. The game envelopes the loop instead of retriggering overlapping recordings. The directional muzzle image is generated project artwork.
+
+Version 0.9 adds `gatling_attack.wav`, an 85 ms enveloped excerpt of the same included GPL cannon source, reproduced by `tools/build_gatling_audio.py`. The animated missile motor shader is original project code.

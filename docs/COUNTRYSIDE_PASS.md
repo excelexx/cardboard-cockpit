@@ -1,3 +1,5 @@
+> Integrated in SPECTRE 0.9 with the current fighter and combat rules. The integrated route completes in 179.15 simulated seconds, visits all eleven landmarks, and spends 40.18 seconds above the city. This original branch report is retained for provenance.
+
 # Coastal countryside and city flyover
 
 The guided route now crosses the photographic city's actual footprint, rather

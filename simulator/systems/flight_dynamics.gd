@@ -1,5 +1,6 @@
 extends RefCounted
 class_name FlightDynamics
+const Tune = preload("res://data/balance.gd")
 ## Fictional fly-by-wire dynamics: filtered angular rates, momentum and energy.
 var profile: Dictionary
 var position := Vector3.ZERO
@@ -8,6 +9,8 @@ var speed := 0.0
 var throttle := 0.0
 var engine := 0.0
 var afterburner := false
+var power_input := 0.0
+var airbrake := 0.0
 var wind := Vector3.ZERO
 var pitch := 0.0
 var roll := 0.0
@@ -36,13 +39,13 @@ var barrel_remaining := 0.0
 var barrel_direction := 1.0
 var barrel_start := 0.0
 var last_ground := 0.0
-const BARREL_DURATION := 1.7
+const BARREL_DURATION := Tune.BARREL_DURATION
 
 func reset(aircraft: Dictionary) -> void:
 	profile = aircraft.duplicate(true)
 	position = Vector3(0,float(profile.clearance),1100)
 	velocity = Vector3.ZERO; wind = Vector3.ZERO
-	speed = 0; throttle = 0; engine = 0
+	speed = 0; throttle = 0; engine = 0; power_input = 0; airbrake = 0
 	pitch = 0; roll = 0; heading = 0
 	pitch_velocity = 0; roll_velocity = 0; yaw_velocity = 0
 	vertical_speed = 0; g_load = 1
@@ -75,17 +78,22 @@ func step(dt: float, controls: Vector3, brakes: bool, ground: float, runway: boo
 
 func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> void:
 	elapsed += dt
-	engine = move_toward(engine,throttle,dt*(0.52 if throttle>engine else 0.7))
-	var thrust: float = float(profile.acceleration)*engine*(1.58 if afterburner and not gear else 1.0)
+	engine = move_toward(engine,throttle,dt*((Tune.ENGINE_INPUT_UP if throttle>engine else Tune.ENGINE_INPUT_DOWN) if absf(power_input)>.01 else (Tune.ENGINE_CRUISE_UP if throttle>engine else Tune.ENGINE_CRUISE_DOWN)))
+	var thrust: float = float(profile.acceleration)*engine*(Tune.AFTERBURNER_THRUST if afterburner and not gear else 1.0)
+	airbrake = move_toward(airbrake,1.0 if power_input<-.1 and airborne else 0.0,dt*Tune.AIRBRAKE_RESPONSE)
+	if airborne and power_input>0: thrust += power_input*Tune.INPUT_ACCELERATION
 	var drag: float = float(profile.acceleration)*pow(speed/float(profile.max_speed),2)
 	drag += (0.70 if gear else 0.15)+flaps*(0.35+speed*0.007)
+	if airborne: drag += airbrake*Tune.AIRBRAKE_DECELERATION*clampf((speed-Tune.AIRBRAKE_MIN_SPEED)/Tune.AIRBRAKE_TAPER,0,1)
 	if not airborne: drag += 0.45+(19 if brakes else 0)
-	speed = clampf(speed+(thrust-drag-sin(pitch)*5.0)*dt,0,float(profile.max_speed)*(1.19 if afterburner else 1.03))
+	speed = clampf(speed+(thrust-drag-sin(pitch)*5.0)*dt,0,float(profile.max_speed)*(Tune.AFTERBURNER_SPEED if afterburner else 1.03))
+	if airborne and not gear and power_input<-.1: speed = maxf(speed,Tune.AIRBRAKE_MIN_SPEED)
 	var previous_velocity: Vector3 = velocity
 	if airborne:
+		var handling: float = 1+Tune.THROTTLE_HANDLING_SCALAR*(1-2*throttle)
 		var authority: float = clampf(speed/effective_rotation_speed(),0.15,1.25)
-		roll_velocity = lerpf(roll_velocity,controls.x*float(profile.roll_rate),1-exp(-dt*13.0))
-		pitch_velocity = lerpf(pitch_velocity,controls.y*float(profile.pitch_rate)*authority,1-exp(-dt*12.0))
+		roll_velocity = lerpf(roll_velocity,controls.x*float(profile.roll_rate)*handling,1-exp(-dt*Tune.ROLL_RESPONSE))
+		pitch_velocity = lerpf(pitch_velocity,controls.y*float(profile.pitch_rate)*authority*handling,1-exp(-dt*Tune.PITCH_RESPONSE))
 		var rolling: bool = barrel_remaining>0
 		if rolling:
 			barrel_remaining = maxf(0,barrel_remaining-dt)
@@ -94,19 +102,19 @@ func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> voi
 		else:
 			roll = wrapf(roll+roll_velocity*dt,-PI,PI)
 		pitch = clampf(pitch+pitch_velocity*dt,-1.10,1.20)
-		var coordinated: float = sin(roll)*64.0/maxf(speed,55.0)
-		var desired_yaw: float = coordinated+controls.z*0.13
-		yaw_velocity = lerpf(yaw_velocity,0.0 if rolling else desired_yaw,1-exp(-dt*5.0))
+		var coordinated: float = sin(roll)*Tune.BANK_TURN_FORCE/maxf(speed,55.0)
+		var desired_yaw: float = coordinated+controls.z*Tune.YAW_RATE*handling
+		yaw_velocity = lerpf(yaw_velocity,0.0 if rolling else desired_yaw,1-exp(-dt*Tune.YAW_RESPONSE))
 		heading = wrapf(heading+yaw_velocity*dt,-PI,PI)
 		var lift: float = clampf(speed/(effective_rotation_speed()*0.82),0,1)
 		var sink: float = (1-lift)*28.0+(1-maxf(cos(roll),0.0))*6.0
 		var desired_vertical: float = sin(pitch)*speed-sink
 		if airborne_time<5 and position.y-ground<25: desired_vertical = maxf(desired_vertical,2)
-		vertical_speed = lerpf(vertical_speed,desired_vertical,1-exp(-dt*3.0))
+		vertical_speed = lerpf(vertical_speed,desired_vertical,1-exp(-dt*Tune.VERTICAL_RESPONSE))
 		var horizontal := Vector3(sin(heading),0,-cos(heading))*speed*cos(pitch)+wind
 		if velocity.length()<0.01 and speed>1: velocity = Vector3(horizontal.x,vertical_speed,horizontal.z)
-		velocity.x = lerpf(velocity.x,horizontal.x,1-exp(-dt*4.0))
-		velocity.z = lerpf(velocity.z,horizontal.z,1-exp(-dt*4.0))
+		velocity.x = lerpf(velocity.x,horizontal.x,1-exp(-dt*Tune.VELOCITY_RESPONSE))
+		velocity.z = lerpf(velocity.z,horizontal.z,1-exp(-dt*Tune.VELOCITY_RESPONSE))
 		velocity.y = vertical_speed
 		position += velocity*dt
 		airborne_time += dt
@@ -130,7 +138,7 @@ func resolve_contact(ground: float, runway: bool) -> void:
 	if contact!="": return
 	if airborne and position.y<=ground+float(profile.clearance):
 		touchdown_speed = speed; touchdown_sink = vertical_speed; touchdown_bank = roll; touchdown_center = absf(position.x)
-		if runway and gear and speed<105 and vertical_speed>-10 and absf(roll)<0.4:
+		if runway and gear and speed<Tune.TOUCHDOWN_MAX_SPEED and vertical_speed>-Tune.TOUCHDOWN_MAX_SINK and absf(roll)<Tune.TOUCHDOWN_MAX_BANK:
 			airborne = false; position.y = ground+float(profile.clearance)
 			vertical_speed = 0; velocity.y = 0; contact = "landed"
 		else: contact = "crash"
@@ -144,7 +152,7 @@ func rollout_step(dt: float, brakes: bool, steering: float, on_runway: bool) -> 
 	pitch_velocity = move_toward(pitch_velocity,0,dt)
 	roll_velocity = move_toward(roll_velocity,0,dt)
 	throttle = 0; afterburner = false; engine = move_toward(engine,0,dt*0.5)
-	speed = maxf(0,speed-(1.4+(5.2 if brakes else 0))*dt)
+	speed = maxf(0,speed-(Tune.ROLLOUT_DRAG+(Tune.ROLLOUT_BRAKING if brakes else 0))*dt)
 	heading += clampf(steering,-1,1)*0.11*clampf(speed/20,0,1)*dt
 	velocity = Vector3(sin(heading),0,-cos(heading))*speed
 	position += velocity*dt; distance += speed*dt

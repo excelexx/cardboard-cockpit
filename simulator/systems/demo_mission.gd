@@ -1,9 +1,10 @@
 extends RefCounted
 class_name DemoMission
+const Tune = preload("res://data/balance.gd")
 ## A continuous departure, valley engagement, recovery and landing.
-const Route=preload("res://systems/scenic_route.gd")
-var route_index:=0
-var visited_route: Array[int]=[]
+const CoastalRoute = preload("res://systems/scenic_route.gd")
+var route_index := 0
+var visited_route: Array[int] = []
 var app: Node
 var active := false
 var phase := "takeoff"
@@ -13,15 +14,14 @@ var history: Array[Dictionary] = []
 var nearest_runway_distance := INF
 func reset(enabled: bool) -> void:
 	active = enabled; phase = "takeoff"; clock = 0; phase_clock = 0
-	history.clear(); nearest_runway_distance = INF
-	route_index=0; visited_route.clear()
+	history.clear(); nearest_runway_distance = INF; route_index = 0; visited_route.clear()
 	if enabled: history.append({"phase":phase,"time":0.0,"position":app.flight.position})
 func transition(next: String) -> void:
 	if phase==next: return
 	phase = next; phase_clock = 0
 	history.append({"phase":phase,"time":clock,"position":app.flight.position})
 	if phase=="combat":
-		for i in range(7): app.combat.spawn_contact()
+		app.combat.spawn_clock = Tune.FIRST_ARRIVAL
 	elif phase=="return": app.audio.radio.say("checkpoint")
 	print("DEMO PHASE: ",phase," time=",snappedf(clock,.01)," position=",app.flight.position)
 func tick(dt: float) -> void:
@@ -30,21 +30,24 @@ func tick(dt: float) -> void:
 	var f: FlightDynamics = app.flight
 	if phase=="takeoff" and f.airborne and f.position.y-app.world.ground_height(f.position.x,f.position.z)>45:
 		transition("combat")
-	elif phase=="combat" and route_index>=8:
+	elif app.route_id!="coast" and phase=="combat" and (f.position.z<-9000 or phase_clock>Tune.ALPINE_COMBAT_LIMIT):
 		transition("return")
-	elif phase=="return" and route_index>=Route.POINTS.size() and f.position.z>-13200 and absf(f.position.x)<350 and absf(f.heading)<.45:
+	elif app.route_id!="coast" and phase=="return" and f.position.z<-10300 and f.position.z>-13200 and absf(f.position.x)<350 and absf(f.heading)<.45:
 		transition("approach")
-	if phase in ["combat","return"] and route_index<Route.POINTS.size():
-		if f.position.distance_to(Route.POINTS[route_index])<330:
-			visited_route.append(route_index)
-			route_index+=1
+	if app.route_id=="coast" and phase in ["combat","return"]:
+		var delta: Vector3 = route_target()-f.position
+		if Vector2(delta.x,delta.z).length()<Tune.WAYPOINT_RADIUS and absf(delta.y)<Tune.WAYPOINT_HEIGHT_TOLERANCE:
+			visited_route.append(route_index); route_index += 1
+			if route_index>=CoastalRoute.POINTS.size(): transition("approach")
+			elif route_index>=8 and phase=="combat": transition("return")
 	if f.contact=="landed": transition("rollout")
 	app.combat.engagement_enabled = phase=="combat"
 func label() -> String:
 	return {"takeoff":"01 / DEPARTURE","combat":"02 / INTERCEPT","return":"03 / RECOVERY","approach":"03 / FINAL APPROACH","rollout":"03 / ROLLOUT"}.get(phase,"")
 func instruction() -> String:
+	if app.route_id=="coast" and phase in ["combat","return"]: return CoastalRoute.NAMES[mini(route_index,CoastalRoute.NAMES.size()-1)]+"  •  FOLLOW THE BLUE DIAMOND"
 	if phase=="takeoff": return "W  FULL POWER  •  ↑ ROTATE AT 105 KT" if not app.flight.airborne else "POSITIVE CLIMB  •  G GEAR UP"
-	if phase=="combat": return "HOLD SPACE + T TO FIRE BOTH  /  OR HOLD BOTH MOUSE BUTTONS"
+	if phase=="combat": return "W ACCELERATE  /  S AIRBRAKE  •  ALIGN THE ACQUISITION RING"
 	if phase=="return": return "NORTH FIELD / RWY 36  •  REDUCE POWER"
 	if phase=="approach": return "GEAR DOWN  •  FLAPS 2  •  HOLD THE GLIDEPATH"
 	return "HOLD SPACE TO BRAKE  •  A / D CENTRELINE"
@@ -57,10 +60,20 @@ func controls() -> Vector3:
 	if phase=="approach":
 		f.afterburner = false
 		return app.approach_controls()
-	var desired: Vector3=Route.POINTS[mini(route_index,Route.POINTS.size()-1)]
-	var speed: float=145.0 if phase=="combat" else 110.0
-	f.gear=false
-	f.flaps=0 if phase=="combat" else 1
+	if app.route_id=="coast": return coastal_controls()
+	var desired := Vector3(0,240,-11000)
+	var speed := Tune.ALPINE_RETURN_SPEED
+	if phase=="combat":
+		f.gear = false; f.flaps = 0
+		speed = Tune.ALPINE_COMBAT_SPEED
+		desired = Vector3(sin(-f.position.z*.00085)*150,210+sin(clock*.07)*25,f.position.z-1300)
+		var nearest := INF
+		for enemy: Dictionary in app.combat.enemies:
+			var delta: Vector3 = enemy.position-f.position
+			if delta.z < -150 and absf(enemy.position.x)<550 and enemy.position.y<420 and delta.length()<nearest:
+				nearest = delta.length(); desired = app.combat.lead_point(enemy)
+	else:
+		f.gear = false; f.flaps = 1
 	var terrain: float = app.world.ground_height(f.position.x,f.position.z)
 	for distance in [300.0,650.0,1100.0]:
 		var probe: Vector3 = f.position+f.forward()*distance
@@ -78,3 +91,18 @@ func controls() -> Vector3:
 			if shot.kind=="hostile_missile" and not shot.has("decoy") and shot.position.distance_to(f.position)<650:
 				app.combat.deploy_flares(); break
 	return Vector3(clampf((bank-f.roll)*1.6-f.roll_velocity*.3,-1,1),clampf((pitch-f.pitch)*3.0-f.pitch_velocity*.25,-1,1),clampf(error*.8,-1,1))
+
+func route_target() -> Vector3:
+	return CoastalRoute.POINTS[mini(route_index,CoastalRoute.POINTS.size()-1)]
+
+func coastal_controls() -> Vector3:
+	var f: FlightDynamics = app.flight
+	var delta: Vector3 = route_target()-f.position
+	var error: float = wrapf(atan2(delta.x,-delta.z)-f.heading,-PI,PI)
+	var desired_roll: float = clampf(error*1.6,-.66,.66)
+	var desired_pitch: float = clampf(atan2(delta.y,maxf(Vector2(delta.x,delta.z).length(),250)),-.36,.40)
+	var desired_speed: float = Tune.COAST_EARLY_SPEED if route_index<4 else Tune.COAST_CRUISE_SPEED
+	if route_index>=8: desired_speed = Tune.COAST_RETURN_SPEED
+	f.gear = false; f.flaps = 0; f.afterburner = false
+	f.throttle = clampf(.24+(desired_speed-f.speed)*.065,0,1)
+	return Vector3(clampf((desired_roll-f.roll)*5,-1,1),clampf((desired_pitch-f.pitch)*6,-1,1),clampf(error*1.4,-1,1))

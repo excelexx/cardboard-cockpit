@@ -3,7 +3,6 @@ render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, fog_disabled;
 
 uniform vec4 cloud_color : source_color = vec4(0.95, 0.96, 0.97, 0.70);
 uniform float seed = 0.0;
-uniform bool billboard = true;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
@@ -26,10 +25,10 @@ float fbm(vec2 p) {
 }
 void vertex() {
 	// Screen-facing clouds keep their world position and their natural soft silhouette.
-	if (billboard) MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
+	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
 }
 void fragment() {
-	vec2 p = UV * vec2(5.0, 2.5) + vec2(seed + TIME * 0.006, 0.0);
+	vec2 p = UV * vec2(5.0, 2.5) + vec2(seed, 0.0);
 	float detail = fbm(p);
 	float edge = pow(abs(UV.x * 2.0 - 1.0), 4.0) + pow(abs(UV.y * 2.0 - 1.0), 2.0);
 	float shape = smoothstep(0.25, 0.68, detail + 0.30 - edge * 0.60);

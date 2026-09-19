@@ -1,9 +1,11 @@
-# Relaxed arcade demo — version 0.8
+# Relaxed arcade demo — version 0.9
 
-**Goal:** take off, enjoy clearing large flocks with unlimited weapons, then land. The geese never attack. No reload, heat, steady-lock or aircraft-upgrade systems interrupt play.
+**Goal:** take off, enjoy clearing small, staggered groups with unlimited weapons, then land. The geese never attack. No reload, heat, steady-lock or aircraft-upgrade systems interrupt play.
 
-- **Play / Enter:** assisted flight with player-controlled shooting. Hold Space + T, or both mouse buttons, to fire Gatling and missiles together. Aim generally toward a goose; missiles select targets immediately and Gatling assistance is generous.
-- **Watch demo:** the same complete flight with automatic shooting, useful for an uninterrupted judge demonstration. It takes approximately 2 minutes 45 seconds and ends stopped on Cape North's runway.
+- **Play / Enter:** assisted flight with player-controlled shooting. Hold Space + T, or both mouse buttons, to fire Gatling and missiles together. Bring a goose inside the six-degree ring; the crosshair tracks it and LOCK appears quickly. A small retention margin forgives drift. Unlocked missiles fly straight.
+- **Watch demo:** the same complete flight with automatic shooting, useful for an uninterrupted judge demonstration. Azure Coast takes about three minutes; Alpine Valley takes about 2 minutes 18 seconds and ends stopped on North Field's runway.
+- **ROUTE:** choose Azure Coast for Festyve’s city, villages and island tour, or Alpine Valley for the existing mountain sortie.
+- **W / S:** fast acceleration / strong airbrake, with a forgiving minimum airborne speed.
 - **Arrows:** optional manual steering. Hold for a smooth bank/pitch; release to level. H resumes route assistance.
 - **X / V:** missile inset / cockpit or chase view. Q performs a quick roll when altitude permits.
 - **Escape / R / F1:** pause / restart the current style of demo / controls. F10 changes quality.

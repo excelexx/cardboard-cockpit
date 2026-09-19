@@ -6,7 +6,7 @@ func check(value: bool, label: String):
 	checks += 1
 	if not value: failures.append(label); push_error("DEMO FAIL: "+label)
 func run():
-	var app = load("res://scenes/main.tscn").instantiate(); root.add_child(app)
+	var app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
 	app.on_action("guided")
 	check(app.mission.active and app.mission.phase=="takeoff" and not app.flight.airborne and app.flight.speed==0,"Full demo starts stationary on the departure runway")
