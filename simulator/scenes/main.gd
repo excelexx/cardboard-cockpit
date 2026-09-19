@@ -510,6 +510,12 @@ func _physics_process(dt: float) -> void:
 	flight.step(dt,control,Input.is_physical_key_pressed(KEY_SPACE),ground,on_runway,false)
 	# Resolve against the surface reached by this frame, including runway edges
 	# and rising terrain, rather than the point the aircraft just left.
+	if combat is GooseCampaign and combat.showcase:
+		var safe_floor: float = world.ground_height(flight.position.x,flight.position.z)+100.0
+		if flight.position.y<safe_floor:
+			flight.position.y = safe_floor
+			flight.vertical_speed = maxf(0,flight.vertical_speed)
+			flight.pitch = maxf(0.03,flight.pitch)
 	flight.resolve_contact(world.ground_height(flight.position.x, flight.position.z), world.is_runway(flight.position.x, flight.position.z))
 	if flight.airborne and not was_airborne:
 		show_toast("Positive climb. Welcome to the sky.")
