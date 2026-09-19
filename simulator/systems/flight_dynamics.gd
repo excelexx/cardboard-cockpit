@@ -46,7 +46,7 @@ func reset(aircraft: Dictionary) -> void:
 	touchdown_sink = 0.0
 	touchdown_bank = 0.0
 
-func step(dt: float, control: Vector3, brakes: bool, ground: float, runway: bool) -> void:
+func step(dt: float, control: Vector3, brakes: bool, ground: float, runway: bool, resolve_surface: bool = true) -> void:
 	if contact != "":
 		return
 	elapsed += dt
@@ -91,6 +91,12 @@ func step(dt: float, control: Vector3, brakes: bool, ground: float, runway: bool
 	var forward := Vector3(sin(heading), 0, -cos(heading))
 	position += forward * speed * cos(pitch) * dt
 	distance += speed * dt
+	if resolve_surface:
+		resolve_contact(ground, runway)
+
+func resolve_contact(ground: float, runway: bool) -> void:
+	if contact != "":
+		return
 	if airborne and position.y <= ground + float(profile.clearance):
 		touchdown_speed = speed
 		touchdown_sink = vertical_speed
@@ -111,4 +117,9 @@ func get_heading_degrees() -> float:
 	return fposmod(rad_to_deg(heading), 360.0)
 
 func get_smoothness() -> int:
-	return clampi(int(100.0 - roughness / maxf(elapsed, 1.0) * 220.0 - stall_time), 0, 100)
+	var landing_penalty: float = 0.0
+	if contact == "landed":
+		landing_penalty = maxf(absf(touchdown_sink) - 1.0, 0.0) * 3.0
+		landing_penalty += maxf(touchdown_speed / float(profile.rotation_speed) - 1.1, 0.0) * 50.0
+		landing_penalty += absf(touchdown_bank) * 30.0
+	return clampi(int(100.0 - roughness / maxf(elapsed, 1.0) * 220.0 - stall_time - landing_penalty), 0, 100)

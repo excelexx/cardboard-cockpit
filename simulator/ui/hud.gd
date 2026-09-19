@@ -36,6 +36,19 @@ func _process(_dt: float) -> void:
 func text(at: Vector2, value: String, size: int = 20, color: Color = WHITE, technical: bool = false) -> void:
 	draw_string(mono if technical else font, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
 
+func paragraph(at: Vector2, value: String, width: float, size: int, color: Color) -> void:
+	var current := ""
+	var row := 0
+	for word: String in value.split(" "):
+		var candidate: String = word if current.is_empty() else current + " " + word
+		if not current.is_empty() and font.get_string_size(candidate, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width:
+			text(at + Vector2(0, row * (size + 5)), current, size, color)
+			row += 1
+			current = word
+		else:
+			current = candidate
+	text(at + Vector2(0, row * (size + 5)), current, size, color)
+
 func line(a: Vector2, b: Vector2, color: Color = Color(0.4,0.55,0.6,0.3), width: float = 1.0) -> void:
 	draw_line(a,b,color,width,true)
 
@@ -255,7 +268,7 @@ func draw_results() -> void:
 	var success: bool = app.mission_success
 	text(Vector2(428,254),"FLIGHT DEBRIEF",13,AMBER,true)
 	text(Vector2(426,319),"Welcome to North Field." if success else "Every flight teaches you.",36)
-	text(Vector2(428,363),app.result_reason,18,GREEN if success else MUTED)
+	paragraph(Vector2(428,355),app.result_reason,742,17,GREEN if success else MUTED)
 	line(Vector2(428,397),Vector2(1170,397))
 	var f: FlightDynamics = app.flight
 	var names: Array[String] = ["FLIGHT TIME", "CHECKPOINTS", "SMOOTHNESS"]
@@ -299,10 +312,12 @@ func draw_calibration() -> void:
 	text(Vector2(386,210),"OPTIONAL  /  CARDBOARD CONTROLS",13,AMBER,true)
 	text(Vector2(384,268),"Connect your cardboard cockpit.",34)
 	text(Vector2(386,315),"Keyboard and mouse are ready now. Vision needs the separate tracker.",18,MUTED)
-	var lines: Array[String] = ["1. Print marker 7 for your yoke and marker 23 for the throttle.","2. Place the webcam in front so both markers stay visible.","3. Press C in the tracker preview to open its calibration wizard.","4. Hold neutral, then show each full yoke and throttle range.","5. Start the tracker and enable vision below."]
+	var lines: Array[String] = ["1. Print marker 7 for your yoke and marker 23 for the throttle.","2. Place the webcam in front so both markers stay visible.","3. Run: ./tools/tracker.sh --camera 0 --calibrate", "4. Capture the seven poses with Space in the tracker preview.","5. Enable vision below, then return to flight."]
 	for i: int in lines.size():
 		text(Vector2(386,382+i*45),lines[i],18,WHITE)
-	text(Vector2(386,641),app.vision.status,15,GREEN if app.vision.connected else AMBER,true)
-	text(Vector2(386,675),"Any keyboard steering immediately returns control to you.",17,MUTED)
+	text(Vector2(386,605),"ROLL %+.2f   PITCH %+.2f   POWER %03d%%" % [app.vision.yoke.x,app.vision.yoke.y,int(app.vision.throttle*100)],15,WHITE,true)
+	text(Vector2(386,639),"YOKE: %s    THROTTLE: %s" % ["TRACKED" if app.vision.tracking else "LOST", "TRACKED" if app.vision.throttle_confidence>0.4 else "HOLDING / LOST"],13,MUTED,true)
+	text(Vector2(386,673),app.vision.status,13,GREEN if app.vision.connected else AMBER,true)
+	text(Vector2(386,701),"Keyboard steering or power changes give you control.",15,MUTED)
 	button("vision",Rect2(386,727,401,57),"VISION: ON" if app.vision.enabled else "ENABLE VISION",true)
-	button("calibration",Rect2(810,727,402,57),"BACK TO FLIGHT")
+	button("calibration",Rect2(810,727,402,57),"BACK TO FLIGHT" if app.mode == "flight" else "BACK")

@@ -7,6 +7,12 @@ The native flight simulator works with keyboard and mouse by itself. This option
 Use Python 3.9–3.12. From the `cardboard-cockpit` project folder:
 
 ```sh
+./tools/setup_vision.sh
+```
+
+This selects a supported Python interpreter (or uses installed `uv`) and installs the pinned dependencies without opening a camera. `./tools/tracker.sh` then runs the tracker with the correct environment. Manual installation also works:
+
+```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r vision/requirements.txt
 ```
@@ -70,7 +76,7 @@ Later runs load the saved calibration:
 .venv/bin/python vision/tracker.py --camera 0
 ```
 
-Press **C** in the tracker preview to recalibrate; press **Q** or **Escape** to close it. Recalibrate whenever the webcam or prop mounting moves. Changing camera index or actual frame dimensions requires recalibration. Use `--no-preview` only after calibration to keep the spectator display unobtrusive. A webcam or permission change requires stopping and restarting the service.
+Press **C** in the tracker preview to recalibrate; press **Q** or **Escape**, or close the window, to stop the service and release the camera. Recalibrate whenever the webcam or prop mounting moves. Changing camera index or actual frame dimensions requires recalibration. Use `--no-preview` only after calibration to keep the spectator display unobtrusive. A webcam or permission change requires stopping and restarting the service.
 
 ## Tuning and recovery
 
@@ -94,6 +100,8 @@ Default smoothing is 0.10 seconds and the yoke dead zone is 6%. The target captu
 ```
 
 Tests cover sign and range mapping, reversed mounting, angle wrapping, bad calibration rejection, seven-stage calibration, packet shape, clipping, smoothing, independent marker loss, synthetic marker detection, projected yoke pose, duplicate marker rejection, and a real loopback WebSocket service with two clients and reconnection. Synthetic tests do not open a webcam.
+
+The camera-mode pipeline is also exercised with rendered marker frames: detection → calibration/filtering → live WebSocket packets, independent marker loss, resolution-change rejection, preview closure, and capture cleanup. A fake camera supplies those frames; this is software coverage, not physical-camera validation.
 
 The native receiver also has an integration check. From the repository root, run your Godot executable with:
 

@@ -194,6 +194,9 @@ func update_rings() -> void:
 		mat.emission_energy_multiplier = 2.2 if i == ring_index else 0.6
 
 func start_flight() -> void:
+	help_visible = false
+	calibration_visible = false
+	credits_visible = false
 	for child: Node in aircraft.get_children():
 		child.queue_free()
 	aircraft.add_child(load_plane())
@@ -211,8 +214,21 @@ func start_flight() -> void:
 	update_rings()
 	update_camera(1.0)
 
+func overlay_visible() -> bool:
+	return help_visible or calibration_visible or credits_visible
+
+func _notification(what: int) -> void:
+	# Never leave an aircraft flying unattended after switching apps.
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and mode == "flight" and not test_mode:
+		mode = "paused"
+		look = Vector2.ZERO
+
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		# Overlays own input. Gameplay shortcuts must not mutate the hidden
+		# flight or advance the hangar while the pilot is reading instructions.
+		if overlay_visible() and event.keycode not in [KEY_ESCAPE, KEY_F1, KEY_C, KEY_M, KEY_Q]:
+			return
 		match event.keycode:
 			KEY_F1: on_action("help")
 			KEY_M: on_action("mute")
@@ -247,6 +263,8 @@ func _input(event: InputEvent) -> void:
 					show_toast("Training copilot engaged" if copilot else "You have control")
 			KEY_1,KEY_2,KEY_3,KEY_4,KEY_5:
 				if mode == "hangar": select_plane(event.keycode-KEY_1)
+	if overlay_visible():
+		return
 	if event is InputEventMouseMotion:
 		if mode == "hangar" and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and event.position.y<735:
 			hangar_angle += event.relative.x*0.006
@@ -265,11 +283,18 @@ func on_action(action: String) -> void:
 			mode = "hangar"
 			help_visible = false
 			calibration_visible = false
+			credits_visible = false
 			update_rings()
 		"resume": mode = "flight"
-		"help": help_visible = not help_visible
+		"help":
+			help_visible = not help_visible
+			calibration_visible = false
+			credits_visible = false
 		"credits": credits_visible = not credits_visible
-		"calibration": calibration_visible = not calibration_visible
+		"calibration":
+			calibration_visible = not calibration_visible
+			help_visible = false
+			credits_visible = false
 		"vision":
 			vision.enabled = not vision.enabled
 			if not vision.enabled: vision.status = "KEYBOARD / MOUSE"
@@ -284,7 +309,7 @@ func _process(dt: float) -> void:
 	if mode == "hangar":
 		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT): hangar_angle += dt*0.025
 	update_camera(dt)
-	audio.update(flight.engine,flight.speed,mode == "flight" and not help_visible and not calibration_visible)
+	audio.update(flight.engine,flight.speed,mode == "flight" and not overlay_visible())
 	if capture_at>0 and runtime>=capture_at:
 		capture_at = -1
 		await RenderingServer.frame_post_draw
@@ -297,13 +322,15 @@ func _process(dt: float) -> void:
 		get_tree().quit(2)
 
 func _physics_process(dt: float) -> void:
-	if mode != "flight" or help_visible or calibration_visible or credits_visible:
+	if mode != "flight" or overlay_visible():
 		return
 	var keyboard := Vector3(float(Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_UP))-float(Input.is_physical_key_pressed(KEY_DOWN)),float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)))
 	var throttle_delta: float = float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
 	if keyboard.length()>0 or throttle_delta!=0:
 		if copilot: show_toast("You have control")
 		copilot = false
+		if keyboard.length() > 0:
+			mouse_yoke = false
 		vision.enabled = false
 		vision.status = "KEYBOARD / MOUSE"
 	if copilot:
@@ -323,9 +350,12 @@ func _physics_process(dt: float) -> void:
 		control = control.lerp(target_control,1.0-exp(-dt*8.0))
 	var prior: Vector3 = flight.position
 	var ground: float = world.ground_height(flight.position.x,flight.position.z)
-	var on_runway: bool = absf(flight.position.x)<50 and (absf(flight.position.z)<1600 or absf(flight.position.z+15000)<1600)
+	var on_runway: bool = world.is_runway(flight.position.x, flight.position.z)
 	var was_airborne: bool = flight.airborne
-	flight.step(dt,control,Input.is_physical_key_pressed(KEY_SPACE),ground,on_runway)
+	flight.step(dt,control,Input.is_physical_key_pressed(KEY_SPACE),ground,on_runway,false)
+	# Resolve against the surface reached by this frame, including runway edges
+	# and rising terrain, rather than the point the aircraft just left.
+	flight.resolve_contact(world.ground_height(flight.position.x, flight.position.z), world.is_runway(flight.position.x, flight.position.z))
 	if flight.airborne and not was_airborne:
 		show_toast("Positive climb. Welcome to the sky.")
 		audio.ping()
@@ -333,7 +363,7 @@ func _physics_process(dt: float) -> void:
 		finish_mission()
 	if ring_index<CHECKPOINTS.size() and flight.airborne:
 		var target: Vector3 = CHECKPOINTS[ring_index]
-		if prior.z>=target.z and flight.position.z<=target.z:
+		if not is_equal_approx(prior.z, flight.position.z) and (prior.z-target.z)*(flight.position.z-target.z) <= 0.0:
 			var fraction: float = inverse_lerp(prior.z,flight.position.z,target.z)
 			var crossing: Vector3 = prior.lerp(flight.position,clampf(fraction,0,1))
 			if Vector2(crossing.x-target.x,crossing.y-target.y).length()<RING_RADIUS:

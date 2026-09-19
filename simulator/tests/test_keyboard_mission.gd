@@ -16,10 +16,14 @@ var settings_existed: bool = false
 var settings_backup: PackedByteArray
 var finished: bool = false
 var mission_frames: int = 0
+var mission_plane: int = 3
 
 
 func _initialize() -> void:
 	Engine.max_fps = 0
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--mission-plane="):
+			mission_plane = clampi(argument.trim_prefix("--mission-plane=").to_int(), 0, 4)
 	settings_existed = FileAccess.file_exists("user://settings.cfg")
 	if settings_existed:
 		settings_backup = FileAccess.get_file_as_bytes("user://settings.cfg")
@@ -163,7 +167,9 @@ func run_test() -> void:
 		finish(false)
 		return
 
-	print("KEYBOARD MISSION: Boeing 737, all controls injected as physical key events")
+	app.select_plane(mission_plane)
+	app.start_flight()
+	print("KEYBOARD MISSION: ", app.profile().name, ", all controls injected as physical key events")
 	while app.mode == "flight" and app.flight.elapsed < 400.0:
 		await physics_frame
 		if app.mode != "flight":
