@@ -1,6 +1,20 @@
-# Cardboard Cockpit
+# Goose Protocol · Cardboard Cockpit
 
-A native Mac flight game with five real aircraft models, a cinematic mountain valley, and optional cardboard controls.
+**Version 0.4 — a three-minute, cardboard-controlled arcade demo.** Waterloo geese have taken over the skies. Start with a tiny trainer and a worn gatling, upgrade through six aircraft and six single-weapon loadouts, and finish in a Millennium Falcon-style freighter firing twin plasma cannons.
+
+Double-click **Launch Cardboard Cockpit.command**, then press **Enter** or **Start the 3-minute demo**. Each stage lasts 30 seconds. Aim assistance fires the current weapon when a goose is locked; **Space / left click** fires manually. **H** hands the guided demonstration over to the pilot. Tracked cardboard controls take control automatically. **C** opens camera setup before launch.
+
+**Developer mode:** press **F9**, then **1–6** to jump to any stage or **N** for the next stage. F9 disables the shortcuts again. The HUD clearly marks developer mode and the showcase's training shield. The guided showcase advances on time; it does not claim to be an unassisted campaign victory.
+
+See [the three-minute judge runbook](docs/DEMO_RUNBOOK.md), [asset credits](docs/demo-assets.md), and [verification](docs/verification.md).
+
+The six upgrades are Kestrel trainer / worn gatling, F-35 / guided missile, B-2 / heavy autocannon, An-225 / missile battery, VX-9 / pulse plasma, and Millennium Falcon-style freighter / twin plasma. Enemies always remain Canada geese; flock sizes rise from 3 to 16. No dimension switching or reality-warping systems are included.
+
+The merged flight lab below remains accessible from **Aircraft hangar**. It preserves the upstream cockpits, weather presets and landing rollout, alongside the earlier verified fixes.
+
+---
+
+A native Mac flight game with six real aircraft models, a cinematic mountain valley, and optional cardboard controls.
 
 **Version 0.3 — native keyboard/mouse flight prototype.** Choose a valley mission, landing practice, or free flight. Fly from detailed cockpits with live instruments, animated aircraft controls, selectable sky conditions, and a landing rollout. This is a standalone Godot application; it does not run in a browser or require an internet connection to fly.
 
@@ -10,7 +24,7 @@ A native Mac flight game with five real aircraft models, a cinematic mountain va
 
 Double-click **Launch Cardboard Cockpit.command** in this folder, or open **build/Cardboard Cockpit.app** directly. The packaged app needs neither Godot nor Python installed. The local build is ad-hoc signed, not Apple-notarized for public distribution.
 
-1. Choose the A380, F-35, B-2, 737, or 747 in the hangar.
+1. Choose the A380, F-35, B-2, 737, 747, or An-225 in the hangar.
 2. Click **Prepare flight**. Choose **Valley mission**, **Landing practice**, or **Free flight**, and select **Golden hour**, **Clear midday**, or **High overcast** conditions. Start the flight. Enter also advances these screens.
 3. Hold **W** for power. At the indicated rotation speed, gently hold **↑** to lift off.
 4. Follow the amber rings. Use **V** to cycle camera views or click **View** at the top right.
@@ -20,6 +34,8 @@ Double-click **Launch Cardboard Cockpit.command** in this folder, or open **buil
 **Landing practice** starts airborne on the North Field approach with gear and approach flaps selected. **Free flight** removes the checkpoint requirement and lets you explore the fictional valley and land at either airport. The numbered instructions above describe the valley mission.
 
 **H** engages an optional training copilot that can fly the route and brake after landing. Steering or changing power with the keyboard immediately returns control to you. Results disclose when the copilot was used. **R** restarts the selected flight mode; **Escape** pauses.
+
+Switching to another app pauses the flight automatically. Help and camera setup block flight shortcuts until closed. Arrow-key or rudder input takes over from the mouse yoke. Missed checkpoints can be collected by turning back through the ring in either direction.
 
 ## Controls
 
@@ -111,23 +127,29 @@ Read [vision setup and calibration](docs/vision-setup.md) and the [construction 
 
 Print the [one-page construction PDF](docs/Cardboard%20Cockpit%20Build%20Guide.pdf) and [marker/keyboard-panel PDF](vision/Cardboard%20Cockpit%20Markers.pdf) on A4 at **100% / actual size**. The black yoke marker is 70 mm and the throttle marker is 50 mm; both were measured and detected in the rendered PDF.
 
-A ready-to-use local `.venv` was created on this Mac. From a fresh clone, create it and install `vision/requirements.txt` as described in the setup guide.
+From a fresh clone, run `./tools/setup_vision.sh` to create the local `.venv` and install the pinned camera dependencies. It uses Python 3.9–3.12 or an installed `uv`. Setup never opens a camera.
 
 ```sh
 # Test the native connection without a webcam:
-.venv/bin/python vision/tracker.py --simulate --loss-demo
+./tools/tracker.sh --simulate --loss-demo
 
 # When real controls are ready, explicitly choose a camera and calibrate:
-.venv/bin/python vision/tracker.py --camera 0 --calibrate
+./tools/tracker.sh --camera 0 --calibrate
 ```
 
 In the game press **C**, enable vision, and return to flight. Calibration poses are captured with Space in the separate tracker preview. Press C in that preview to recalibrate. The client uses `ws://127.0.0.1:8765`; images are neither uploaded nor recorded.
+
+The setup panel shows live roll, pitch, throttle and independent marker status. Closing the tracker preview stops the service and releases the camera, just like Q or Escape.
 
 ## Verification
 
 [Verification notes](docs/verification.md) distinguish automated software checks from physical testing still outstanding.
 
 ```sh
+# Run every automated check, including full keyboard AND copilot missions
+# for all five aircraft. No webcam is opened:
+./tools/verify.sh
+
 # Flight behavior checks for all five profiles:
 .tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script res://tests/test_flight.gd
 
@@ -153,6 +175,8 @@ In the game press **C**, enable vision, and return to flight. Calibration poses 
 .venv/bin/python -m unittest discover -s vision/tests -v
 .tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script ../tools/test_vision_client.gd
 ```
+
+The same software suite runs in GitHub Actions on pushes and pull requests. Test logs distinguish deterministic keyboard-event input from physical OS interaction and synthetic marker images from real webcam testing.
 
 ## Files and credits
 
