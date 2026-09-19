@@ -1,0 +1,15 @@
+> Historical graphics-branch report. The integrated SPECTRE 0.9 release preserves this scenery and the original alpine route; current checks are in [verification](verification.md). The older campaign/loadout references below describe the source branch.
+
+# Photographic scenery and frame consistency — September 19, 2026
+
+Replaced the generated grid with two City of Helsinki photogrammetry districts: 128 base tiles plus 256 near-detail tiles, approximately 63 MB of GLBs available offline. Real USGS/Mapzen elevation supplies the mountain relief, rescaled into the fictional coast. Three baked fir silhouettes populate forests; nearby street trees and shoreline rocks retain their textured 3D models. Irregular water normals and depth-based shallows replace the repeating wave pattern. Concrete slab joints, photographic asphalt, touchdown rubber and instanced parked F-35s detail the airfield.
+
+Airport terrain is recessed below the runway, apron and foundations. Below-datum city scan outliers are clamped to source elevation zero. Wooded borders connect the photographic districts to the surrounding terrain. City LOD decisions switch complete four-tile refinements together with hysteresis, preventing gaps from independent tile thresholds.
+
+Aircraft and cockpit interiors are prepared before the campaign. Hidden interiors retain their render targets with instrument updates disabled. Fixed cockpit geometry is batched, duplicate displays share textures, and instrument textures refresh at 24 Hz. Terrain grid heights are cached instead of recalculating elevation/noise for every tree and collision query.
+
+Native Metal automated route test on this Apple M4, 1280×800 window, balanced quality: render interval median 16.660 ms, p95 17.820 ms, p99 18.480 ms, worst 35.696 ms. Flight-update CPU p99 0.753 ms; preflight preparation 1.215 s. Method: `tests/profile_sortie.gd -- --render`, six fixed physics steps per rendered frame, normal rendering loop, startup samples excluded. This is an accelerated diagnostic, not a guarantee of FPS or zero future stalls. Earlier runs overlapping asset imports/other tests were discarded for comparison. Static screenshot scripts force redraws and are not ordinary gameplay FPS measurements.
+
+Grounding: 13,638 airport checks and 55,543 sampled city vertices with zero terrain intrusions. Camera regression: 1,280 checks. The route visits eleven landmarks and lands after about 185 simulated seconds without terrain-rescue corrections. Physical controller testing is separate.
+
+The city is genuinely photograph-derived, but the whole game is not uniformly photorealistic or Microsoft Flight Simulator fidelity. Airports, cockpit shells, bridge and boats still include authored/simplified geometry. City lighting is baked into historical imagery, and collisions use conservative tile bounds. Previously packaged apps need rebuilding; use the source launcher for this update. See photogrammetry, nature and environment asset credits for licenses and modifications.

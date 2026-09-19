@@ -1,5 +1,6 @@
 extends Control
 class_name CockpitHUD
+const Tune = preload("res://data/balance.gd")
 signal action(name: String)
 var app: Node
 var font := SystemFont.new()
@@ -76,6 +77,7 @@ func draw_title() -> void:
 	text(Vector2(74,421),"Clear the flock. Enjoy the flight.",26,WHITE)
 	text(Vector2(74,468),"Take off. Own the valley. Bring it home.",18,MUTED)
 	button("fly",Rect2(74,571,394,69),"PLAY   →",true)
+	button("route",Rect2(490,582,260,48),"ROUTE: "+("AZURE COAST" if app.route_id=="coast" else "ALPINE VALLEY"))
 	button("guided",Rect2(74,659,187,48),"Watch demo")
 	button("approach",Rect2(279,659,189,48),"Landing practice")
 	button("camera",Rect2(74,737,187,43),"Cardboard setup")
@@ -108,6 +110,13 @@ func draw_flight() -> void:
 			line(Vector2(1370,439+i*22),Vector2(1384 if i%2 else 1390,439+i*22),Color(0.45,0.7,0.72,0.38))
 		text(Vector2(44,518),"%.1f G" % f.g_load,12,CYAN,true)
 		text(Vector2(1430,518),"%+d" % int(f.vertical_speed*196.85),12,CYAN,true)
+	if app.route_id=="coast" and app.mission.active and app.mission.phase in ["combat","return"]:
+		var waypoint: Vector3 = app.mission.route_target()
+		if not app.camera.is_position_behind(waypoint):
+			var nav: Vector2 = app.camera.unproject_position(waypoint)
+			nav = nav.clamp(Vector2(160,135),Vector2(1440,730))
+			draw_polyline(PackedVector2Array([nav+Vector2(0,-10),nav+Vector2(10,0),nav+Vector2(0,10),nav+Vector2(-10,0),nav+Vector2(0,-10)]),Color(.4,.7,1),2,true)
+			text(nav+Vector2(16,3),"NAV %02d" % (app.mission.route_index+1),11,Color(.5,.75,1),true)
 	var nose: Vector2 = app.camera.unproject_position(f.position+c.forward()*2000)
 	var ring_edge: Vector3 = c.forward().rotated(app.camera.global_basis.x,deg_to_rad(c.ACQUIRE_ANGLE))
 	var ring_radius: float = clampf(nose.distance_to(app.camera.unproject_position(f.position+ring_edge*1200)),38,115)
@@ -126,7 +135,7 @@ func draw_flight() -> void:
 	line(center+Vector2(0,6),center+Vector2(0,12),sight_color,1.8)
 	draw_circle(center,1.3,sight_color)
 	if c.active and c.engagement_enabled:
-		text(nose+Vector2(-50,ring_radius+22),"SEEKER / 6°",11,MUTED,true)
+		text(nose+Vector2(-50,ring_radius+22),"SEEKER / %.0f°" % Tune.ACQUIRE_DEGREES,11,MUTED,true)
 		if not tracking: text(nose+Vector2(-62,ring_radius+40),"ALIGN TO ACQUIRE",10,MUTED,true)
 	for enemy: Dictionary in c.enemies:
 		if app.camera.is_position_behind(enemy.position): continue
@@ -139,6 +148,8 @@ func draw_flight() -> void:
 			text(point+Vector2(radius+10,-15),"TRK %02d" % (enemy.id+1),12,WHITE,true)
 			text(point+Vector2(radius+10,2),"RNG %d M" % int(f.position.distance_to(enemy.position)),11,CYAN,true)
 			text(point+Vector2(radius+10,20),"LOCK" if c.lock_progress>=1 else "ACQUIRING",11,track_color,true)
+			line(point+Vector2(radius+10,29),point+Vector2(radius+62,29),Color(.4,.6,.6,.35),3)
+			line(point+Vector2(radius+10,29),point+Vector2(radius+10+52*clampf(enemy.health/enemy.max_health,0,1),29),WHITE,2)
 			line(point+Vector2(-radius,radius+7),point+Vector2(-radius+radius*2*c.lock_progress,radius+7),track_color,2)
 			var distance: float = f.position.distance_to(enemy.position)
 			var pip: Vector2 = app.camera.unproject_position(f.position+c.assisted_direction()*distance)
@@ -173,7 +184,7 @@ func draw_flight() -> void:
 		if i<2: text(Vector2(x+51,920),"INFINITE",11,MUTED,true)
 	var seeker: String = "M-26 / LOCK" if c.lock_progress>=1 else "M-26 / ACQUIRING" if c.target_id>=0 else "M-26 / UNGUIDED"
 	text(Vector2(45,813),seeker,12,GREEN if c.lock_progress>=1 else MUTED,true)
-	var ready: float = 1-clampf(c.missile_cooldown/.85,0,1)
+	var ready: float = 1-clampf(c.missile_cooldown/Tune.MISSILE_INTERVAL,0,1)
 	line(Vector2(218,937),Vector2(218+128*ready,937),GREEN if ready>=.99 else AMBER,2)
 	if f.airborne:
 		text(Vector2(44,550),"AIRBRAKE" if f.airbrake>.1 else "ACCEL" if f.power_input>.1 else "CRUISE",12,AMBER if f.airbrake>.1 else CYAN,true)

@@ -1,5 +1,6 @@
 extends Node3D
 class_name FighterEffects
+const Tune = preload("res://data/balance.gd")
 const WeaponArt = preload("res://systems/weapon_visuals.gd")
 const Fighter = preload("res://systems/fighter_model.gd")
 const Utils = preload("res://systems/model_utils.gd")
@@ -126,7 +127,7 @@ func build() -> void:
 func missile_launch(_side: float, index: int = -1) -> void:
 	last_store += 1
 	if index>=0 and index<stores.size():
-		store_timers[index] = .85; stores[index].visible = false
+		store_timers[index] = Tune.MISSILE_INTERVAL; stores[index].visible = false
 func update(dt: float) -> void:
 	clock += dt
 	update_gun(dt)

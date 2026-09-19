@@ -11,7 +11,7 @@ func tap(code: Key) -> void:
 		var event := InputEventKey.new(); event.keycode = code; event.physical_keycode = code; event.pressed = pressed
 		Input.parse_input_event(event); Input.flush_buffered_events()
 func run_tests() -> void:
-	app = load("res://scenes/main.tscn").instantiate(); root.add_child(app)
+	app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	await process_frame
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
 	check(app.mode=="title","Application starts on the flight deck")
