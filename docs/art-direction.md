@@ -32,3 +32,5 @@ Missiles and tracers are deliberately enlarged, and geese are closer and larger.
 `tools/build_cg26_blender.py` creates the original CG-26 shoulder-mounted rotary cannon, with six hollow barrels, rotating braces, receiver, ventilation slots, feed housing and amber service band. `docs/source/CG26.blend` retains editable source; the exported hierarchy preserves the gimbal, rotor and muzzle attachment. The gun follows the displayed aim and spins down after release.
 
 Runtime-loaded 3D textures explicitly include mipmaps. Foliage uses alpha-to-coverage with 4× MSAA in both quality modes; stable instance color data avoids the earlier temporal speckling.
+
+Version 0.9 refines the M-26 with a graphite motor sleeve, brighter metallic airframe, larger beveled fins and a second serial band. The exhaust is a soft angular-faded animated gas shader with a warm dissipating tail. Smoke remains for two seconds after a missile disappears. The CG-26 adds a small receiver recoil and a short source-derived mechanical attack at the beginning of each trigger press.

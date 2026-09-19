@@ -264,6 +264,7 @@ func update_gun(dt: float) -> void:
 	if is_instance_valid(gun_gimbal):
 		var wanted: Vector3 = app.combat.assisted_direction() if app.combat.active else app.flight.forward()
 		gun_gimbal.look_at(gun_gimbal.global_position+wanted*100,Vector3.UP)
+		gun_gimbal.position.z = .018*(.5+.5*sin(clock*145)) if firing else 0.0
 	if is_instance_valid(gun_rotor): gun_rotor.rotate_z(rotor_speed*dt)
 	gun_flash.visible = firing and not app.cockpit
 	gun_light.visible = firing

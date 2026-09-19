@@ -294,6 +294,7 @@ func _physics_process(dt: float) -> void:
 	if vision.enabled and vision.tracking:
 		copilot = false; input.x = vision.yoke.x; input.y = vision.yoke.y
 		if combat.lock_progress>=1 and combat.assist: combat.fire_gun()
+	flight.power_input = 0
 	if copilot:
 		input = mission.controls() if mission.active else combat.pilot_controls() if combat.active else approach_controls()
 		if demo_auto_fire and combat.active and combat.engagement_enabled and combat.lock_progress>=1:
@@ -307,7 +308,8 @@ func _physics_process(dt: float) -> void:
 			var mouse: Vector2 = (get_viewport().get_mouse_position()-Vector2(800,470))/Vector2(430,300)
 			input.x = clampf(mouse.x,-1,1); input.y = clampf(-mouse.y,-1,1)
 		if vision.enabled and vision.throttle_confidence>0.4: flight.throttle = move_toward(flight.throttle,vision.throttle,dt*0.8)
-		flight.throttle = clampf(flight.throttle+power*dt*0.38,0,1)
+		flight.throttle = clampf(flight.throttle+power*dt*2.4,0,1)
+		flight.power_input = power
 		flight.afterburner = Input.is_physical_key_pressed(KEY_SHIFT) and flight.airborne
 		var landing_assist: bool = flight.gear and (flight_kind=="approach" or (mission.active and mission.phase=="approach"))
 		var clearance: float = flight.position.y-world.ground_height(flight.position.x,flight.position.z)

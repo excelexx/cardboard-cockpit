@@ -17,7 +17,7 @@ func transition(next: String) -> void:
 	phase = next; phase_clock = 0
 	history.append({"phase":phase,"time":clock,"position":app.flight.position})
 	if phase=="combat":
-		for i in range(7): app.combat.spawn_contact()
+		app.combat.spawn_clock = .7
 	elif phase=="return": app.audio.radio.say("checkpoint")
 	print("DEMO PHASE: ",phase," time=",snappedf(clock,.01)," position=",app.flight.position)
 func tick(dt: float) -> void:
@@ -36,7 +36,7 @@ func label() -> String:
 	return {"takeoff":"01 / DEPARTURE","combat":"02 / INTERCEPT","return":"03 / RECOVERY","approach":"03 / FINAL APPROACH","rollout":"03 / ROLLOUT"}.get(phase,"")
 func instruction() -> String:
 	if phase=="takeoff": return "W  FULL POWER  •  ↑ ROTATE AT 105 KT" if not app.flight.airborne else "POSITIVE CLIMB  •  G GEAR UP"
-	if phase=="combat": return "HOLD SPACE + T TO FIRE BOTH  /  OR HOLD BOTH MOUSE BUTTONS"
+	if phase=="combat": return "W ACCELERATE  /  S AIRBRAKE  •  ALIGN THE ACQUISITION RING"
 	if phase=="return": return "NORTH FIELD / RWY 36  •  REDUCE POWER"
 	if phase=="approach": return "GEAR DOWN  •  FLAPS 2  •  HOLD THE GLIDEPATH"
 	return "HOLD SPACE TO BRAKE  •  A / D CENTRELINE"
