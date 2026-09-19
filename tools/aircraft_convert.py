@@ -233,6 +233,7 @@ def convert(id,files):
    elif id=='b737':isgear=any(t in name for t in ['tyre','strut','axle','steercyl','linklower','linkupper']) or name=='collar'
    elif id=='b747':isgear=any(t in (name+' '+anc) for t in ['gearnose','gearwing','gearbody','gearwheel','gearaxel']) and not any(t in name for t in ['door','well'])
    elif id=='b2':isgear=('tire' in name or 'gear' in name) and not any(t in name for t in ['cover','box'])
+   elif id=='an225':isgear=any(t in name for t in ['-mg-','-ng-','tyre','strut']) and 'door' not in name
    if isgear:gear_nodes.append(node_idx);gear_names.append(o['name'])
    else:gltf['scenes'][0]['nodes'].append(node_idx)
    gltf['nodes'].append({'name':o['name'],'mesh':len(gltf['meshes'])});gltf['meshes'].append({'name':o['name'],'primitives':prim})
@@ -250,7 +251,7 @@ def convert(id,files):
  (out/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n');print(json.dumps(manifest));return manifest
 
 def main():
- configs={'a380':[],'f35':['Models/F-35B.ac','Models/Engine.ac','Models/Gear.ac'],'b2':['Models/spirit.ac'],'b737':['Models/737-300.ac'],'b747':['Models/boeing747-400-jw.ac']}
+ configs={'a380':[],'f35':['Models/F-35B.ac','Models/Engine.ac','Models/Gear.ac'],'b2':['Models/spirit.ac'],'b737':['Models/737-300.ac'],'b747':['Models/boeing747-400-jw.ac'],'an225':['Models/AN225-48.ac']}
  all=[convert(id,fs) for id,fs in configs.items()]
  (ASSETS/'manifest.json').write_text(json.dumps(all,indent=2)+'\n')
 if __name__=='__main__':main()

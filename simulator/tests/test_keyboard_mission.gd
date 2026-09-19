@@ -25,7 +25,7 @@ func _initialize() -> void:
 	Engine.max_fps = 0
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--mission-plane="):
-			mission_plane = clampi(argument.trim_prefix("--mission-plane=").to_int(), 0, 4)
+			mission_plane = clampi(argument.trim_prefix("--mission-plane=").to_int(), 0, 5)
 	settings_existed = FileAccess.file_exists("user://settings.cfg")
 	if settings_existed:
 		settings_backup = FileAccess.get_file_as_bytes("user://settings.cfg")

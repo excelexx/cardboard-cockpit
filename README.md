@@ -1,6 +1,20 @@
-# Cardboard Cockpit
+# Goose Protocol · Cardboard Cockpit
 
-A native Mac flight game with five real aircraft models, a cinematic mountain valley, and optional cardboard controls.
+**Version 0.3 — a three-minute, cardboard-controlled arcade demo.** Waterloo geese have taken over the skies. Start with a tiny trainer and a worn gatling, upgrade through six aircraft and six single-weapon loadouts, and finish in a Millennium Falcon-style freighter firing twin plasma cannons.
+
+Double-click **Launch Cardboard Cockpit.command**, then press **Enter** or **Start the 3-minute demo**. Each stage lasts 30 seconds. Aim assistance fires the current weapon when a goose is locked; **Space / left click** fires manually. **H** hands the guided demonstration over to the pilot. Tracked cardboard controls take control automatically. **C** opens camera setup before launch.
+
+**Developer mode:** press **F9**, then **1–6** to jump to any stage or **N** for the next stage. F9 disables the shortcuts again. The HUD clearly marks developer mode and the showcase's training shield. The guided showcase advances on time; it does not claim to be an unassisted campaign victory.
+
+See [the three-minute judge runbook](docs/DEMO_RUNBOOK.md), [asset credits](docs/demo-assets.md), and [verification](docs/verification.md).
+
+The six upgrades are Kestrel trainer / worn gatling, F-35 / guided missile, B-2 / heavy autocannon, An-225 / missile battery, VX-9 / pulse plasma, and Millennium Falcon-style freighter / twin plasma. Enemies always remain Canada geese; flock sizes rise from 3 to 16. No dimension switching or reality-warping systems are included.
+
+The merged flight lab below remains accessible from **Aircraft hangar**. It preserves the upstream cockpits, weather presets and landing rollout, alongside the earlier verified fixes.
+
+---
+
+A native Mac flight game with six real aircraft models, a cinematic mountain valley, and optional cardboard controls.
 
 **Version 0.2 — native keyboard/mouse flight prototype.** Choose a valley mission, landing practice, or free flight. Fly from detailed cockpits with live instruments, animated aircraft controls, selectable sky conditions, and a landing rollout. This is a standalone Godot application; it does not run in a browser or require an internet connection to fly.
 
@@ -10,7 +24,7 @@ A native Mac flight game with five real aircraft models, a cinematic mountain va
 
 Double-click **Launch Cardboard Cockpit.command** in this folder, or open **build/Cardboard Cockpit.app** directly. The packaged app needs neither Godot nor Python installed. The local build is ad-hoc signed, not Apple-notarized for public distribution.
 
-1. Choose the A380, F-35, B-2, 737, or 747 in the hangar.
+1. Choose the A380, F-35, B-2, 737, 747, or An-225 in the hangar.
 2. Click **Prepare flight**. Choose **Valley mission**, **Landing practice**, or **Free flight**, and select **Golden hour**, **Clear midday**, or **High overcast** conditions. Start the flight. Enter also advances these screens.
 3. Hold **W** for power. At the indicated rotation speed, gently hold **↑** to lift off.
 4. Follow the amber rings. Use **V** to switch between cockpit and chase views.

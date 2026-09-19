@@ -9,10 +9,17 @@ const Audio = preload("res://systems/engine_audio.gd")
 const Vision = preload("res://systems/vision_client.gd")
 const Cockpit = preload("res://scenes/cockpit.gd")
 const Visuals = preload("res://systems/aircraft_visuals.gd")
+const Campaign = preload("res://systems/campaign.gd")
+const Fantasy = preload("res://systems/fantasy_aircraft.gd")
+const Combat = preload("res://systems/combat.gd")
 const Approach = preload("res://systems/approach_guidance.gd")
 const CHECKPOINTS: Array[Vector3] = [Vector3(0,180,-2000),Vector3(-450,420,-4200),Vector3(450,650,-6500),Vector3(150,420,-9000),Vector3(0,200,-11800)]
 const RING_RADIUS: float = 280.0
 
+var campaign_profile: Dictionary = {}
+var showcase_mode := true
+var developer_mode := false
+var combat: CombatDirector
 var mode := "hangar"
 var resume_mode := "flight"
 var flight_kind := "valley"
@@ -60,7 +67,7 @@ var auto_capture_index: int = 0
 var hangar_environment := Environment.new()
 
 func profile() -> Dictionary:
-	return Catalog.PLANES[selected]
+	return campaign_profile if not campaign_profile.is_empty() else Catalog.PLANES[selected]
 
 func _ready() -> void:
 	get_window().title = "Cardboard Cockpit — Flight Experience"
@@ -96,6 +103,9 @@ func _ready() -> void:
 	hud.select_aircraft.connect(select_plane)
 	audio = Audio.new()
 	add_child(audio)
+	combat = Combat.new()
+	combat.app = self
+	add_child(combat)
 	var saved := ConfigFile.new()
 	if saved.load("user://settings.cfg") == OK:
 		audio.muted = bool(saved.get_value("audio","muted",false))
@@ -110,7 +120,7 @@ func _ready() -> void:
 		if arg.begins_with("--capture-at="):
 			capture_at = maxf(1.0,arg.trim_prefix("--capture-at=").to_float())
 		if arg.begins_with("--plane="):
-			select_plane(clampi(arg.trim_prefix("--plane=").to_int(),0,4))
+			select_plane(clampi(arg.trim_prefix("--plane=").to_int(),0,Catalog.PLANES.size()-1))
 		if arg.begins_with("--conditions="):
 			conditions = arg.trim_prefix("--conditions=")
 			world.set_conditions(conditions)
@@ -140,28 +150,35 @@ func _ready() -> void:
 			flight.airborne = true
 			flight.ever_airborne = true
 			flight.airborne_time = 30
+	if OS.get_cmdline_user_args().is_empty() and DisplayServer.get_name()!="headless": mode = "title"
 	update_camera(1.0)
 
 func select_plane(index: int) -> void:
+	campaign_profile.clear()
 	selected = index
 	if is_instance_valid(preview):
 		preview.queue_free()
 	preview = load_plane()
 	hangar.pedestal.add_child(preview)
 	preview.position.y = 3.0
-	# Keep the fighter visually substantial while respecting real proportions in flight.
-	var factor: float = clampf(66.0 / maxf(float(profile().span),float(profile().length)),0.85,3.6)
-	preview.scale = Vector3.ONE * factor
-	preview.position.y = 3.0 * factor
+	# All previews share the same meter scale and camera distance.
+	hangar_zoom = 1.0
 	hangar_angle = 2.40
 	save_settings()
 
 func load_plane() -> Node3D:
 	var id: String = str(profile().id)
+	if id in ["trainer","vx9","falcon"]: return Fantasy.create(id)
 	var path: String = "res://assets/aircraft/%s/%s.tscn" % [id,id]
 	if ResourceLoader.exists(path):
 		var scene: PackedScene = load(path)
-		return scene.instantiate() as Node3D
+		var model: Node3D = scene.instantiate() as Node3D
+		var metadata_path := "res://assets/aircraft/%s/manifest.json" % id
+		if FileAccess.file_exists(metadata_path):
+			var metadata: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(metadata_path))
+			var dimensions: Dictionary = metadata.dimensions
+			model.scale = Vector3(float(profile().span)/float(dimensions.wingspan),1.0,float(profile().length)/float(dimensions.length))
+		return model
 	# Only used while an asset is importing; imported web models are the shipped fleet.
 	var placeholder := MeshInstance3D.new()
 	var mesh := CapsuleMesh.new()
@@ -211,6 +228,15 @@ func update_rings() -> void:
 		mat.emission_energy_multiplier = 2.2 if i == ring_index else 0.6
 
 func start_flight() -> void:
+	campaign_profile.clear()
+	if (flight_kind=="campaign") != (combat is GooseCampaign):
+		remove_child(combat)
+		combat.queue_free()
+		combat = Campaign.new() if flight_kind=="campaign" else Combat.new()
+		combat.app = self
+		add_child(combat)
+	if flight_kind == "combat" and str(profile().id)!="f35":
+		select_plane(1)
 	help_visible = false
 	calibration_visible = false
 	credits_visible = false
@@ -225,6 +251,7 @@ func start_flight() -> void:
 	var tune: Dictionary = profile().duplicate()
 	tune.clearance = 3.0
 	flight.reset(tune)
+	audio.set_aircraft(profile())
 	mode = "flight"
 	ring_index = 0
 	copilot = false
@@ -234,6 +261,17 @@ func start_flight() -> void:
 	toast_time = 0
 	control = Vector3.ZERO
 	touchdown_valid = false
+	combat.reset(flight_kind in ["combat","campaign"])
+	if flight_kind == "combat":
+		flight.position = Vector3(0,650,-3500)
+		flight.speed = 145
+		flight.throttle = 0.5
+		flight.engine = 0.5
+		flight.airborne = true
+		flight.ever_airborne = true
+		flight.airborne_time = 30
+		flight.gear = false
+		cockpit = false
 	if flight_kind == "approach":
 		ring_index = 5
 		flight.position = Vector3(0,155,-11200)
@@ -253,7 +291,8 @@ func overlay_visible() -> bool:
 
 func _notification(what: int) -> void:
 	# Never leave an aircraft flying unattended after switching apps.
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and mode == "flight" and not test_mode:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and mode in ["flight", "rollout", "ejected"] and not test_mode and capture_file.is_empty():
+		resume_mode = mode
 		mode = "paused"
 		look = Vector2.ZERO
 
@@ -269,6 +308,20 @@ func _input(event: InputEvent) -> void:
 				take_manual_control(true)
 			elif physical in [KEY_W, KEY_S]:
 				take_manual_control(false)
+		if mode == "flight":
+			if event.keycode == KEY_SHIFT:
+				if flight.start_barrel_roll(-1 if control.x<0 else 1): show_toast("BARREL ROLL")
+			if flight_kind == "combat":
+				if event.keycode == KEY_T: combat.fire_missile()
+				if event.keycode == KEY_Z: combat.deploy_flares()
+				if event.keycode == KEY_J: combat.assist = not combat.assist
+		if combat is GooseCampaign and mode=="flight":
+			if event.keycode==KEY_F9:
+				combat.developer = not combat.developer
+				developer_mode = combat.developer
+			if combat.developer:
+				if event.keycode==KEY_N: combat.skip_to(combat.wave % 6)
+				if event.keycode>=KEY_1 and event.keycode<=KEY_6: combat.skip_to(event.keycode-KEY_1)
 		match event.keycode:
 			KEY_F1: on_action("help")
 			KEY_F2: expanded_hud = not expanded_hud
@@ -278,14 +331,15 @@ func _input(event: InputEvent) -> void:
 					show_toast("Flaps " + ["UP","15°","30°"][flight.flaps])
 			KEY_M: on_action("mute")
 			KEY_ENTER:
-				if mode == "hangar": on_action("brief")
+				if mode == "title": on_action("demo")
+				elif mode == "hangar": on_action("brief")
 				elif mode == "briefing": on_action("fly")
 				elif mode == "results": on_action("restart")
 			KEY_ESCAPE:
 				if credits_visible: credits_visible = false
 				elif help_visible: help_visible = false
 				elif calibration_visible: calibration_visible = false
-				elif mode in ["flight","rollout"]:
+				elif mode in ["flight","rollout","ejected"]:
 					resume_mode = mode
 					mode = "paused"
 				elif mode == "paused": mode = resume_mode
@@ -308,7 +362,7 @@ func _input(event: InputEvent) -> void:
 					copilot = not copilot
 					used_copilot = used_copilot or copilot
 					show_toast("Training copilot engaged" if copilot else "You have control")
-			KEY_1,KEY_2,KEY_3,KEY_4,KEY_5:
+			KEY_1,KEY_2,KEY_3,KEY_4,KEY_5,KEY_6:
 				if mode == "hangar": select_plane(event.keycode-KEY_1)
 	if overlay_visible():
 		return
@@ -323,6 +377,21 @@ func _input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN: hangar_zoom = minf(1.45,hangar_zoom+0.06)
 
 func on_action(action: String) -> void:
+	if action=="brief_campaign":
+		flight_kind = "campaign"
+		mode = "briefing"
+		return
+	if action=="showcase":
+		showcase_mode = not showcase_mode
+		return
+	if action=="developer":
+		developer_mode = not developer_mode
+		return
+	if action=="demo":
+		flight_kind = "campaign"
+		showcase_mode = true
+		start_flight()
+		return
 	if action.begins_with("weather_"):
 		conditions = action.trim_prefix("weather_")
 		world.set_conditions(conditions)
@@ -335,6 +404,7 @@ func on_action(action: String) -> void:
 		"brief": mode = "briefing"
 		"fly", "restart": start_flight()
 		"hangar":
+			campaign_profile.clear()
 			mode = "hangar"
 			help_visible = false
 			calibration_visible = false
@@ -371,6 +441,7 @@ func _process(dt: float) -> void:
 		cockpit_frame.set_navigation(flight_kind,ring_index)
 		cockpit_frame.update_instruments(flight,control,dt if active else 0.0)
 	audio.update(flight.engine,flight.speed,active)
+	audio.campaign_audio(flight_kind=="campaign" and mode in ["flight","results"])
 	if capture_at>0 and runtime>=capture_at:
 		capture_at = -1
 		await RenderingServer.frame_post_draw
@@ -385,6 +456,9 @@ func _process(dt: float) -> void:
 func _physics_process(dt: float) -> void:
 	if overlay_visible():
 		return
+	if mode == "ejected":
+		combat.tick_ejection(dt)
+		return
 	if mode == "rollout":
 		var steering: float = float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
 		var brakes: bool = copilot or Input.is_physical_key_pressed(KEY_SPACE)
@@ -398,6 +472,18 @@ func _physics_process(dt: float) -> void:
 		return
 	if mode != "flight":
 		return
+	if str(profile().id)=="f35" and flight.airborne:
+		combat.eject_hold = combat.eject_hold+dt if Input.is_physical_key_pressed(KEY_E) else 0.0
+		if combat.eject_hold>=1.0 and combat.eject(): return
+	if flight_kind in ["combat","campaign"]:
+		combat.tick(dt)
+		if mode!="flight": return
+		if Input.is_physical_key_pressed(KEY_SPACE) or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT): combat.fire_gun()
+		if vision.enabled and vision.tracking: copilot = false
+		combat.cardboard_controls()
+		if copilot and combat.lock_progress>=1:
+			combat.fire_gun()
+			combat.fire_missile()
 	var keyboard := Vector3(float(Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_UP))-float(Input.is_physical_key_pressed(KEY_DOWN)),float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)))
 	var throttle_delta: float = float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
 	if keyboard.length()>0 or throttle_delta!=0:
@@ -465,6 +551,7 @@ func take_manual_control(steering: bool) -> void:
 	vision.status = "KEYBOARD / MOUSE"
 
 func pilot_controls() -> Vector3:
+	if flight_kind in ["combat","campaign"]: return combat.pilot_controls()
 	var target: Vector3 = target_position()
 	var desired_speed: float = 115.0
 	if not flight.airborne:
@@ -494,9 +581,13 @@ func pilot_controls() -> Vector3:
 	return Vector3(roll_input,pitch_input,0)
 
 func target_position() -> Vector3:
+	if flight_kind in ["combat","campaign"]:
+		var enemy: Dictionary = combat.target()
+		return enemy.position if not enemy.is_empty() else flight.position+combat.forward()*1500
 	return CHECKPOINTS[ring_index] if ring_index<5 and flight_kind=="valley" else Vector3(0,3,Approach.AIM_Z)
 
 func phase_label() -> String:
+	if flight_kind in ["combat","campaign"]: return "SKY SHIELD · INTERCEPTION"
 	if mode == "hangar": return "HANGAR"
 	if mode=="rollout" or (mode=="paused" and resume_mode=="rollout"): return "ROLLOUT · BRAKE TO A STOP"
 	if flight_kind=="free" and flight.airborne: return "FREE FLIGHT · EXPLORE THE VALLEY"
@@ -505,6 +596,8 @@ func phase_label() -> String:
 	return "AIRBORNE · VALLEY CHECKPOINTS"
 
 func flight_prompt() -> String:
+	if mode=="ejected": return "EJECTION SUCCESSFUL · PARACHUTE DEPLOYED"
+	if flight_kind in ["combat","campaign"]: return "SPACE fire · T missile · Z flares · SHIFT roll · Hold E eject"
 	if mode=="rollout": return "Power idle  ·  Hold SPACE to brake  ·  A / D to stay centered"
 	if flight.contact!="": return "Flight complete"
 	if flight.stall_time>0.8: return "LOW AIRSPEED  ·  Add power and lower the nose gently"
@@ -543,13 +636,20 @@ func show_toast(message: String) -> void:
 	toast_time = 4.0
 
 func update_camera(dt: float) -> void:
-	if mode in ["hangar","briefing"]:
+	if mode=="ejected" and is_instance_valid(combat.parachute):
+		camera.environment = null
+		cockpit_frame.set_presentation_visible(false)
+		aircraft.visible = true
+		camera.position = combat.eject_position+Vector3(15,8,22)
+		camera.look_at(combat.eject_position+Vector3(0,3,0))
+		return
+	if mode in ["hangar","briefing","title"]:
 		camera.environment = hangar_environment
 		camera.near = 0.5
 		aircraft.visible = false
 		hangar.visible = true
-		cockpit_frame.visible = false
-		var orbit := Vector3(sin(hangar_angle)*87,24,cos(hangar_angle)*87)*hangar_zoom
+		cockpit_frame.set_presentation_visible(false)
+		var orbit := Vector3(sin(hangar_angle)*110,30,cos(hangar_angle)*110)*hangar_zoom
 		camera.position = hangar.position+orbit
 		var screen_right := Vector3(cos(hangar_angle),0,-sin(hangar_angle))
 		camera.look_at(hangar.position+Vector3(0,7,0)-screen_right*19.0)
@@ -558,7 +658,7 @@ func update_camera(dt: float) -> void:
 		camera.environment = null
 		aircraft.visible = not cockpit
 		hangar.visible = false
-		cockpit_frame.visible = cockpit
+		cockpit_frame.set_presentation_visible(cockpit)
 		var plane_basis := Basis.from_euler(Vector3(flight.pitch,-flight.heading,-flight.roll))
 		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT): look = look.lerp(Vector2.ZERO,1-exp(-dt*2.0))
 		if cockpit:
@@ -570,7 +670,8 @@ func update_camera(dt: float) -> void:
 		else:
 			camera.near = 0.5
 			var length: float = maxf(float(profile().length),30.0)
-			var offset := Vector3(sin(look.x)*length*1.15,length*0.22+6.0+look.y*15.0,cos(look.x)*length*1.05)
+			var height: float = length*0.50+12.0 if flight_kind=="campaign" else length*0.22+6.0
+			var offset := Vector3(sin(look.x)*length*1.15,height+look.y*15.0,cos(look.x)*length*1.05)
 			var wanted: Vector3 = flight.position+Basis(Vector3.UP,-flight.heading)*offset
 			camera.position = camera.position.lerp(wanted,1-exp(-dt*5)) if camera.position.distance_to(wanted)<1000 else wanted
 			camera.look_at(flight.position+plane_basis*Vector3(0,3,-length*0.30))
@@ -599,7 +700,7 @@ func set_quality(high: bool) -> void:
 func load_settings() -> void:
 	var settings := ConfigFile.new()
 	if settings.load("user://settings.cfg") == OK:
-		selected = clampi(int(settings.get_value("flight","aircraft",0)),0,4)
+		selected = clampi(int(settings.get_value("flight","aircraft",0)),0,Catalog.PLANES.size()-1)
 		high_quality = bool(settings.get_value("video","high_quality",false))
 		conditions = str(settings.get_value("world","conditions","golden"))
 
@@ -610,3 +711,28 @@ func save_settings() -> void:
 	settings.set_value("world","conditions",conditions)
 	if is_instance_valid(audio): settings.set_value("audio","muted",audio.muted)
 	settings.save("user://settings.cfg")
+
+func apply_campaign_aircraft(tune: Dictionary) -> void:
+	campaign_profile = tune.duplicate(true)
+	for child: Node in aircraft.get_children():
+		aircraft.remove_child(child)
+		child.queue_free()
+	var model: Node3D = load_plane()
+	aircraft.add_child(model)
+	aircraft_visuals = Visuals.new()
+	aircraft.add_child(aircraft_visuals)
+	aircraft_visuals.initialize(model,profile())
+	cockpit_frame.build(profile())
+	flight.reset(tune)
+	flight.position = Vector3(0,700,-3500)
+	flight.speed = 110 if str(tune.id)=="trainer" else 140
+	flight.throttle = 0.4
+	flight.engine = 0.4
+	flight.airborne = true
+	flight.ever_airborne = true
+	flight.airborne_time = 30
+	flight.gear = false
+	control = Vector3.ZERO
+	cockpit = false
+	audio.set_aircraft(profile())
+	update_camera(1.0)

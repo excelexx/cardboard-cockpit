@@ -25,3 +25,7 @@ Original simulation light-volume meshes and overlapping alternate gear shell mes
 3. Import the `simulator/` Godot project. Load each aircraft through `res://assets/aircraft/<id>/<id>.tscn`.
 
 The conversion requires only the Python standard library. Models were imported and rendered in Godot 4.7.2 for inspection. Per-aircraft `manifest.json` records measured geometry bounds and triangle counts. Measurements include source geometry details and are not manufacturer specifications.
+
+## Version 0.3 demo assets
+
+See [demo asset credits](docs/demo-assets.md) for the Canada goose (Poly by Google, CC BY 3.0), Kenney ships and effects (CC0), MintoDog music (CC0), British Library goose recording (CC BY-SA 4.0), generated title artwork and original fan-made freighter adaptations. An-225 by Herbert Wagner, liveries by eagle, is GPL-2.0 with pinned source, COPYING and textures included.

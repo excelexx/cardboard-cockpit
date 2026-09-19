@@ -1,5 +1,5 @@
 extends SceneTree
-## Validates reversible presentation on the five real imported aircraft.
+## Validates reversible presentation on the six real imported aircraft.
 ## Optional -- --capture writes rendered inspection images into workspace work/.
 const Visuals = preload("res://systems/aircraft_visuals.gd")
 const Catalog = preload("res://data/aircraft.gd")
@@ -118,7 +118,7 @@ func run_checks() -> void:
 		model.free()
 		helper.free()
 	if failures.is_empty():
-		print("PASS: ", checks, " aircraft presentation checks across all five imported models.")
+		print("PASS: ", checks, " aircraft presentation checks across all six imported models.")
 		quit(0)
 	else:
 		for failure in failures:

@@ -18,8 +18,10 @@ var metal: StandardMaterial3D
 var black: StandardMaterial3D
 var rubber: StandardMaterial3D
 var lettering: Color = Color(0.7,0.77,0.78)
+var presentation_state: int = -1
 
 func build(aircraft: Dictionary) -> void:
+	presentation_state = -1
 	for child: Node in get_children():
 		remove_child(child)
 		child.queue_free()
@@ -50,6 +52,15 @@ func build(aircraft: Dictionary) -> void:
 		if child is Node3D:
 			child.position += Vector3(0,0.08,-0.16)
 	control_rest = pilot_control.position
+
+func set_presentation_visible(value: bool) -> void:
+	visible = value
+	if presentation_state == int(value): return
+	presentation_state = int(value)
+	for geometry: Node in find_children("*","GeometryInstance3D",true,false):
+		geometry.visible = value
+	for viewport: Node in find_children("*","SubViewport",true,false):
+		viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if value else SubViewport.UPDATE_DISABLED
 
 func update_instruments(flight: FlightDynamics, control: Vector3, delta: float) -> void:
 	for display: CockpitInstruments in displays:
