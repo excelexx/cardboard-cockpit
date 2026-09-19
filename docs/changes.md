@@ -1,3 +1,10 @@
+# Version 0.3 — camera views
+
+- Seven views: cockpit, chase, tail, top down, left side, right side and nose.
+- V cycles forward, Shift+V cycles backward, and 1–7 select a view during flight. Hangar aircraft shortcuts remain 1–5.
+- Click the current view at the top right, or Camera views in the pause menu, to choose with the mouse.
+- Exterior framing adjusts for aircraft dimensions, top-down stays aligned with heading, and view changes preserve the flight state.
+
 # Version 0.2 — cockpit and landing update
 
 - Aircraft-inspired 3D flight decks for all five aircraft, with live flight/navigation/engine screens and moving sticks, yokes and throttle levers.

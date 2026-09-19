@@ -86,7 +86,7 @@ func _gui_input(event: InputEvent) -> void:
 				if id.begins_with("plane_"):
 					select_aircraft.emit(int(id.trim_prefix("plane_")))
 				else:
-					action.emit(id)
+					action.emit("views" if id=="views_header" else id)
 				accept_event()
 				break
 
@@ -115,6 +115,8 @@ func _draw() -> void:
 		draw_pause()
 	elif app.mode == "results":
 		draw_results()
+	if app.camera_menu_open and app.mode not in ["hangar","briefing"]:
+		draw_camera_picker()
 	if app.help_visible:
 		draw_help()
 	if app.calibration_visible:
@@ -209,7 +211,7 @@ func draw_briefing() -> void:
 	else:
 		text(Vector2(355,626),"%s  ·  %s km visibility  ·  calm winds" % [app.world.get_conditions().time_of_day,app.world.get_conditions().visibility_km],13,MUTED,true)
 	text(Vector2(355,681),"W/S power   Arrows pitch/bank   G gear   F flaps   SPACE brakes",14,WHITE,true)
-	text(Vector2(355,716),"H enables a training copilot. V changes view. F1 shows all controls.",17,GREEN)
+	text(Vector2(355,716),"V cycles seven views. 1–7 select a view. H enables the training copilot.",17,GREEN)
 	button("hangar",Rect2(355,775,250,57),"Back to hangar")
 	button("fly",Rect2(926,775,319,57),"BEGIN APPROACH  →" if app.flight_kind=="approach" else "CLEARED FOR TAKEOFF  →",true)
 
@@ -223,26 +225,32 @@ func draw_flight() -> void:
 	text(Vector2(599,78),("CHECKPOINTS  %d / 5" % app.ring_index if app.flight_kind=="valley" else app.world.get_condition_name().to_upper()),12,MUTED,true)
 	text(Vector2(1130,53),"%02d:%02d" % [int(f.elapsed)/60,int(f.elapsed)%60],21,WHITE,true)
 	text(Vector2(1280,51),"COPILOT" if app.copilot else "MANUAL FLIGHT",13,AMBER if app.copilot else GREEN,true)
-	text(Vector2(1280,76),"%s   ·   %d FPS" % ["COCKPIT" if app.cockpit else "CHASE",Engine.get_frames_per_second()],11,MUTED,true)
+	text(Vector2(1130,78),"%d FPS" % Engine.get_frames_per_second(),11,MUTED,true)
+	var camera_button := Rect2(1268,60,282,30)
+	zones["views_header"] = camera_button
+	if hot=="views_header" or app.camera_menu_open:
+		panel(camera_button,Color(0.18,0.25,0.28,0.96))
+	text(Vector2(1280,80),"VIEW: %s   ▾   V" % app.camera_view_label().to_upper(),12,AMBER,true)
 	# Central heading ribbon and horizon flight director.
 	panel(Rect2(581,120,438,44),Color(0.03,0.06,0.08,0.5))
 	for offset: int in range(-2,3):
 		text(Vector2(607+(offset+2)*84,149),"%03d" % int(fposmod(f.get_heading_degrees()+offset*15,360)),14,AMBER if offset==0 else MUTED,true)
 	draw_colored_polygon(PackedVector2Array([Vector2(793,169),Vector2(807,169),Vector2(800,176)]),AMBER)
-	var center := Vector2(800,435)
-	line(center+Vector2(-65,0),center+Vector2(-22,0),Color(1,1,1,0.85),2)
-	line(center+Vector2(22,0),center+Vector2(65,0),Color(1,1,1,0.85),2)
-	line(center+Vector2(-22,0),center+Vector2(0,8),Color(1,1,1,0.85),2)
-	line(center+Vector2(0,8),center+Vector2(22,0),Color(1,1,1,0.85),2)
-	draw_circle(center,3,AMBER)
-	if f.airborne:
-		for degree: int in [-20,-10,0,10,20]:
-			var offset_y: float = (rad_to_deg(f.pitch)-degree)*6.0
-			if absf(offset_y)<150:
-				var a := Vector2(-100,offset_y).rotated(f.roll)
-				var b := Vector2(100,offset_y).rotated(f.roll)
-				line(center+a,center+b,Color(0.8,0.93,0.97,0.35),1)
-				text(center+b+Vector2(9,5),str(degree),11,MUTED,true)
+	if app.camera_view in ["cockpit","chase","tail"]:
+		var center := Vector2(800,435)
+		line(center+Vector2(-65,0),center+Vector2(-22,0),Color(1,1,1,0.85),2)
+		line(center+Vector2(22,0),center+Vector2(65,0),Color(1,1,1,0.85),2)
+		line(center+Vector2(-22,0),center+Vector2(0,8),Color(1,1,1,0.85),2)
+		line(center+Vector2(0,8),center+Vector2(22,0),Color(1,1,1,0.85),2)
+		draw_circle(center,3,AMBER)
+		if f.airborne:
+			for degree: int in [-20,-10,0,10,20]:
+				var offset_y: float = (rad_to_deg(f.pitch)-degree)*6.0
+				if absf(offset_y)<150:
+					var a := Vector2(-100,offset_y).rotated(f.roll)
+					var b := Vector2(100,offset_y).rotated(f.roll)
+					line(center+a,center+b,Color(0.8,0.93,0.97,0.35),1)
+					text(center+b+Vector2(9,5),str(degree),11,MUTED,true)
 	var target: Vector3 = app.target_position()
 	var distance: float = f.position.distance_to(target)
 	panel(Rect2(28,122,346,98),Color(0.03,0.06,0.08,0.78))
@@ -257,7 +265,7 @@ func draw_flight() -> void:
 		text(Vector2(1240,219),"A webcam sees cardboard controls",16)
 		text(Vector2(1240,244),"and turns movement into flight.",16)
 		text(Vector2(1240,278),"C  CAMERA SETUP    ·    TAB  HIDE",10,MUTED,true)
-	if app.ring_index>=5 and app.flight_kind!="free" and f.airborne:
+	if app.ring_index>=5 and app.flight_kind!="free" and f.airborne and app.camera_view in ["cockpit","chase","tail"]:
 		draw_approach()
 	if not app.cockpit or app.expanded_hud:
 		panel(Rect2(28,831,1544,140),Color(0.025,0.05,0.065,0.92))
@@ -278,11 +286,26 @@ func draw_flight() -> void:
 	var prompt_y: float = 751 if not app.cockpit or app.expanded_hud else 323
 	panel(Rect2(800-tw*0.5-24,prompt_y,tw+48,49),Color(0.04,0.085,0.11,0.86))
 	text(Vector2(800-tw*0.5,prompt_y+31),prompt,20,AMBER if f.stall_time>1 else WHITE)
-	text(Vector2(36,993),"W/S POWER   ARROWS PITCH / BANK   A/D RUDDER   V VIEW   G GEAR   F FLAPS   H COPILOT   F2 INSTRUMENTS   F1 HELP   ESC PAUSE",10,MUTED,true)
+	text(Vector2(36,993),"W/S POWER   ARROWS PITCH / BANK   A/D RUDDER   V / SHIFT+V VIEWS   1–7 SELECT   G GEAR   F FLAPS   H COPILOT   F2 INSTRUMENTS   F1 HELP   ESC PAUSE",10,MUTED,true)
 	if app.toast_time>0:
 		var w: float = font.get_string_size(app.toast,HORIZONTAL_ALIGNMENT_LEFT,-1,24).x
 		panel(Rect2(800-w/2-28,247,w+56,60))
 		text(Vector2(800-w/2,286),app.toast,24,GREEN)
+
+func draw_camera_picker() -> void:
+	panel(Rect2(1256,108,316,422),Color(0.025,0.045,0.06,0.98))
+	text(Vector2(1276,141),"CAMERA VIEWS",12,AMBER,true)
+	zones["views"] = Rect2(1521,117,37,31)
+	text(Vector2(1533,141),"×",23,MUTED)
+	var ids: Array[String] = ["cockpit","chase","tail","top","left","right","front"]
+	var names: Array[String] = ["Cockpit","Chase","Tail","Top down","Left side","Right side","Nose"]
+	for i: int in ids.size():
+		var rect := Rect2(1272,158+i*44,284,38)
+		var selected: bool = app.camera_view==ids[i]
+		button("view_"+ids[i],rect,names[i],selected)
+		text(rect.position+Vector2(15,25),str(i+1),12,INK if selected else MUTED,true)
+	text(Vector2(1276,491),"V  NEXT   SHIFT+V  PREVIOUS",10,MUTED,true)
+	text(Vector2(1276,512),"ESC CLOSES THIS MENU",10,MUTED,true)
 
 func draw_approach() -> void:
 	var guidance: Dictionary = app.approach_data()
@@ -312,6 +335,7 @@ func draw_pause() -> void:
 	button("hangar",Rect2(598,545,404,52),"Choose another aircraft")
 	button("help",Rect2(598,612,192,50),"Controls")
 	button("mute",Rect2(810,612,192,50),"Sound: OFF" if app.audio.muted else "Sound: ON")
+	button("views_header",Rect2(810,686,192,46),"Camera views")
 	text(Vector2(598,719),"Q  QUALITY: %s" % ("HIGH" if app.high_quality else "BALANCED"),12,MUTED,true)
 
 func draw_results() -> void:
@@ -343,14 +367,14 @@ func draw_help() -> void:
 	panel(Rect2(315,105,970,785))
 	text(Vector2(370,166),"YOUR FLIGHT CONTROLS",14,AMBER,true)
 	text(Vector2(368,222),"A little input goes a long way.",35)
-	var rows: Array[Array] = [["W / S", "Increase / decrease engine power"],["↑ / ↓", "Nose up / nose down"],["← / →", "Bank left / right"],["A / D", "Rudder and runway steering"],["RIGHT MOUSE", "Hold and drag to look around"],["B", "Toggle mouse yoke (move cursor to steer)"],["G  /  SPACE", "Landing gear / wheel brakes"],["F  /  F2", "Flaps UP / 15 / 30 · show instrument overlay"],["V  /  H", "Cockpit or chase view / training copilot"],["R  /  M", "Reset aircraft / mute sound"],["TAB  /  C", "Spectator panel / camera setup"],["ESC  /  Q", "Pause / change render quality"]]
+	var rows: Array[Array] = [["W / S", "Increase / decrease engine power"],["↑ / ↓", "Nose up / nose down"],["← / →", "Bank left / right"],["A / D", "Rudder and runway steering"],["RIGHT MOUSE", "Hold and drag to look around"],["B", "Toggle mouse yoke (move cursor to steer)"],["G  /  SPACE", "Landing gear / wheel brakes"],["F  /  F2", "Flaps UP / 15 / 30 · show instrument overlay"],["V / SHIFT+V", "Next / previous camera view"],["1–7", "Select a camera directly during flight"],["H", "Training copilot on/off"],["R  /  M", "Reset aircraft / mute sound"],["TAB  /  C", "Spectator panel / camera setup"],["ESC  /  Q", "Pause / change render quality"]]
 	if app.flight_kind=="combat":
 		rows = [["ARROWS / W / S","Bank and pitch / increase or reduce power"],["SPACE / LEFT CLICK","Fire the cannon (watch the heat bar)"],["T","Launch a missile after the target locks"],["Z","Deploy defensive flares"],["SHIFT","Perform a full F-35 barrel roll"],["HOLD E","Eject from the F-35 (hold one second)"],["J","Toggle cardboard combat assistance"],["CARDBOARD AIM","Hold a drone in the reticle to fire"],["PULL YOKE BACK","Launch a locked missile; re-center to re-arm"],["FULL YOKE BANK","Barrel roll; re-center to re-arm"],["V / H / R","Camera / training copilot / restart"]]
 	if app.flight_kind=="campaign" or app.mode=="title":
 		rows = [["ARROWS","Bank and pitch to aim at a goose"],["W / S","Increase / decrease power"],["SPACE / LEFT CLICK","Fire this level's single weapon"],["CARDBOARD YOKE","Aim to lock and fire automatically"],["H","Guided demo / take over manually"],["V","Switch cockpit / chase camera"],["C","Connect and inspect cardboard controls"],["F9","Enable / disable developer mode"],["1–6 / N","Developer: choose level / next upgrade"],["R","Restart the complete demo"],["ESC / M","Pause / mute all audio"]]
 	for i: int in rows.size():
-		text(Vector2(373,268+i*40),str(rows[i][0]),15,WHITE,true)
-		text(Vector2(657,268+i*40),str(rows[i][1]),17,MUTED)
+		text(Vector2(373,268+i*35),str(rows[i][0]),15,WHITE,true)
+		text(Vector2(657,268+i*35),str(rows[i][1]),17,MUTED)
 	button("help",Rect2(943,802,283,52),"GOT IT  /  F1",true)
 	button("credits",Rect2(373,802,283,52),"Credits & sources")
 
