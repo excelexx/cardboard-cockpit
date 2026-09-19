@@ -42,5 +42,19 @@ async def main(seconds):
    result=await client.read_gatt_char(PHASE_UUID)
    if result!=bytes([phase]):raise RuntimeError('Phase readback mismatch')
   print('PASS: telemetry, render counters and four legacy phase readbacks',flush=True)
+ # A new connection must recover both directions without a USB reset.
+ device=await BleakScanner.find_device_by_filter(lambda d,a:SERVICE_UUID in a.service_uuids,timeout=10)
+ if device is None:raise RuntimeError('Badge did not advertise after disconnect')
+ async with BleakClient(device) as client:
+  resumed=json.loads((await client.read_gatt_char(INFO_UUID)).decode())
+  if resumed['frames']<info['frames'] or resumed['packets']<info['packets']:raise RuntimeError('Unexpected reboot during reconnect')
+  buttons=await client.read_gatt_char(BUTTON_UUID)
+  if len(buttons)!=3:raise RuntimeError('Buttons unavailable after reconnect')
+  ready=disconnected();ready.update(mode=0,name='PILOT',pilot=1)
+  c=client.services.get_characteristic(INSTRUMENT_UUID)
+  for part in fragments(encode(ready,seq+1),seq+1,c.max_write_without_response_size):await client.write_gatt_char(INSTRUMENT_UUID,part,response=True)
+  confirmed=json.loads((await client.read_gatt_char(INFO_UUID)).decode())
+  if confirmed['mode']!=0 or confirmed['packets']<=info['packets']:raise RuntimeError('Telemetry did not recover after reconnect')
+  print('PASS: Bluetooth disconnect/reconnect, buttons and fresh telemetry without USB reset',flush=True)
 if __name__=='__main__':
  parser=argparse.ArgumentParser();parser.add_argument('--seconds',type=int,default=25);args=parser.parse_args();asyncio.run(main(args.seconds))

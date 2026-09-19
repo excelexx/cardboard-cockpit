@@ -83,7 +83,7 @@ class PhaseCallbacks:public NimBLECharacteristicCallbacks {
 class InfoCallbacks:public NimBLECharacteristicCallbacks {
  void onRead(NimBLECharacteristic*c,NimBLEConnInfo&) override {
   char b[220];Telemetry t;portENTER_CRITICAL(&stateMux);t=latest;portEXIT_CRITICAL(&stateMux);
-  snprintf(b,sizeof(b),"{\"fw\":\"instrument-2.1\",\"packets\":%lu,\"bad\":%lu,\"frames\":%lu,\"fps10\":%u,\"heap\":%lu,\"seq\":%u,\"age\":%lu,\"buttons\":%u,\"mode\":%u,\"roll\":%d,\"pitch\":%d}",(unsigned long)goodPackets,(unsigned long)badPackets,(unsigned long)renderFrames,fps10,(unsigned long)ESP.getFreeHeap(),t.sequence,(unsigned long)(millis()-lastPacketAt),heldMask,t.mode,t.roll,t.pitch);
+  snprintf(b,sizeof(b),"{\"fw\":\"instrument-3\",\"packets\":%lu,\"bad\":%lu,\"frames\":%lu,\"fps10\":%u,\"heap\":%lu,\"seq\":%u,\"age\":%lu,\"buttons\":%u,\"mode\":%u,\"roll\":%d,\"pitch\":%d}",(unsigned long)goodPackets,(unsigned long)badPackets,(unsigned long)renderFrames,fps10,(unsigned long)ESP.getFreeHeap(),t.sequence,(unsigned long)(millis()-lastPacketAt),heldMask,t.mode,t.roll,t.pitch);
   c->setValue((uint8_t*)b,strlen(b));
  }
 };
@@ -155,9 +155,22 @@ void jet(int cx,int cy,float angle){
 void ready(const Telemetry&t,bool linked,uint32_t now){
  txt(22,43,"PILOT",2,DIM);txt(22,66,t.name,3,WHITE);jet(260,88,now*.00065f);
  canvas.drawRoundRect(14,138,292,65,8,DIM);txt(37,152,linked?"READY FOR TAKEOFF":"WAITING FOR COCKPIT",2,linked?GREEN:AMBER);
- txt(57,184,linked?"START TO LAUNCH":"BLUETOOTH LINK",1,DIM);txt(69,220,"SPECTRE FLIGHT INSTRUMENT",1,CYAN);
+ txt(57,184,linked?"START TO LAUNCH":"BLUETOOTH LINK",1,DIM);txt(69,217,"SPECTRE FLIGHT INSTRUMENT",1,CYAN);
+}
+void compass(const Telemetry&t){
+ float heading=t.heading*.01f;
+ for(int offset=-4;offset<=4;offset++){
+  int tick=(int(heading/15)+offset)*15;float delta=tick-heading;int x=106+int(delta*2.1f);
+  if(x<20||x>186)continue;
+  int bearing=(tick%360+360)%360;char label[4];
+  if(bearing%90==0)snprintf(label,sizeof(label),"%s",bearing==0?"N":bearing==90?"E":bearing==180?"S":"W");
+  else snprintf(label,sizeof(label),"%03d",bearing);
+  txt(x-int(strlen(label))*3,27,label,1,bearing%90==0?CYAN:DIM);
+ }
+ canvas.fillTriangle(103,35,109,35,106,32,AMBER);
 }
 void horizon(const Telemetry&t,float bank,float pitch){
+ compass(t);
  const int x0=8,y0=37,w=196,h=144,cx=106,cy=109;
  int sn=(int)(sinf(bank*PI/180)*1024),cs=(int)(cosf(bank*PI/180)*1024),offset=(int)(pitch*1.4f*1024);
  uint8_t*buf=canvas.getBuffer();
@@ -172,7 +185,8 @@ void horizon(const Telemetry&t,float bank,float pitch){
  // Fixed bank scale and moving bank pointer, deliberately separate from pitch.
  for(int mark=-60;mark<=60;mark+=15){float a=mark*PI/180;int outer=61,inner=(mark%30==0)?54:57;canvas.drawLine(cx+sinf(a)*inner,cy-cosf(a)*inner,cx+sinf(a)*outer,cy-cosf(a)*outer,WHITE);}
  float a=constrain(bank,-65.f,65.f)*PI/180;int px=cx+sinf(a)*49,py=cy-cosf(a)*49;canvas.fillTriangle(px,py-3,px-3,py+3,px+3,py+3,CYAN);
- canvas.fillRect(12,155,188,20,PANEL);char data[32];snprintf(data,sizeof(data),"BANK %02d   PITCH %+03d",(int)roundf(fabsf(bank)),(int)roundf(pitch));txt(17,161,data,1,CYAN);
+ canvas.fillRect(12,155,188,24,PANEL);char data[32];snprintf(data,sizeof(data),"BANK %02d   PITCH %+03d",(int)roundf(fabsf(bank)),(int)roundf(pitch));txt(17,159,data,1,CYAN);
+ txt(17,171,"GEAR",1,t.flags&8?GREEN:DIM);txt(56,171,"FLAPS",1,t.flags&16?GREEN:DIM);txt(105,171,"ASSIST",1,t.flags&32?CYAN:DIM);txt(163,171,"FIRE",1,t.flags&128?AMBER:DIM);
  txt(12,190,"KTS",1,DIM);number(12,202,t.speed,2);txt(118,190,"ALT FT",1,DIM);number(118,202,t.altitude,2);
 }
 void radar(const Telemetry&t,uint32_t now){
@@ -193,8 +207,8 @@ void radar(const Telemetry&t,uint32_t now){
 }
 void result(const Telemetry&t){
  bool success=t.flags&64;txt(22,43,success?"MISSION COMPLETE":"MISSION INCOMPLETE",2,success?GREEN:AMBER);
- txt(22,79,"SCORE",1,DIM);number(20,94,t.score,4,WHITE);txt(22,144,"GEESE CLEARED",1,DIM);number(226,141,t.kills,2,CYAN);
- txt(22,180,t.landing==1?"LANDING: SAFE / STOPPED":"LANDING: NOT COMPLETED",1,t.landing==1?GREEN:AMBER);
+ canvas.drawFastHLine(22,69,276,DIM);txt(22,79,"SORTIE SCORE",1,DIM);number(20,94,t.score,4,WHITE);txt(22,144,"GEESE CLEARED",1,DIM);number(226,141,t.kills,2,CYAN);
+ canvas.drawFastHLine(22,166,276,DIM);txt(22,180,t.landing==1?"LANDING: SAFE / STOPPED":"LANDING: NOT COMPLETED",1,t.landing==1?GREEN:AMBER);
  txt(22,213,"START: REPLAY   NEXT PILOT: LAPTOP",1,DIM);
 }
 void render(uint32_t now){
@@ -205,7 +219,7 @@ void render(uint32_t now){
  // Freshness is explicitly annunciated; never invent a mission transition.
  float dt=min(.1f,(now-prior)*.001f);prior=now;
  float difference=t.roll*.01f-bank;while(difference>180)difference-=360;while(difference< -180)difference+=360;
- bank+=difference*(1-expf(-dt*18));pitch+=(t.pitch*.01f-pitch)*(1-expf(-dt*18));
+ bank+=difference*(1-expf(-dt*18));while(bank>180)bank-=360;while(bank< -180)bank+=360;pitch+=(t.pitch*.01f-pitch)*(1-expf(-dt*18));
  if(lastPilot!=t.pilot){lastPilot=t.pilot;lockUntil=0;wasLocked=false;}
  bool locked=t.flags&1;if(locked&&!wasLocked)lockUntil=now+1600;wasLocked=locked;
  canvas.fillScreen(BG);identity(t);
@@ -259,7 +273,7 @@ void setup(){
  auto info=service->createCharacteristic(INFO_UUID,NIMBLE_PROPERTY::READ,220);info->setCallbacks(new InfoCallbacks());
  service->start();auto adv=NimBLEDevice::getAdvertising();adv->addServiceUUID(SERVICE_UUID);adv->enableScanResponse(true);NimBLEDevice::startAdvertising();
  xTaskCreate(buttonTask,"buttons",3072,nullptr,2,nullptr);
- Serial.printf("SPECTRE instrument-2.1 ready; heap=%u framebuffer=%s\n",ESP.getFreeHeap(),canvas.getBuffer()?"OK":"FAILED");
+ Serial.printf("SPECTRE instrument-3 ready; heap=%u framebuffer=%s\n",ESP.getFreeHeap(),canvas.getBuffer()?"OK":"FAILED");
 }
 void loop(){
  static uint32_t last=0,fpsAt=0,lastCount=0;uint32_t now=millis();ledTick(now);

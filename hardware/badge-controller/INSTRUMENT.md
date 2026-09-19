@@ -5,7 +5,7 @@ The existing 320×240 ST7789 now renders a flight instrument locally. Bluetooth 
 ## Display states
 
 - **Ready:** pilot/callsign, rotating wireframe jet, READY FOR TAKEOFF and START hint.
-- **Flight:** interpolated bank/pitch artificial horizon, airspeed in knots, altitude in feet, true SF heading and a heading-up 3 km radar. Geese are green, the boss amber, friendly missiles white and hostile missiles red. The selected contact has a square bracket. Bank scale markings and numeric bank/pitch support precise reading. Contacts outside the scale stay at the edge.
+- **Flight:** interpolated bank/pitch artificial horizon, airspeed in knots, altitude in feet, true SF heading and a heading-up 3 km radar. Geese are green, the boss amber, friendly missiles white and hostile missiles red. The selected contact has a square bracket. Bank scale markings, a moving compass strip, normalized numeric bank/pitch, and gear/flap/assist/fire annunciators support precise reading. Contacts outside the scale stay at the edge.
 - **Action:** brief TARGET LOCKED cue, actual hostile-missile warning, weapon status, B - LAND AT SFO, and landing-assistance status. A warning is never invented just for decoration.
 - **Paused:** frozen flight data with FLIGHT PAUSED.
 - **Results:** score, geese cleared and actual landing/mission result. Safe landing without the boss remains MISSION INCOMPLETE.
@@ -48,4 +48,8 @@ The user explicitly authorized this firmware update. A fresh complete 4 MB backu
 
 For a later update, stop the game/helper and any serial/JTAG owner, make a fresh private backup, confirm the partition layout and app size, then write and verify only the app partition. Do not erase the device or overwrite its partition/provisioning regions. To roll back, restore the old app region from that device's private backup; preserve the rest of flash.
 
-`host/test_instrument_live.py` is an explicit physical BLE acceptance test with synthetic readiness, moving horizon/radar, warning and scorecard states. It never flashes or touches USB. Do not run it alongside the game relay. Afterward, run the actual game for the real telemetry test. The LCD has no MISO connection, so a successful transfer/render counter is not a substitute for human visual confirmation.
+`host/test_instrument_live.py` is an explicit physical BLE acceptance test with synthetic readiness, moving horizon/radar, warning and scorecard states. It never flashes or touches USB. Do not run it alongside the game relay. The test also disconnects and reconnects BLE, checks that firmware counters did not reset, reads the buttons, and sends a fresh Ready frame. Afterward, run the actual game for the real telemetry test. The LCD has no MISO connection, so a successful transfer/render counter is not a substitute for human visual confirmation.
+
+## Wireless handoff
+
+After the final application flash/readback and Bluetooth acceptance test, USB is no longer needed for gameplay data. Keep the battery switch **off while USB is connected**, as the maker instructs. Unplug USB-C, then turn on the badge's two-AA battery supply. Leave laptop Bluetooth enabled and the game running; its helper scans again and reconnects automatically. Battery runtime and operation at low battery voltage have not been measured. No speaker, microphone, gyroscope, touchscreen or vibration motor has been identified on this board; audio cues can be played by the laptop. Accelerometer measurements are verified, while NFC tag reading remains an experiment.
