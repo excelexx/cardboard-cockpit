@@ -1,3 +1,15 @@
+# Goose Protocol 0.3 — demo verification
+
+The latest source combines the upstream cockpit/weather/rollout changes with the earlier fixes, adds the An-225 at a shared meter scale, and centers the new game on a six-stage, three-minute Waterloo-geese showcase.
+
+Passed locally: the showcase completes all six stages in 180.1 simulated seconds; its progression/one-weapon/developer-control/cardboard-takeover tests pass; the underlying interception, homing-projectile, damage, flare, barrel-roll and ejection checks pass. All six aircraft also pass valley, approach and keyboard-mission checks, including the upstream landing, weather and aircraft-animation tests. Python tracker and native WebSocket integration checks are retained.
+
+Native rendered screenshots verified the generated title art, goose encounters, upgrade HUD and finale. The showcase discloses guided piloting, aim assistance, timed progression and a training shield. It is a presentation mode, not an assertion of unassisted campaign completion. Actual cardboard tracking automatically takes over from the guided pilot.
+
+The game's goose and sci-fi ship assets are credited in `demo-assets.md` and in the packaged `DEMO_CREDITS.txt`. The final ship is a fan-made Falcon-style interpretation, not an official Star Wars asset. The physically printed cardboard/webcam setup remains untested and should be rehearsed before judging.
+
+## Previous verification record
+
 # Verification — version 0.2, September 18, 2026
 
 Verified from a fresh clone on Apple M5 Pro, 24 GiB RAM, macOS 26.5 (arm64), Godot 4.7.2, Python 3.12.13. No webcam was opened. Run `./tools/verify.sh` to reproduce the automated software checks.

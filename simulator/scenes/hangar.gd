@@ -71,5 +71,29 @@ func build() -> void:
 	title.position = Vector3(0,28,-88)
 	title.modulate = Color(0.65,0.75,0.78)
 	add_child(title)
+	add_scale_references()
 	pedestal = Node3D.new()
 	add_child(pedestal)
+
+func add_scale_references() -> void:
+	var yellow := material(Color(0.97,0.65,0.10))
+	var dark := material(Color(0.07,0.09,0.1))
+	# A seven-meter service truck and a 1.8-meter ground crew figure make the
+	# shared scale legible without enlarging small aircraft.
+	box(Vector3(55,1.3,-15),Vector3(2.4,2.6,7.0),yellow)
+	box(Vector3(55,2.0,-18),Vector3(2.2,1.0,1.2),dark)
+	var person := MeshInstance3D.new()
+	var body := CapsuleMesh.new()
+	body.radius = 0.26
+	body.height = 1.8
+	person.mesh = body
+	person.material_override = yellow
+	person.position = Vector3(49,0.9,-19)
+	add_child(person)
+	var label := Label3D.new()
+	label.text = "1.8 m CREW / 7 m SERVICE TRUCK"
+	label.font_size = 40
+	label.pixel_size = 0.018
+	label.position = Vector3(54,5,-17)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	add_child(label)

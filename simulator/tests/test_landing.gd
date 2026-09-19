@@ -15,7 +15,7 @@ func _initialize() -> void:
 	test_guidance()
 	for failure in failures:
 		printerr("FAIL: ", failure)
-	print("PASS: " if failures.is_empty() else "FAIL: ", checks, " landing and approach checks across all five aircraft.")
+	print("PASS: " if failures.is_empty() else "FAIL: ", checks, " landing and approach checks across all six aircraft.")
 	quit(0 if failures.is_empty() else 1)
 
 func expect(condition: bool, description: String) -> void:

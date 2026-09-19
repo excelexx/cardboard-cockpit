@@ -306,6 +306,12 @@
         "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Models/Liveries/Pylons.png",
         "sha256": "520270cb1c4fafdcd68835b489549074266599f188e0d330d6bc95c6cc73661c",
         "bytes": 4898
+      },
+      {
+        "path": "Sounds/gunfire.wav",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Sounds/gunfire.wav",
+        "sha256": "e68dcb5a605333fe244fa12acc3519913aecf01d743ebbc13bcae1ae5599838d",
+        "bytes": 106550
       }
     ]
   },
@@ -516,6 +522,47 @@
         "url": "https://raw.githubusercontent.com/FGMEMBERS/747/abd1de993dc2ef6750c98136a2222c0a660e11b4/Models/boeing747-400-jw.xml",
         "sha256": "3b0c50903374ea8065da7fea3c06d3825263f72228c2db4358484b48c6e18f57",
         "bytes": 36963
+      }
+    ]
+  },
+  {
+    "id": "an225",
+    "author": "Herbert Wagner; livery by eagle",
+    "license": "GPL-2.0",
+    "repository": "https://github.com/HerbyW/AN-225-Mrija",
+    "commit": "8aa5d855c7675259dfaf6e83c677ccfd432e10ed",
+    "files": [
+      {
+        "path": "Models/AN225-48.ac",
+        "url": "https://raw.githubusercontent.com/HerbyW/AN-225-Mrija/8aa5d855c7675259dfaf6e83c677ccfd432e10ed/Models/AN225-48.ac",
+        "sha256": "cc9189be29af2c5f40dd9f62c2b45f3db33b9ff3bc914105c1dc22b7b303f7f9"
+      },
+      {
+        "path": "Models/AN225-tx-001.png",
+        "url": "https://raw.githubusercontent.com/HerbyW/AN-225-Mrija/8aa5d855c7675259dfaf6e83c677ccfd432e10ed/Models/AN225-tx-001.png",
+        "sha256": "588a28dcac8796e4f8be81df741174d523037949fb1e5e96e31c1665351242e5"
+      },
+      {
+        "path": "README.txt",
+        "url": "https://raw.githubusercontent.com/HerbyW/AN-225-Mrija/8aa5d855c7675259dfaf6e83c677ccfd432e10ed/README.txt",
+        "sha256": "28dca4f4c76eda89bf1502e4be65c51a530b8bf61e4fc68268acb47bb4811336"
+      },
+      {
+        "path": "COPYING",
+        "url": "https://raw.githubusercontent.com/HerbyW/AN-225-Mrija/8aa5d855c7675259dfaf6e83c677ccfd432e10ed/COPYING",
+        "sha256": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa"
+      },
+      {
+        "path": "Sounds/jet.wav",
+        "url": "https://raw.githubusercontent.com/HerbyW/AN-225-Mrija/8aa5d855c7675259dfaf6e83c677ccfd432e10ed/Sounds/jet.wav",
+        "sha256": "4d2a180cf65b82357dcc3cf403bb1fdb913d7d39f6caf987714f176bda3b3ccb",
+        "bytes": 431972
+      },
+      {
+        "path": "Sounds/wind.wav",
+        "url": "https://raw.githubusercontent.com/HerbyW/AN-225-Mrija/8aa5d855c7675259dfaf6e83c677ccfd432e10ed/Sounds/wind.wav",
+        "sha256": "d9f76844664c453669929b8666c8af2405154ff5d0e34374377312bbb19ed118",
+        "bytes": 67488
       }
     ]
   }
