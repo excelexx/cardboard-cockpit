@@ -600,9 +600,12 @@ func _batch_static_geometry(parent: Node3D) -> void:
 			instance.queue_free()
 
 
+func is_runway(x: float, z: float) -> bool:
+	return absf(x) <= 50.0 and minf(absf(z), absf(z - DESTINATION_Z)) <= 1600.0
+
 func ground_height(x: float, z: float) -> float:
 	# Runway deck is at zero; terrain immediately underneath remains recessed.
-	if absf(x) <= 50.0 and minf(absf(z), absf(z - DESTINATION_Z)) <= 1600.0:
+	if is_runway(x, z):
 		return 0.0
 	# Match the two triangles in the rendered heightfield, including on steep
 	# mountain faces, instead of sampling a different continuous noise surface.

@@ -1,27 +1,30 @@
-# Verification — September 18, 2026
+# Verification — version 0.2, September 18, 2026
 
-Tested on Apple M4, 16 GiB RAM, macOS 27.0, Godot 4.7.2. This records actual checks rather than declaring untested hardware complete.
+Verified from a fresh clone on Apple M5 Pro, 24 GiB RAM, macOS 26.5 (arm64), Godot 4.7.2, Python 3.12.13. No webcam was opened. Run `./tools/verify.sh` to reproduce the automated software checks.
 
-## Passed
+## Passed in this revision
 
-- All five downloaded aircraft imported and rendered from front-quarter, side and top views. Correct Y-up / negative-Z-forward orientation, scale, materials and visible gear grouping were checked.
-- 240 flight-model checks pass across all five profiles: takeoff threshold, gradual acceleration, turn direction, reset, braking, finite state under frame hitches, touchdown requirements and rejection of unsafe landings.
-- Each aircraft completed a full deterministic mission with the training controller: five rings and destination runway touchdown. Initial A380 mission tuning exposed a missed-turn problem; the corrected steering, speed and ring clearance passed the complete route for all five aircraft.
-- The Boeing 737 also completed the mission through physical keyboard-event inputs with the copilot disabled throughout. 35 input/UI checks include selection, briefing, pause/resume, reset, camera, steering, power, gear and brakes. Touchdown was within the runway and nearly centered.
-- 23 Python vision tests pass, including synthetic ArUco detection and pose estimation, calibration ranges, independent tracking loss and real local WebSocket clients.
-- The native Godot client received simulated control packets, handled disconnects and stale data, held safe throttle, reconnected, and returned to keyboard input. 62 malformed-packet cases were rejected without changing controls.
-- Both runway decks sample at exactly zero altitude; five route targets clear the terrain. Collision sampling follows the rendered terrain triangles.
-- Rendered the real hangar and flight scenes and inspected screenshots. Forward+ uses Metal on this Mac. An isolated world sample measured 60 FPS over 120 frames at 1280×800; a full flight screenshot also showed 60 FPS. These are local spot checks, not a sustained cross-device benchmark.
-- Exported the universal native Mac application using the official release template and local ad-hoc signing. The packaged executable was tested independently of the editor.
-- The staged bundle passes strict macOS code-signature verification. Packaging signs in the OS temporary directory and creates a metadata-free ZIP containing the app and source. The synced Documents folder was observed reattaching Finder metadata during signature checks, so verification happens before the archive is copied there.
-- Both one-page A4 PDFs were rendered and visually inspected. Marker black squares measure 70 mm / 50 mm, and OpenCV detects the correct IDs 7 / 23 from the rendered marker PDF.
+- **242 flight-model checks** across all five profiles: rotation thresholds, progressive thrust, banked turns, reset, braking, bounded state during frame hitches, touchdown requirements, unsafe-landing rejection, and touchdown-sensitive scoring.
+- **10 interaction regressions**: overlays block hidden flight/hangar actions, keyboard steering takes over from mouse yoke, app focus loss pauses flight, new flights clear overlays, rings work in either direction, and touchdown uses the current runway/terrain position.
+- **Five complete copilot missions**, one per aircraft: takeoff, all five rings, and a successful landing at North Field.
+- **Five complete keyboard-event missions**, one per aircraft, with the copilot disabled. Each run also performs 35 input/UI checks. The test controller injects W/S, arrows and G through Godot's input system; it uses the existing pilot as a target oracle, not as the active controller. These are deterministic software tests, not five human-flown missions.
+- **26 Python tests**, including actual OpenCV detection of rendered ArUco markers, projected pose, duplicate IDs, calibration and filtering, independent marker loss, two real loopback WebSocket clients and reconnects. Camera-mode tests feed synthetic frames through detection, filtering and the socket; they verify resolution-change rejection, preview closure and resource cleanup using a fake capture source.
+- **Native tracker integration**: changing simulated controls arrive in Godot; stale/disconnected yoke neutralizes, throttle holds, restarted services reconnect, and keyboard takeover clears active vision state. All 62 malformed-packet cases are rejected without mutating controls. The deliberately invalid exponent test emits an expected Godot warning.
+- **Standalone exported app**: all five complete copilot missions also pass from the packaged executable. The application runs from its bundled resources without the editor.
+- **Native desktop interaction** through OS clicks/keypresses: aircraft selection, briefing, flight start, copilot, pause and controls screens. Both the development executable and the packaged application's hangar were inspected.
+- **Visual checks**: Metal Forward+ hangar, cockpit and chase scenes; camera setup readouts; long debrief text wrapping; a smaller window; and OpenGL Compatibility rendering. Metal remains the default. Observed FPS readings are spot checks, not a sustained cross-device benchmark.
+- **Packaging**: universal Apple Silicon/Intel executable exported, locally ad-hoc signed, and verified with `codesign --verify --deep --strict`. The ZIP includes the app plus source and original licensed aircraft assets. The local app bundle also passed strict signature verification after copying out of staging.
+- Shell syntax, Python compilation and `git diff --check` pass. GitHub Actions is configured to run the complete software suite on macOS for pushes and pull requests.
 
-## Not claimed or still outstanding
+## Fixes exercised
 
-- Real webcam capture, physical printed-marker calibration, cardboard ergonomics, lighting robustness and sustained webcam frame rate have not been tested. No webcam was opened during development.
-- Native OS-driven mouse/keyboard inspection through Computer Use was unavailable because Accessibility/Screen Recording permissions were pending. In-engine rendering, keyboard-event integration tests and the packaged executable were used for verification.
-- Intel Mac, Windows and Linux runtime behavior has not been tested.
-- The app is not Apple-notarized for general public distribution.
-- Flight behavior and the shared cockpit HUD are arcade approximations, not aircraft-system or aerodynamic validation.
+Help/camera overlays no longer allow hidden gear, copilot, restart or hangar shortcuts. Switching between overlays clears obscured panels. Switching apps pauses flight. Keyboard steering disables the mouse yoke. Restart clears overlays. Checkpoints can be recovered from either direction. Collision resolves against the surface reached during the current step. Landing smoothness now includes touchdown speed, sink and bank. Closing the tracker preview stops the service and releases capture. Setup and verification have dedicated scripts.
 
-A repeat Python test run performed during concurrent GPU imports hit its five-second subprocess-startup timeout. Re-running after those jobs finished passed all 23 tests in 0.85 seconds. No physical-camera result is inferred from that synthetic cadence test.
+## Limits
+
+- Physical printed-marker calibration, real webcam capture, lighting tolerance, cardboard ergonomics and sustained camera frame rate remain untested; the user chose software-only verification because physical props were unavailable.
+- The Mac package includes Intel code, but Intel desktop, Windows and Linux runtime behavior have not been exercised in this session.
+- The app is locally signed, not Apple-notarized for public distribution.
+- This remains an arcade simulator with shared cockpit instruments. Global scenery, real airliner systems, weather, and aircraft-specific cockpit interaction are outside the documented project scope. Buildings are visual scenery; terrain and runways determine collision.
+
+The original version's verification also recorded printable-PDF measurements, asset attribution and model orientation checks. Those artifacts were not changed in this revision; no new physical-print or hardware result is inferred from them.

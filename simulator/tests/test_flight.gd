@@ -17,6 +17,7 @@ func _initialize() -> void:
 	test_touchdown_outcomes()
 	test_braking()
 	test_pause_contract()
+	test_landing_score()
 	if failures.is_empty():
 		print("PASS: ", checks, " flight behavior checks across ", Catalog.PLANES.size(), " aircraft.")
 		quit(0)
@@ -199,3 +200,19 @@ func test_pause_contract() -> void:
 	expect(model.position == paused_position and model.elapsed == paused_time, "paused instrument reads do not advance flight")
 	simulate(model, 0.1, Vector3.ZERO)
 	expect(model.position != paused_position and model.elapsed > paused_time, "resuming step advances paused flight")
+
+func test_landing_score() -> void:
+	var gentle = touchdown_fixture()
+	gentle.contact = "landed"
+	gentle.touchdown_speed = 60.0
+	gentle.touchdown_sink = -1.0
+	var hard = touchdown_fixture()
+	hard.contact = "landed"
+	hard.touchdown_speed = 60.0
+	hard.touchdown_sink = -8.0
+	var fast = touchdown_fixture()
+	fast.contact = "landed"
+	fast.touchdown_speed = 100.0
+	fast.touchdown_sink = -1.0
+	expect(gentle.get_smoothness() > hard.get_smoothness(), "gentler touchdown earns a higher smoothness score")
+	expect(gentle.get_smoothness() > fast.get_smoothness(), "slower safe touchdown earns a higher smoothness score")

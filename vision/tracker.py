@@ -27,6 +27,7 @@ else:
 YOKE_ID = 7
 THROTTLE_ID = 23
 DEFAULT_CALIBRATION = Path(__file__).resolve().with_name("calibration.local.json")
+PREVIEW_TITLE = "Cardboard Cockpit - private local tracker"
 
 
 def load_cv():
@@ -255,7 +256,7 @@ def draw_preview(frame, packet, wizard, fps: float):
     for index, line in enumerate(lines):
         cv2.putText(frame, line, (18, 28 + index * 32), cv2.FONT_HERSHEY_SIMPLEX, .62,
                     (115, 226, 247) if index == 0 else (235, 239, 240), 1, cv2.LINE_AA)
-    cv2.imshow("Cardboard Cockpit - private local tracker", frame)
+    cv2.imshow(PREVIEW_TITLE, frame)
 
 
 async def run(args):
@@ -365,6 +366,14 @@ async def run(args):
                     draw_preview(frame, packet, wizard, fps_estimate)
                     key = detector.cv2.waitKey(1) & 0xFF
                     if key in (27, ord("q")):
+                        break
+                    # Closing the native window is also an explicit stop. Do
+                    # not silently reopen it and keep the webcam running.
+                    try:
+                        if detector.cv2.getWindowProperty(PREVIEW_TITLE, detector.cv2.WND_PROP_VISIBLE) < 1:
+                            break
+                    except detector.cv2.error:
+                        # Some backends destroy the window before it can be queried.
                         break
                     if key == ord("c"):
                         wizard = CalibrationWizard(args.camera, frame.shape[1], frame.shape[0])

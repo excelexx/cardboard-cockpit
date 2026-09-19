@@ -2,7 +2,7 @@
 
 A native Mac flight game with five real aircraft models, a cinematic mountain valley, and optional cardboard controls.
 
-**Version 0.1 — playable keyboard/mouse prototype.** Select an aircraft, take off from Northstar, fly through five checkpoints, and land at North Field. This is a standalone Godot application; it does not run in a browser or require an internet connection to fly.
+**Version 0.2 — verified keyboard/mouse flight and optional vision controls.** Select an aircraft, take off from Northstar, fly through five checkpoints, and land at North Field. This is a standalone Godot application; it does not run in a browser or require an internet connection to fly.
 
 ![The aircraft hangar](docs/screenshots/hangar.png)
 
@@ -17,6 +17,8 @@ Double-click **Launch Cardboard Cockpit.command** in this folder, or open **buil
 5. After the fifth ring, reduce power with **S**, lower gear with **G**, align with runway 36 and descend gently. Touchdown must be on the runway, below about 204 knots, with gear down and nearly level wings. Slower, gentler landings score better.
 
 **H** engages an optional training copilot that can fly the entire route. Steering or changing power with the keyboard immediately returns control to you. Results disclose when the copilot was used. **R** restarts immediately; **Escape** pauses.
+
+Switching to another app pauses the flight automatically. Help and camera setup block flight shortcuts until closed. Arrow-key or rudder input takes over from the mouse yoke. Missed checkpoints can be collected by turning back through the ring in either direction.
 
 ## Controls
 
@@ -86,23 +88,29 @@ Read [vision setup and calibration](docs/vision-setup.md) and the [construction 
 
 Print the [one-page construction PDF](docs/Cardboard%20Cockpit%20Build%20Guide.pdf) and [marker/keyboard-panel PDF](vision/Cardboard%20Cockpit%20Markers.pdf) on A4 at **100% / actual size**. The black yoke marker is 70 mm and the throttle marker is 50 mm; both were measured and detected in the rendered PDF.
 
-A ready-to-use local `.venv` was created on this Mac. From a fresh clone, create it and install `vision/requirements.txt` as described in the setup guide.
+From a fresh clone, run `./tools/setup_vision.sh` to create the local `.venv` and install the pinned camera dependencies. It uses Python 3.9–3.12 or an installed `uv`. Setup never opens a camera.
 
 ```sh
 # Test the native connection without a webcam:
-.venv/bin/python vision/tracker.py --simulate --loss-demo
+./tools/tracker.sh --simulate --loss-demo
 
 # When real controls are ready, explicitly choose a camera and calibrate:
-.venv/bin/python vision/tracker.py --camera 0 --calibrate
+./tools/tracker.sh --camera 0 --calibrate
 ```
 
 In the game press **C**, enable vision, and return to flight. Calibration poses are captured with Space in the separate tracker preview. Press C in that preview to recalibrate. The client uses `ws://127.0.0.1:8765`; images are neither uploaded nor recorded.
+
+The setup panel shows live roll, pitch, throttle and independent marker status. Closing the tracker preview stops the service and releases the camera, just like Q or Escape.
 
 ## Verification
 
 [Verification notes](docs/verification.md) distinguish automated software checks from physical testing still outstanding.
 
 ```sh
+# Run every automated check, including full keyboard AND copilot missions
+# for all five aircraft. No webcam is opened:
+./tools/verify.sh
+
 # Flight behavior checks for all five profiles:
 .tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script res://tests/test_flight.gd
 
@@ -116,6 +124,8 @@ In the game press **C**, enable vision, and return to flight. Calibration poses 
 .venv/bin/python -m unittest discover -s vision/tests -v
 .tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script ../tools/test_vision_client.gd
 ```
+
+The same software suite runs in GitHub Actions on pushes and pull requests. Test logs distinguish deterministic keyboard-event input from physical OS interaction and synthetic marker images from real webcam testing.
 
 ## Files and credits
 
