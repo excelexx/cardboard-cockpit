@@ -124,6 +124,7 @@ func draw_title() -> void:
 	text(Vector2(74,892),"SPACE  PRIMARY TOGGLE  /  T  SALVO TOGGLE",11,MUTED,true)
 	text(Vector2(74,915),app.badge.status,11,GREEN if app.badge.connected else MUTED,true)
 	button("credits",Rect2(74,927,140,34),"Credits")
+	button("next_pilot",Rect2(500,659,245,48),"Next pilot / %02d" % app.pilot_number)
 func draw_flight() -> void:
 	if app.paper_test or (app.cockpit and not app.combat.active):
 		draw_clear_flight()
@@ -435,6 +436,7 @@ func draw_results() -> void:
 	text(Vector2(433,575),app.result_advice,14,MUTED)
 	button("fly",Rect2(433,642,350,62),"PLAY AGAIN",true)
 	button("title",Rect2(816,642,350,62),"FLIGHT DECK")
+	button("next_pilot",Rect2(816,718,350,42),"NEXT PILOT")
 func draw_help() -> void:
 	zones.clear(); dim(); panel(Rect2(365,136,870,738),.97)
 	text(Vector2(419,196),"FLIGHT CONTROLS",13,CYAN,true)
