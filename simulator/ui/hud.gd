@@ -9,6 +9,7 @@ var title_art: Texture2D
 var zones: Dictionary = {}
 var hot := ""
 var clock := 0.0
+var camera_preview = preload("res://systems/camera_preview.gd").new()
 const WHITE := Color(0.91,0.95,0.97)
 const MUTED := Color(0.70,0.82,0.85)
 const CYAN := Color(0.33,0.86,0.87)
@@ -23,7 +24,10 @@ func _ready() -> void:
 	if ResourceLoader.exists("res://assets/art/spectre-title.png"): title_art = load("res://assets/art/spectre-title.png")
 	mouse_filter = Control.MOUSE_FILTER_PASS
 func _process(dt: float) -> void:
+	if is_instance_valid(app): camera_preview.poll(app.vision.enabled, app.vision.endpoint)
 	clock += dt; queue_redraw()
+func _exit_tree() -> void:
+	camera_preview.close()
 func text(at: Vector2, value: String, size: int = 18, color: Color = WHITE, technical: bool = false) -> void:
 	if not app.text_hud and app.mode=="flight" and not app.overlay_visible():return
 	draw_string(mono if technical else font,at+Vector2(0,1),value,HORIZONTAL_ALIGNMENT_LEFT,-1,maxi(size,12),Color(0.005,0.015,0.025,color.a*.85))
@@ -61,11 +65,28 @@ func _draw() -> void:
 	zones.clear()
 	if app.mode=="title": draw_title()
 	else: draw_flight()
+	if app.vision.enabled: draw_camera_preview()
 	if app.mode=="paused": draw_pause()
 	if app.mode=="results": draw_results()
 	if app.help_visible: draw_help()
 	if app.calibration_visible: draw_camera_setup()
 	if app.credits_visible: draw_credits()
+func draw_camera_preview() -> void:
+	var card := Rect2(1300,780,264,192)
+	panel(card,.94)
+	var live: bool = camera_preview.texture != null
+	draw_circle(card.position+Vector2(14,16),3,GREEN if live else AMBER)
+	text(card.position+Vector2(25,21),"CAMERA" if live else "CAMERA / WAITING",12,WHITE,true)
+	text(card.position+Vector2(187,21),"LOCAL",12,MUTED,true)
+	var area := Rect2(card.position+Vector2(8,30),Vector2(248,154))
+	draw_rect(area,Color(.005,.012,.02))
+	if live:
+		var native_size: Vector2 = camera_preview.texture.get_size()
+		var fitted: Vector2 = native_size * minf(area.size.x/native_size.x,area.size.y/native_size.y)
+		draw_texture_rect(camera_preview.texture,Rect2(area.position+(area.size-fitted)/2,fitted),false)
+	else:
+		text(area.position+Vector2(25,80),"Waiting for webcam",15,MUTED)
+
 func draw_title() -> void:
 	if title_art!=null: draw_texture_rect(title_art,Rect2(0,0,1600,1000),false)
 	else: draw_rect(Rect2(0,0,1600,1000),Color(0.025,0.045,0.07))
@@ -181,7 +202,7 @@ func draw_flight() -> void:
 	if c.hit_flash>0:
 		line(Vector2(20,270),Vector2(20,660),Color(1,0.25,0.15,c.hit_flash*1.7),4)
 		line(Vector2(1580,270),Vector2(1580,660),Color(1,0.25,0.15,c.hit_flash*1.7),4)
-	draw_scope(Vector2(1450,830),c)
+	draw_scope(Vector2(1450,650 if app.vision.enabled else 830),c)
 	var primary_color: Color=CYAN if app.primary_latched or c.beam_active else MUTED
 	var salvo_color: Color=CYAN if app.salvo_latched else MUTED
 	text(Vector2(45,907),"PRIMARY  "+("LIVE" if app.primary_latched or c.beam_active else "SAFE"),12,primary_color,true)
@@ -258,12 +279,15 @@ func draw_clear_flight() -> void:
 			brackets(at,24,GREEN if c.lock_progress>=1 else AMBER)
 			text(at+Vector2(34,0),"%d M" % int(f.position.distance_to(enemy.position)),16,WHITE,true)
 	if app.paper_test:
-		text(Vector2(52,920),"BANK  %+.0f%%     PITCH  %+.0f%%" % [app.control.x*100,app.control.y*100],21,WHITE,true)
+		# Show the same pilot demand as Python, not the elevator correction
+		# that naturally returns to zero when the aircraft reaches its target.
+		text(Vector2(52,920),"YOKE BANK  %+.2f     PITCH  %+.2f" % [app.vision.yoke.x,app.vision.yoke.y],21,WHITE,true)
+		text(Vector2(52,884),"AIRCRAFT PITCH  %+.1f DEG" % rad_to_deg(f.pitch),15,MUTED,true)
 		text(Vector2(52,957),"R  RESET FLIGHT   ·   SPACE IN CAMERA WINDOW  RECENTER",15,MUTED)
 	else:
 		text(Vector2(52,951),"POWER %d%%  ·  GEAR %s" % [int(f.throttle*100),"DOWN" if f.gear else "UP"],17,MUTED)
 		if c.active and c.engagement_enabled:
-			text(Vector2(1090,951),"SPACE  FIRE    T  MISSILE",17,MUTED)
+			text(Vector2(960 if app.vision.enabled else 1090,951),"SPACE  FIRE    T  MISSILE",17,MUTED)
 			text(Vector2(680,170),"MISSILE LOCK" if c.lock_progress>=1 else "",20,GREEN)
 	if c.incoming_distance<2200: text(Vector2(610,210),"MISSILE INBOUND — Z FLARES",20,DANGER)
 	if f.stall_time>.6: text(Vector2(660,250),"STALL — LOWER NOSE",20,AMBER)

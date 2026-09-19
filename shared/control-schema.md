@@ -46,13 +46,17 @@ Receiver requirements:
 
 ## Transport and timing
 
-The service binds only to `127.0.0.1`, never a public interface. It accepts native WebSocket clients without an `Origin` header and rejects browser origins. Messages are output only; sending client data closes that connection. No images or calibration data travel over the socket. Each client has a one-frame queue so a slow receiver cannot accumulate stale controls. The target rate is 30 Hz (`--fps 24` or `25` is also supported); actual webcam speed depends on hardware and light.
+The service binds only to `127.0.0.1`, never a public interface. It accepts native WebSocket clients without an `Origin` header and rejects browser origins. Messages are output only; sending client data closes that connection. No images or calibration data travel over the control socket. Each client has a one-frame queue so a slow receiver cannot accumulate stale controls. The target rate is 30 Hz (`--fps 24` or `25` is also supported); actual webcam speed depends on hardware and light.
+
+The separate `/preview` WebSocket path carries binary JPEG frames for the game's bottom-right self-view. Frames are mirrored for display only, preserve aspect ratio within 320 x 240 pixels, are capped at 64 KiB, and are sent at most 10 times per second only while a preview client is connected. Its independent one-frame queue cannot accumulate stale video or delay control sends. Images remain in memory on this computer and are never recorded or uploaded. The game clears the image after one second without a valid frame or when tracking is disabled. Marker detection always uses the original, unmirrored image.
 
 Use a local monotonic timeout of roughly 350 ms to detect a stopped service. `timestamp` uses wall clock for logging; system clock changes must not override timeout logic. Discard duplicate or older sequence numbers within a connection. Reset the sequence guard on reconnection, since the service may have restarted. Packets are normally under 300 bytes; receivers can cap messages at 2 KB.
 
 ## Loss and ownership
 
 The tracker smooths valid input with a 0.10 s exponential time constant, uses a 6% yoke dead zone, and limits yoke changes to 3.5 units/second and throttle changes to 1.5 units/second. Values are bounded before serialization. Low confidence (<0.25), invalid numbers, duplicated marker IDs, and detection failure count as loss.
+
+After filtering, the tracker applies `--yoke-sensitivity` (default 2.0) to bank and pitch, with an additional `--bank-scale` (default 0.7) for bank only, then clamps them to [-1, 1]. Effective gains are 1.4 for bank and 2.0 for pitch. These final values drive both its on-screen readout and the control packet. The game uses the packet directly without another gain; its YOKE readout displays the received command separately from aircraft attitude and flight-control corrections. Throttle and weapon controls are unaffected.
 
 Yoke loss sets confidence to zero immediately, holds its last target for 250 ms, then eases toward roll/pitch zero. Throttle loss sets its confidence to zero immediately and holds the last smoothed power setting. It does **not** cut power during a camera interruption. At first startup all outputs are zero. During calibration, confidence is zero for both controls and the same loss policies apply.
 

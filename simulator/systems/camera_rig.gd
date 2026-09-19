@@ -7,6 +7,7 @@ var pip_camera: Camera3D
 var clock := 0.0
 var trauma := 0.0
 var yaw := 0.0
+var pitch := 0.0
 var bank := 0.0
 var offset := Vector3(0,6.4,23)
 var last_speed := 0.0
@@ -69,14 +70,18 @@ func update(dt: float) -> void:
 	else:
 		camera.near = 1.0
 		if not initialized:
-			yaw = f.heading; bank = 0; initialized = true
+			yaw = f.heading; pitch = f.pitch; bank = 0; initialized = true
 		yaw = lerp_angle(yaw,f.heading,1-exp(-dt*8))
+		pitch = lerp_angle(pitch,f.pitch,1-exp(-dt*10))
 		bank = lerpf(bank,(-f.roll*.82 if f.barrel_remaining>0 else clampf(-f.roll*.10,-.12,.12)),1-exp(-dt*4))
 		var desired := Vector3(-app.control.x*0.8,6.1+speed_fraction*1.1,22.0+speed_fraction*4+clampf(acceleration*0.035,-0.4,0.8))
 		offset = offset.lerp(desired,1-exp(-dt*6))
 		var orbit: Vector3 = Basis(Vector3.UP,app.look.x)*offset
 		orbit.y += app.look.y*6
-		camera.position = f.position+Basis(Vector3.UP,-yaw)*orbit
+		# Follow the aircraft's pitch as well as heading, keeping the chase
+		# offset behind its nose direction through climbs and dives.
+		var chase_basis := Basis.from_euler(Vector3(pitch,-yaw,0))
+		camera.position = f.position+chase_basis*orbit
 		camera.position.y = maxf(camera.position.y,ground+2.5)
 		var target: Vector3 = f.position+plane_basis*Vector3(0,1.0,-7)
 		camera.look_at(target)

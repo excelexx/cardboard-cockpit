@@ -372,6 +372,7 @@ func _physics_process(dt: float) -> void:
 	if input.length()>0 or power!=0: take_manual_control(input.length()>0)
 	if vision.enabled and vision.tracking:
 		if flight.airborne and vision.yoke.distance_to(assisted_yoke_reference)>.10:copilot=false
+		# Tracker packets already include the user's sensitivity setting.
 		input.x = vision.yoke.x; input.y = vision.yoke.y
 		# Physical yoke weapon toggles own firing; tracking alone never shoots.
 	flight.power_input = 0

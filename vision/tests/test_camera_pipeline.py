@@ -72,6 +72,19 @@ class CameraPipelineTests(unittest.IsolatedAsyncioTestCase):
                     packet = json.loads(await asyncio.wait_for(connection.recv(), 1))
                 self.assertTrue(packet["tracking"])
                 self.assertGreater(packet["throttle"]["value"], .1)
+                # The separate preview stream must deliver a mirrored, bounded
+                # JPEG while the original connection keeps receiving controls.
+                async with connect("ws://127.0.0.1:%d/preview" % self.port, proxy=None) as preview:
+                    jpeg = await asyncio.wait_for(preview.recv(), 1)
+                    self.assertIsInstance(jpeg, bytes)
+                    self.assertLessEqual(len(jpeg), 65536)
+                    decoded = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
+                    self.assertEqual(decoded.shape, (180, 320, 3))
+                    expected = cv2.flip(cv2.resize(self.camera.frame, (320, 180), interpolation=cv2.INTER_AREA), 1)
+                    self.assertLess(np.abs(decoded.astype(float)-expected).mean(), 3)
+                    control = json.loads(await asyncio.wait_for(connection.recv(), 1))
+                    self.assertGreater(control["sequence"], packet["sequence"])
+                    self.assertTrue(control["tracking"])
                 self.camera.hide_yoke = True
                 for _ in range(5):
                     packet = json.loads(await asyncio.wait_for(connection.recv(), 1))
@@ -91,6 +104,52 @@ class CameraPipelineTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(asyncio.CancelledError):
                     await service
             self.assertTrue(self.camera.closed, "Cancellation releases capture")
+
+    async def test_python_readout_and_game_packet_share_sensitive_pitch(self):
+        self.args.no_preview = False
+        shown = {}
+        original_step = tracker.ControlFilter.step
+
+        def raw_input(controller, *args):
+            packet = original_step(controller, *args)
+            # Exercise both directions and saturation through the actual send
+            # and preview paths, independently of synthetic pose estimation.
+            pitch = (.2, -.35, .8)[packet["sequence"] % 3]
+            packet["yoke"].update(roll=-.15, pitch=pitch, confidence=1)
+            packet["throttle"]["value"] = .4
+            return packet
+
+        def readout(frame, packet, wizard, fps):
+            shown[packet["sequence"]] = json.loads(json.dumps(packet))
+
+        with patch.object(tracker, "CameraSource", return_value=self.camera), \
+                patch.object(tracker.ControlFilter, "step", raw_input), \
+                patch.object(tracker, "draw_preview", side_effect=readout), \
+                patch.object(cv2, "waitKey", return_value=-1), \
+                patch.object(cv2, "getWindowProperty", return_value=1):
+            service = asyncio.create_task(tracker.run(self.args))
+            connection = None
+            try:
+                for _ in range(40):
+                    try:
+                        connection = await connect("ws://127.0.0.1:%d" % self.port, proxy=None)
+                        break
+                    except OSError:
+                        await asyncio.sleep(.025)
+                self.assertIsNotNone(connection)
+                for _ in range(6):
+                    packet = json.loads(await asyncio.wait_for(connection.recv(), 1))
+                    self.assertEqual(packet, shown[packet["sequence"]])
+                    self.assertAlmostEqual(packet["yoke"]["roll"], -.21)
+                    self.assertAlmostEqual(packet["yoke"]["pitch"], (.4, -.7, 1)[packet["sequence"] % 3])
+                    self.assertEqual(packet["throttle"]["value"], .4)
+            finally:
+                if connection is not None:
+                    await connection.close()
+                service.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await service
+            self.assertTrue(self.camera.closed)
 
     async def test_resolution_change_requires_recalibration_and_releases_camera(self):
         self.camera.frame = self.camera.frame[:480, :640]

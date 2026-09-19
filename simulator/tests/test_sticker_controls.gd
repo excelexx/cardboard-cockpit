@@ -29,5 +29,24 @@ func run() -> void:
 	assert(app.flight.position!=held_position and app.control.x>0,"Single-card steering resumes flight")
 	app.on_action("restart")
 	assert(app.vision.enabled and not app.copilot and app.flight.position.y>500,"Single-card restart preserves marker control and airborne test")
+	# The chase camera must rotate with climbs/dives, not merely look up or
+	# down from a fixed world-horizontal offset behind the aircraft.
+	app.flight.position = Vector3(0,4000,0)
+	app.cockpit = false
+	app.flight.pitch = 0; app.flight.roll = 0; app.flight.heading = 0
+	app.flight.wind = Vector3.ZERO
+	app.camera_rig.reset()
+	for _i in range(60): app.camera_rig.update(1.0/60)
+	var level_angle: float = asin(-app.camera.basis.z.y)
+	app.flight.pitch = deg_to_rad(20)
+	for _i in range(30): app.camera_rig.update(1.0/60)
+	var climb_angle: float = asin(-app.camera.basis.z.y)
+	assert(absf((climb_angle-level_angle)-deg_to_rad(20))<deg_to_rad(1),"Camera follows the full climb angle within half a second")
+	assert(app.camera.position.y<app.flight.position.y,"Climbing chase offset stays behind the pitched aircraft")
+	app.flight.pitch = deg_to_rad(-20)
+	for _i in range(30): app.camera_rig.update(1.0/60)
+	var dive_angle: float = asin(-app.camera.basis.z.y)
+	assert(absf((dive_angle-level_angle)-deg_to_rad(-20))<deg_to_rad(1),"Camera follows nose-down pitch as well as climbs")
+	assert(app.camera.position.y>app.flight.position.y,"Diving chase offset stays behind the pitched aircraft")
 	print("STICKER INPUT: PASS")
 	app.queue_free(); await process_frame; quit()

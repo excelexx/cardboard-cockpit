@@ -387,6 +387,17 @@ def draw_preview(frame, packet, wizard, fps: float):
     cv2.imshow(PREVIEW_TITLE, frame)
 
 
+def encode_camera_preview(frame):
+    """Small mirrored self-view, encoded before detection draws on the frame."""
+    cv2, _ = load_cv()
+    height, width = frame.shape[:2]
+    scale = min(320 / width, 240 / height, 1.0)
+    small = cv2.resize(frame, (max(1, round(width * scale)), max(1, round(height * scale))),
+                       interpolation=cv2.INTER_AREA)
+    ok, jpeg = cv2.imencode(".jpg", cv2.flip(small, 1), [cv2.IMWRITE_JPEG_QUALITY, 65])
+    return jpeg.tobytes() if ok and jpeg.size <= 65536 else None
+
+
 async def run(args):
     try:
         from websockets.asyncio.server import serve
@@ -419,12 +430,15 @@ async def run(args):
     controller = ControlFilter(calibration, args.smoothing, args.deadzone)
     weapon_switches = WeaponSwitches()
     clients = set()
+    preview_clients = set()
+    last_preview = 0.0
 
     async def handler(connection):
         # Each client has a one-packet queue: slow consumers never build a stale
         # control backlog and never delay capture or other receivers.
         queue = asyncio.Queue(maxsize=1)
-        clients.add(queue)
+        subscribers = preview_clients if connection.request.path == "/preview" else clients
+        subscribers.add(queue)
 
         async def sender():
             while True:
@@ -443,7 +457,7 @@ async def run(args):
         except ConnectionClosed:
             pass
         finally:
-            clients.discard(queue)
+            subscribers.discard(queue)
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
@@ -452,7 +466,7 @@ async def run(args):
         async with serve(handler, "127.0.0.1", args.port, origins=[None], max_size=1024,
                          max_queue=2, compression=None, close_timeout=1):
             print("Cardboard controls: ws://127.0.0.1:%d [%s]" % (args.port, "SIMULATED" if args.simulate else "CAMERA"), flush=True)
-            print("Ctrl+C to stop. No images are sent to the game or saved.", flush=True)
+            print("Ctrl+C to stop. Camera preview stays on this computer; no images are saved or uploaded.", flush=True)
             start = previous = time.monotonic()
             frame_number = 0
             fps_estimate = float(args.fps)
@@ -473,6 +487,14 @@ async def run(args):
                             print("No camera frame. Yoke will neutralize; throttle holds. Use keyboard or restart the tracker.", file=sys.stderr, flush=True)
                     else:
                         failure_count = 0
+                        if preview_clients and frame_start - last_preview >= .1:
+                            jpeg = encode_camera_preview(frame)
+                            if jpeg is not None:
+                                for queue in tuple(preview_clients):
+                                    if queue.full():
+                                        queue.get_nowait()
+                                    queue.put_nowait(jpeg)
+                            last_preview = frame_start
                         if not checked_frame_size:
                             checked_frame_size = True
                             if not args.paper_test and not wizard and (frame.shape[1], frame.shape[0]) != (calibration.width, calibration.height):
@@ -487,6 +509,11 @@ async def run(args):
                     wizard.observe(yoke, throttle)
                     yoke = throttle = None
                 packet = controller.step(time.monotonic(), int(time.time() * 1000), yoke, throttle)
+                # Apply gain once, before both the Python readout and socket send.
+                # Keep neutral filtering and throttle behavior independent of gain.
+                for axis in ("roll", "pitch"):
+                    gain = args.yoke_sensitivity * (args.bank_scale if axis == "roll" else 1.0)
+                    packet["yoke"][axis] = clamp(packet["yoke"][axis] * gain, -1, 1)
                 weapons = weapon_switches.step(getattr(detector,"weapon_observations",{}) if frame is not None and not wizard else {}, time.monotonic())
                 if weapon_switches.configured and not wizard:
                     packet['weapons'] = weapons
@@ -559,6 +586,10 @@ def parser():
     result.add_argument("--height", type=int, default=720)
     result.add_argument("--smoothing", type=float, default=.10, metavar="SECONDS")
     result.add_argument("--deadzone", type=float, default=.06, metavar="FRACTION")
+    result.add_argument("--yoke-sensitivity", type=float, default=2.0, metavar="GAIN",
+                        help="Bank/pitch gain shared by the preview and game (default: 2)")
+    result.add_argument("--bank-scale", type=float, default=.7, metavar="SCALE",
+                        help="Bank-only multiplier on yoke sensitivity (default: 0.7)")
     result.add_argument("--duration", type=float, default=0, metavar="SECONDS", help="Stop after a duration; 0 runs until quit")
     return result
 
@@ -572,6 +603,10 @@ def main():
         argument_parser.error("Use finite duration, smoothing in [0.01, 2], and deadzone in [0, 0.5).")
     if args.camera is not None and args.camera < 0:
         argument_parser.error("Camera index cannot be negative.")
+    if not math.isfinite(args.yoke_sensitivity) or not 0 < args.yoke_sensitivity <= 10:
+        argument_parser.error("Yoke sensitivity must be finite and in (0, 10].")
+    if not math.isfinite(args.bank_scale) or not 0 < args.bank_scale <= 10:
+        argument_parser.error("Bank scale must be finite and in (0, 10].")
     if args.calibrate and args.camera is None:
         argument_parser.error("--calibrate requires an explicit --camera INDEX.")
     if args.paper_test and (args.camera is None or args.calibrate or args.no_preview):
