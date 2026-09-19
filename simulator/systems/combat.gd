@@ -115,29 +115,7 @@ func announce(value: String) -> void:
 	message = value; message_time = 2.5
 
 func goose_model() -> Node3D:
-	var root := Node3D.new()
-	var body: Node3D = load("res://assets/goose/goose.glb").instantiate()
-	body.scale = Vector3.ONE*0.065
-	body.rotation.y = PI
-	body.position=-preload("res://systems/model_utils.gd").bounds(body).get_center()
-	for geometry in body.find_children("*","MeshInstance3D",true,false):
-		for surface in range(geometry.mesh.get_surface_count()):
-			var m: StandardMaterial3D=geometry.mesh.surface_get_material(surface).duplicate()
-			m.albedo_color=Color(.22,.52,.68);m.metallic=.18;m.roughness=.46
-			m.emission_enabled=true;m.emission=Color(.015,.10,.16);m.emission_energy_multiplier=.7
-			m.stencil_reference=1;m.stencil_mode=BaseMaterial3D.STENCIL_MODE_OUTLINE;m.stencil_color=Color(.12,.72,1,.25);m.stencil_outline_thickness=.4
-			geometry.set_surface_override_material(surface,m)
-	root.add_child(body)
-	for side in [-1,1]:
-		var wing := Node3D.new()
-		wing.name = "WingL" if side<0 else "WingR"
-		wing.position = Vector3(side*0.65,0,0)
-		root.add_child(wing)
-		for feather in range(7):
-			var feather_mesh := CapsuleMesh.new()
-			feather_mesh.radius=.38;feather_mesh.height=1.9-feather*.10;feather_mesh.radial_segments=8;feather_mesh.rings=2
-			var part=mesh(wing,feather_mesh,Vector3(side*(.65+feather*.42),0,feather*.11),Color(.08,.25,.38),.2)
-			part.rotation=Vector3(PI/2,side*feather*.025,0);part.scale=Vector3(1,1,.14)
+	var root: Node3D = GooseModel.create()
 	root.scale = Vector3.ONE*Tune.CONTACT_MODEL_SCALE
 	return root
 

@@ -14,16 +14,16 @@ func run() -> void:
 	if wanted.is_empty() or "title" in wanted:
 		for i in 40:await process_frame
 		await shot(folder,"title")
-	for view in ["chase","cockpit","boss","bay","cliffs","beach","gate","marin","pit","pitfight"]:
+	for view in ["chase","cockpit","boss","bay","cliffs","beach","gate","marin","pit","pitfight","jet","jetlow","goose"]:
 		if not wanted.is_empty() and view not in wanted:continue
 		app.set_process(false);app.set_physics_process(false)
 		app.start_flight("combat");app.copilot=false;app.cockpit=view in ["cockpit","pit","pitfight"];app.text_hud=true
-		var scenic:={"cliffs":[Vector3(-4200,360,-8300),0.7],"beach":[Vector3(2300,280,-13400),0.9],"gate":[Vector3(12000,300,-19300),1.45],"marin":[Vector3(16600,520,-21500),0.25],"pit":[Vector3(12000,300,-19300),1.45],"pitfight":[Vector3(12000,300,-19300),1.45]}
+		var scenic:={"cliffs":[Vector3(-4200,360,-8300),0.7],"beach":[Vector3(2300,280,-13400),0.9],"gate":[Vector3(12000,300,-19300),1.45],"marin":[Vector3(16600,520,-21500),0.25],"pit":[Vector3(12000,300,-19300),1.45],"pitfight":[Vector3(12000,300,-19300),1.45],"jet":[Vector3(12000,300,-19300),1.45],"jetlow":[Vector3(12000,300,-19300),1.45],"goose":[Vector3(12000,300,-19300),1.45]}
 		var start:=Vector3(15400,430,-10500) if view!="bay" else Vector3(9000,260,-6000)
 		if scenic.has(view):start=scenic[view][0]
 		app.flight.spawn_airborne(start,330);app.flight.gear=false;app.flight.throttle=.65
 		app.flight.heading=scenic[view][1] if scenic.has(view) else -.35 if view!="bay" else 1.2;app.apply_aircraft_pose();app.combat.spawn_clock=999
-		if (view!="bay" and not scenic.has(view)) or view=="pitfight":
+		if (view!="bay" and not scenic.has(view)) or view in ["pitfight","goose"]:
 			app.combat.spawn_contact("boss" if view=="boss" else "normal")
 			var enemy: Dictionary=app.combat.enemies[0]
 			enemy.position=app.flight.position+app.flight.forward()*(420 if view=="boss" else 260)+Vector3.UP*30
@@ -45,7 +45,19 @@ func run() -> void:
 			if is_instance_valid(chunk.node):mounted[chunk.kind]=int(mounted.get(chunk.kind,0))+1
 			elif chunk.requested:pending+=1;statuses[ResourceLoader.load_threaded_get_status(chunk.path)]=int(statuses.get(ResourceLoader.load_threaded_get_status(chunk.path),0))+1
 		print("LOOK ",view," fps=",frames/3.0," worst_ms=",worst," mounted=",mounted," pending=",pending," statuses=",statuses," draws=",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," prims=",Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)," size=",root.size)
+		if view in ["jet","jetlow","goose"]:
+			# Beauty shots: park the camera by hand after the last simulated frame.
+			app.hud.visible=false
+			var subject: Vector3=app.flight.position
+			var offset: Vector3=app.flight.forward()*-9.0+app.flight.forward().cross(Vector3.UP)*10.5+Vector3.UP*3.2
+			if view=="jetlow":offset=app.flight.forward()*13.0+app.flight.forward().cross(Vector3.UP)*-7.5+Vector3.UP*-1.6
+			if view=="goose":
+				subject=app.combat.enemies[0].node.global_position
+				offset=app.flight.forward()*-62.0+app.flight.forward().cross(Vector3.UP)*58.0+Vector3.UP*20.0
+			app.camera.global_position=subject+offset;app.camera.look_at(subject,Vector3.UP);app.camera.fov=38
+			for i in 8:await process_frame
 		await shot(folder,view)
+		app.hud.visible=true
 		if "profile" in wanted:
 			for kind in ["shadows","ssao","glow","fog","city","road","trees"]:
 				for chunk in app.world.chunks:

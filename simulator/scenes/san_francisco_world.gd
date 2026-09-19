@@ -54,7 +54,7 @@ func build() -> void:
 	env.fog_density = 0.000030
 	env.fog_light_color = Color(1.0,0.78,0.56)
 	env.fog_light_energy = 0.9
-	env.fog_sun_scatter = 0.45
+	env.fog_sun_scatter = 0.10   # higher values white out every view toward the low sun
 	env.fog_aerial_perspective = 0.9
 	env.fog_sky_affect = 0.0
 	env.fog_height = 60.0
@@ -164,10 +164,10 @@ func apply_quality(high: bool) -> void:
 	e.ssao_enabled = high and forward
 	e.ssao_radius = 3.0; e.ssao_intensity = 2.2; e.ssao_power = 1.6; e.ssao_detail = 0.6
 	e.glow_enabled = forward
-	e.glow_intensity=.55
-	e.glow_bloom=.06
-	e.glow_hdr_threshold=1.15
-	e.glow_hdr_scale=1.6
+	e.glow_intensity=.22
+	e.glow_bloom=.0
+	e.glow_hdr_threshold=2.2
+	e.glow_hdr_scale=1.2
 	e.glow_blend_mode=Environment.GLOW_BLEND_MODE_SCREEN
 	for level in range(0,7): e.set_glow_level(level, 1.0 if level in [1,2,4,5] else 0.0)
 func ground_height(x: float,z: float) -> float:
