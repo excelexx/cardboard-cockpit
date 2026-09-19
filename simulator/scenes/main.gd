@@ -17,6 +17,13 @@ const Hud = preload("res://ui/hud.gd")
 const Manual = preload("res://systems/arcade_controls.gd")
 const Mission = preload("res://systems/demo_mission.gd")
 const Badge = preload("res://systems/badge_link.gd")
+const Tutorial = preload("res://systems/tutorial.gd")
+const Results = preload("res://systems/sortie_result.gd")
+var tutorial: FlightTutorial=Tutorial.new()
+var result_headline:=""
+var result_advice:=""
+var result_code:=""
+var landed_early:=false
 const Approach = preload("res://systems/approach_guidance.gd")
 var badge: BadgeLink=Badge.new()
 var cv_weapon_revision:=-1
@@ -74,6 +81,8 @@ var pending_capture := false
 var toast := ""
 var toast_time := 0.0
 var near_obstacle_cooldown:=0.0
+var landing_transition:=0.0
+var landing_started:=false
 func profile() -> Dictionary: return Catalog.PROFILE
 func _ready() -> void:
 	get_window().title = "Goose Protocol — SPECTRE X-26"
@@ -103,6 +112,7 @@ func _ready() -> void:
 	fighter_fx = Effects.new(); fighter_fx.app = self; add_child(fighter_fx); fighter_fx.build()
 	var layer := CanvasLayer.new(); add_child(layer)
 	hud = Hud.new(); hud.app = self; layer.add_child(hud); hud.action.connect(on_action)
+	tutorial.configure(self)
 	set_quality(high_quality)
 	get_viewport().size_changed.connect(_apply_render_scale)
 	var start := false
@@ -138,12 +148,14 @@ func _ready() -> void:
 
 func start_flight(kind: String = "demo") -> void:
 	paper_throttle_seen = false
+	tutorial.stop();result_headline="";result_advice="";result_code="";landed_early=false
 	flight_kind = kind
 	mode = "flight"; resume_mode = "flight"
 	help_visible = false; calibration_visible = false; credits_visible = false
 	copilot = false; used_copilot = false; mission_success = false; result_reason = ""
 	pilot_ejected = false; record_broken = false; eject_hold = 0; crash_clock = 0; fire_guard = 0.3
 	control = Vector3.ZERO; look = Vector2.ZERO
+	landing_started=false;landing_transition=0
 	primary_latched=false;salvo_latched=false;cv_weapon_revision=-1;gear_override=-1;flaps_override=-1;assisted_yoke_reference=vision.yoke
 	flight.reset(profile())
 	if route_id=="sf": flight.position.y += world.ground_height(flight.position.x,flight.position.z)
@@ -205,6 +217,8 @@ func _input(event: InputEvent) -> void:
 				if mode=="flight": mouse_yoke = not mouse_yoke
 			KEY_G:
 				if mode=="flight": flight.gear = not flight.gear;gear_override=int(flight.gear)
+			KEY_L:
+				begin_landing()
 			KEY_F:
 				if mode=="flight": flight.flaps = (flight.flaps+1)%3;flaps_override=flight.flaps
 			KEY_Q:
@@ -232,7 +246,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and (Input.is_key_pressed(KEY_ALT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)):
 		look.x = clampf(look.x-event.relative.x*0.003,-1.4,1.4)
 		look.y = clampf(look.y-event.relative.y*0.003,-0.6,0.6)
-	if event is InputEventMouseButton and event.pressed and fire_guard<=0:
+	if event is InputEventMouseButton and event.pressed and fire_guard<=0 :
 		if event.button_index==MOUSE_BUTTON_RIGHT:salvo_latched=not salvo_latched
 		elif event.button_index==MOUSE_BUTTON_LEFT:primary_latched=not primary_latched
 
@@ -247,14 +261,17 @@ func take_manual_control(steering: bool) -> void:
 func on_action(action: String) -> void:
 	match action:
 		"route": pass
-		"fly": start_flight(); copilot = not vision.enabled; used_copilot = copilot; demo_auto_fire = false
+		"fly":
+			start_flight();copilot=not vision.enabled;used_copilot=copilot;demo_auto_fire=false
+			if mission.cinematic:tutorial.start()
 		"restart":
 			if paper_test:
 				vision.enabled=true
 				start_flight("paper")
 				copilot=false
 			else:
-				start_flight(); copilot = true; used_copilot = true
+				on_action("guided" if demo_auto_fire else "fly")
+		"land": begin_landing()
 		"approach": start_flight("approach")
 		"runway": start_flight("runway")
 		"guided": start_flight(); copilot = true; used_copilot = true; demo_auto_fire = true
@@ -270,13 +287,14 @@ func on_action(action: String) -> void:
 		"mute": audio.muted = not audio.muted; save_settings()
 		"quality": set_quality(not high_quality)
 		"title":
+			tutorial.stop()
 			mode = "title"; combat.active = false; mission.active = false; help_visible = false; calibration_visible = false; credits_visible = false
 			world.visible = false; aircraft.visible = false; fighter_fx.visible = false; cockpit_frame.set_presentation_visible(false)
 			audio.radio.reset(); camera_rig.reset()
 
 func _process(dt: float) -> void:
 	runtime += dt; toast_time = maxf(0,toast_time-dt)
-	vision.poll(dt)
+	vision.poll(dt);tutorial.tick(dt)
 	if vision.weapons_available and cv_weapon_revision!=vision.weapons_revision:
 		cv_weapon_revision=vision.weapons_revision;primary_latched=vision.primary_switch;salvo_latched=vision.salvo_switch
 	var paused: bool = mode=="paused" or overlay_visible()
@@ -297,6 +315,7 @@ func _process(dt: float) -> void:
 			cockpit_frame.set_navigation("sf" if route_id=="sf" else "free",mission.route_index)
 	audio.gun_wanted = active and combat.active and combat.gun_firing_time>0
 	audio.beam_wanted=active and combat.beam_active
+	audio.instructor_speaking=tutorial.speaking()
 	audio.flow_intensity=combat.intent.intensity
 	audio.acquisition=combat.lock_progress if combat.target_id>=0 and combat.lock_progress<1 else 0
 	audio.burner_wanted = flight.afterburner and active
@@ -324,7 +343,9 @@ func _physics_process(dt: float) -> void:
 		if mode=="paused":mode=resume_mode
 		else:resume_mode=mode;mode="paused"
 	if badge.tapped(0) and mode=="flight":flight.gear=not flight.gear;gear_override=int(flight.gear)
-	if badge.tapped(1) and mode=="flight":flight.flaps=(flight.flaps+1)%3;flaps_override=flight.flaps
+	if badge.tapped(1) and mode=="flight":
+		if mission.cinematic or tutorial.active:begin_landing()
+		else:flight.flaps=(flight.flaps+1)%3;flaps_override=flight.flaps
 	if badge.tapped(4) and mode=="flight":cockpit=not cockpit;camera_rig.reset()
 	if badge.tapped(5) and mode=="flight":camera_rig.missile_requested=not camera_rig.missile_requested
 	if badge.tapped(6) and mode=="flight":copilot=not copilot;assisted_yoke_reference=vision.yoke
@@ -353,13 +374,18 @@ func _physics_process(dt: float) -> void:
 	if mode=="rollout":
 		if mission.active: mission.tick(dt)
 		var steer: float = float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
-		flight.rollout_step(dt,copilot or Input.is_physical_key_pressed(KEY_SPACE),steer,is_on_runway(flight.position))
+		flight.rollout_step(dt,landing_started or copilot or Input.is_physical_key_pressed(KEY_SPACE),steer,is_on_runway(flight.position))
 		if not is_on_runway(flight.position): flight.contact = "overrun"
 		apply_aircraft_pose()
-		if flight.contact=="overrun": finish_sortie(false,"Runway excursion. Brake earlier and hold centerline.")
-		elif flight.speed==0: finish_sortie(true,"Aircraft secured. Smooth arrival.")
+		if flight.contact=="overrun":
+			if route_id=="sf":recover_flight()
+			else:finish_sortie(false,"Runway excursion. Brake earlier and hold centerline.")
+		elif flight.speed==0:
+			var success: bool=combat.boss_defeated if mission.cinematic else true
+			finish_sortie(success,"SFO LANDING COMPLETE — AIRCRAFT SECURED" if success else "SFO LANDING COMPLETE — INTERCEPT INCOMPLETE")
 		return
 	if mode!="flight": return
+	landing_transition=maxf(0,landing_transition-dt)
 	fire_guard = maxf(0,fire_guard-dt)
 	eject_hold = eject_hold+dt if not test_mode and Input.is_physical_key_pressed(KEY_E) else 0
 	if eject_hold>0.9 and flight.airborne:
@@ -440,7 +466,7 @@ func _physics_process(dt: float) -> void:
 		audio.play_effect("touchdown_tires",-17); audio.play_effect("touchdown_thump",-16); audio.radio.say("touchdown")
 	elif flight.contact!="": begin_crash()
 	if (absf(flight.position.x)>60000 or absf(flight.position.z)>60000) if route_id=="sf" else (absf(flight.position.x)>14500 or flight.position.z < -24500 or flight.position.z>8500):
-		finish_sortie(false,"Operational sector exited. Turn back earlier.")
+		finish_sortie(false,"Operational sector exited. Turn back earlier.","sector")
 	if flight.airborne and not flight.gear and flight.position.y-world.ground_height(flight.position.x,flight.position.z)<50: audio.radio.say("warning")
 	if flight.stall_time>1: audio.radio.say("warning")
 	apply_aircraft_pose()
@@ -448,20 +474,67 @@ func apply_aircraft_pose() -> void:
 	aircraft.position = flight.position
 	aircraft.rotation = Vector3(flight.pitch,-flight.heading,-flight.roll)
 func begin_crash() -> void:
+	if route_id=="sf":recover_flight();return
 	mode = "crashed"; crash_clock = 0; combat.active = false; copilot = false
 	fighter_fx.debris(flight.position); combat.burst(flight.position,Color(1,0.5,0.15),14)
 	audio.play_effect("explosion",-10); camera_rig.impulse(0.8)
-func finish_sortie(success: bool, reason: String) -> void:
+func recover_flight() -> void:
+	# Arcade recovery keeps the existing mission, score and target progress.
+	var approach: bool=landing_started or flight_kind=="approach"
+	mode="flight";resume_mode="flight";flight.contact="";flight.airborne=true
+	copilot=true;used_copilot=true;assisted_yoke_reference=vision.yoke;control=Vector3.ZERO
+	if approach:
+		landing_started=false;begin_landing()
+	else:
+		var at: Vector3=flight.position
+		var safe_height: float=world.ground_height(at.x,at.z)+200
+		for seconds in [.5,1.0,2.0]:
+			var probe: Vector3=at+flight.forward()*180*seconds
+			safe_height=maxf(safe_height,world.ground_height(probe.x,probe.z)+200)
+		at.y=maxf(at.y,safe_height)
+		var heading: float=flight.heading
+		flight.spawn_airborne(at,180);flight.heading=heading;flight.pitch=0;flight.roll=0
+		flight.pitch_velocity=0;flight.roll_velocity=0;flight.yaw_velocity=0;flight.barrel_remaining=0
+		flight.velocity=flight.forward()*180;flight.vertical_speed=0
+		flight.throttle=.65;flight.engine=.65;flight.afterburner=false;flight.power_input=0
+		flight.gear=false;flight.flaps=0;gear_override=-1;flaps_override=-1
+		combat.hull=Tune.PLAYER_HEALTH;combat.target_id=-1;combat.lock_progress=0
+		fighter_fx.reset();camera_rig.reset();apply_aircraft_pose();fire_guard=.5
+	toast="FLIGHT RECOVERED — KEEP GOING";toast_time=3
+
+func finish_sortie(success: bool, reason: String, cause: String="") -> void:
 	if mode=="results": return
-	if mission.active and success: mission.transition("secured")
-	mission_success = success; result_reason = reason; mode = "results"; combat.active = false
-	if success and not demo_auto_fire and combat.score>best_score:
-		best_score = combat.score; record_broken = true; save_settings()
-	audio.radio.say("landed" if flight.contact=="landed" else "success" if success else "failure")
+	var result: Dictionary=Results.assess({"contact":flight.contact,"stopped":flight.speed<=.1,"boss":combat.boss_defeated,"cinematic":mission.cinematic,"ejected":pilot_ejected,"landing":landing_started or flight_kind=="approach","cause":cause,"early_landing":landed_early},success,reason)
+	mission_success=result.success;result_headline=result.headline;result_reason=result.summary;result_advice=result.advice;result_code=result.code
+	tutorial.stop()
+	if mission.active and mission_success:mission.transition("secured")
+	mode="results";combat.active=false
+	if mission_success and not demo_auto_fire and combat.score>best_score:
+		best_score=combat.score;record_broken=true;save_settings()
+	audio.radio.reset();audio.radio.say(result.radio,3)
 	if test_mode and not test_finished:
-		test_finished = true
-		print("SORTIE RESULT: ","PASS" if success else "FAIL"," time=",flight.elapsed," contacts=",combat.kills," hull=",combat.hull," position=",flight.position," contact=",flight.contact)
-		get_tree().quit(0 if success else 1)
+		test_finished=true
+		print("SORTIE RESULT: ","PASS" if mission_success else "FAIL"," time=",flight.elapsed," contacts=",combat.kills," hull=",combat.hull," position=",flight.position," contact=",flight.contact)
+		get_tree().quit(0 if mission_success else 1)
+func begin_landing() -> void:
+	if mode!="flight" or not flight.airborne or landing_started or route_id!="sf":return
+	landed_early=mission.cinematic and mission.clock<107 and not combat.boss_defeated
+	landing_started=true;landing_transition=1.2
+	tutorial.landing_begun()
+	primary_latched=false;salvo_latched=false;combat.active=false;combat.engagement_enabled=false
+	combat.beam_active=false;combat.gun_firing_time=0;combat.visuals.reset()
+	vision.enabled=false;copilot=true;used_copilot=true;control=Vector3.ZERO
+	gear_override=1;flaps_override=2
+	# A deliberate short demo transition to SFO final, retaining sortie score.
+	flight.spawn_airborne(Vector3(0,49,2100),65)
+	flight.heading=0;flight.roll=0;flight.pitch=-atan(Approach.GLIDESLOPE)
+	flight.pitch_velocity=0;flight.roll_velocity=0;flight.yaw_velocity=0;flight.barrel_remaining=0
+	flight.gear=true;flight.flaps=2;flight.throttle=.22;flight.engine=.3;flight.afterburner=false;flight.power_input=0
+	if mission.active:mission.transition("approach")
+	else:flight_kind="approach"
+	fighter_fx.reset();camera_rig.reset();apply_aircraft_pose();camera_rig.update(.016)
+	audio.radio.say("approach",2)
+
 func approach_controls() -> Vector3:
 	if not flight.airborne:
 		flight.throttle = 1
@@ -515,4 +588,5 @@ func select_route(value: String) -> void:
 	save_settings()
 
 func _exit_tree() -> void:
+	tutorial.stop()
 	badge.close()

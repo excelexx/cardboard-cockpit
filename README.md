@@ -1,8 +1,10 @@
 # Goose Protocol — SPECTRE X-26
 
-Version **0.11.0**: one San Francisco map, one fighter, two latched weapon switches, and a giant goose boss. A complete demo lasts **at most 150 seconds**. The game has unlimited ammunition and forgiving flight assistance.
+Version **0.12.0**: one San Francisco map, one fighter, two latched weapon switches, and a giant goose boss. A complete demo lasts **at most 150 seconds**. The game has unlimited ammunition and forgiving flight assistance.
 
 Open **Launch Cardboard Cockpit.command** or **build/Cardboard Cockpit.app**. **Play / Enter** guides takeoff and the SF route while you shoot. Tap **Space** to switch the minigun and continuous energy cannon on; tap **T** to switch repeated four-missile salvos on. Tap either again to stop. **Watch demo** flies and shoots automatically. Keyboard steering takes over from route assistance; **H** rejoins it. **R** immediately replays.
+
+**Play teaches you during the mission:** spoken tips guide the first three geese, then the instructor hands the rest to you. Flight never pauses for lessons. Crashes recover to stable flight; landing mishaps retry final approach. [Coaching and voice details](docs/TUTORIAL.md).
 
 ## Controls
 
@@ -22,13 +24,13 @@ Open **Launch Cardboard Cockpit.command** or **build/Cardboard Cockpit.app**. **
 | Escape / R / M | Pause / replay / mute |
 | F8 / F9 / F10 | Hide text / telemetry / graphics quality |
 
-The opening leads from SFO into the city; encounters escalate before an anomalous signature reveals the boss. Destroy it for several seconds of free-flight aftermath, or reach an honest timed outcome if it escapes. Replays vary encounter motifs. Normal geese have 900 HP, elites 2,400, and the boss 16,000 with staged weak regions. The geese do not fire back.
+The opening leads from SFO into the city; encounters escalate before an anomalous signature reveals the boss. Destroy it for several seconds of free-flight aftermath, then land at SFO. Badge B, keyboard L or the LAND AT SFO button deploys gear/flaps and starts assisted final approach, touchdown and braking. The ending also starts this automatically after its prompt. A brief transition skips the long return trip, preserving the 150-second limit. Escaping bosses remain an incomplete intercept even after a safe landing. Replays vary encounter motifs. Normal geese have 900 HP, elites 2,400, and the boss 16,000 with staged weak regions. The geese do not fire back.
 
 Aim near a visible contact. Intent scoring, prediction, hysteresis and smoothly varying assistance make tracking forgiving without turning the aircraft automatically in manual flight. Missiles guide only toward their original selected target; free shots remain free shots. Four hardpoints launch with staggered separation and divergent paths. Hit reactions, physical smoke, spectral world cues, audio and local light reinforce real impacts.
 
 ## Cardboard and badge
 
-The **cardboard yoke** owns steering and both latched weapon switches. The **cardboard throttle** owns power, boost and braking. The **wireless badge** supplies occasional secondary controls: START start/replay, HOME pause, A gear, B flaps, LEFT view, RIGHT missile inset, UP route assist, DOWN text visibility. See [switch construction, mapping and evidence](docs/WEAPON_SWITCHES.md) and [printable switch faces](vision/markers/weapon-switches.html).
+The **cardboard yoke** owns steering and both latched weapon switches. The **cardboard throttle** owns power, boost and braking. The **wireless badge** supplies occasional secondary controls: START start/replay, HOME pause, A gear, B assisted landing, LEFT view, RIGHT missile inset, UP route assist, DOWN text visibility. See [switch construction, mapping and evidence](docs/WEAPON_SWITCHES.md) and [printable switch faces](vision/markers/weapon-switches.html).
 
 Use [vision setup](docs/vision-setup.md) and [construction guide](docs/cardboard-build-guide.md) for yoke ID 7 and throttle ID 23. Flip-tab faces use 31/32 and 41/42 in the same `DICT_4X4_50` dictionary.
 

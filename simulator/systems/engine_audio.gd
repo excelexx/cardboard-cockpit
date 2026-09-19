@@ -10,6 +10,7 @@ var beam_loop: AudioStreamPlayer
 var beam_wanted:=false
 var flow_intensity:=0.0
 var acquisition:=0.0
+var instructor_speaking:=false
 var acquire_clock:=0.0
 var spatial_players: Array[AudioStreamPlayer3D]=[]
 var gun_loop: AudioStreamPlayer
@@ -184,7 +185,8 @@ func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> 
 	gun_loop.volume_db = -80 if muted or gun_envelope<.001 else -13+linear_to_db(gun_envelope)+duck_level*.4
 	gun_loop.pitch_scale = lerpf(.80,1.04,gun_envelope)
 	gun_loop.stream_paused = context_paused
-	duck_level = move_toward(duck_level,radio.duck_db(),dt*(70 if radio.duck_db()<duck_level else 10))
+	var wanted_duck: float=minf(radio.duck_db(),-12.0 if instructor_speaking else 0.0)
+	duck_level = move_toward(duck_level,wanted_duck,dt*(70 if wanted_duck<duck_level else 10))
 	burner.volume_db = move_toward(burner.volume_db,-80 if muted or not burner_wanted else -17+duck_level*0.65,dt*80)
 	burner.stream_paused = context_paused
 	music.volume_db = -80 if muted else lerpf(-26,-18,flow_intensity)+duck_level

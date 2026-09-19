@@ -52,3 +52,13 @@ Claude's work from `origin/main` through `0a1a4ef` was merged, including perspec
 Final integrated verification: `tools/verify.sh` passed after the merge, including Claude's sticker input and urban fixture checks. The combined Python suite now contains **41 passing tests**. Camera access remains deferred by the user; no webcam tracker is running.
 
 Final wireless recheck: after restarting the signed release, its own child `BadgeBridge` connected to the real badge and read back phase `[0]`. A local diagnostic log is now retained at `~/Library/Logs/Cardboard Cockpit/badge.log` to diagnose intermittent startup/reconnect delays. No standalone relay or webcam process is required or left running. PR #8 passed both GitHub checks and was merged into `main`.
+
+## 0.11.1 — one-button landing ending
+
+Badge B, keyboard L and the on-screen LAND AT SFO button now start one assisted landing action: safe weapons, deploy gear/flaps, transfer through a brief visual transition to SFO final, approach, touchdown and automatic braking. Score is retained and repeated presses do not restart the approach. The ending begins landing automatically after its seven-second prompt. Guided full run: 125.72 seconds; no-fire full run: 140.20 seconds, both landed and stopped. The no-fire run still reports an incomplete intercept. The explicit return transition is exempt from the continuous-flight displacement test.
+
+## 0.12.0 — in-mission coaching and accurate outcomes
+
+Latest user direction supersedes the separate-training prototype: Play now coaches during the first three real goose kills, without freezing gameplay or opening a separate training mode. The third kill triggers a handoff while preserving the current sortie. SF crashes recover the aircraft to stable flight; landing mishaps retry final approach, retaining score/progress. Normal mission success still requires boss defeat and landing.
+
+Reproduced and fixed a failing regression where safe landing without the boss announced “Mission completed.” The shared result assessment now drives headline, advice, score and radio consistently. Native Daniel speech start/pause/resume/stop was verified. Physical headphone routing remains unverified.

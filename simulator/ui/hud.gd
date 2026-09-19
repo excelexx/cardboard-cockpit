@@ -29,7 +29,7 @@ func _process(dt: float) -> void:
 func _exit_tree() -> void:
 	camera_preview.close()
 func text(at: Vector2, value: String, size: int = 18, color: Color = WHITE, technical: bool = false) -> void:
-	if not app.text_hud and app.mode=="flight" and not app.overlay_visible():return
+	if not app.text_hud and app.mode=="flight" and not app.overlay_visible() and not app.tutorial.active:return
 	draw_string(mono if technical else font,at+Vector2(0,1),value,HORIZONTAL_ALIGNMENT_LEFT,-1,maxi(size,12),Color(0.005,0.015,0.025,color.a*.85))
 	draw_string(mono if technical else font,at,value,HORIZONTAL_ALIGNMENT_LEFT,-1,maxi(size,12),color)
 func line(a: Vector2,b: Vector2,color: Color=MUTED,width: float=1) -> void:
@@ -68,6 +68,12 @@ func _draw() -> void:
 	if app.vision.enabled: draw_camera_preview()
 	if app.mode=="paused": draw_pause()
 	if app.mode=="results": draw_results()
+	if app.toast_time>0 and app.mode=="flight":text(Vector2(510,170),app.toast,17,CYAN,true)
+	if app.mode=="flight" and app.mission.phase=="aftermath":button("land",Rect2(590,790,420,58),"LAND AT SFO  /  BADGE B",true)
+	if app.landing_transition>0:
+		draw_rect(Rect2(0,0,1600,1000),Color(0.01,.02,.03,clampf(app.landing_transition/1.2,0,1)))
+		text(Vector2(580,480),"RETURNING TO SFO FINAL",24,WHITE)
+	if app.tutorial.active and app.mode in ["flight","rollout"] and not app.overlay_visible():draw_tutorial()
 	if app.help_visible: draw_help()
 	if app.calibration_visible: draw_camera_setup()
 	if app.credits_visible: draw_credits()
@@ -342,7 +348,7 @@ func draw_results() -> void:
 	zones.clear(); dim(); panel(Rect2(380,228,840,547),.95)
 	var c: CombatDirector = app.combat
 	text(Vector2(432,291),"SPECTRE / SORTIE RECORD",13,CYAN,true)
-	text(Vector2(430,347),"AIRCRAFT SECURED" if app.mission_success and app.flight.contact=="landed" else "SKY SECURED" if app.mission_success else "SORTIE ENDED",35,WHITE)
+	text(Vector2(430,347),app.result_headline,35,WHITE)
 	text(Vector2(433,390),app.result_reason,17,MUTED)
 	line(Vector2(433,420),Vector2(1167,420),Color(0.3,0.5,0.56,0.4))
 	var labels: Array[String] = ["GEESE CLEARED","BEST STREAK","SCORE"]
@@ -350,7 +356,7 @@ func draw_results() -> void:
 	for i in range(3):
 		text(Vector2(433+i*255,466),labels[i],11,MUTED,true)
 		text(Vector2(431+i*255,516),values[i],36,WHITE,true)
-	text(Vector2(433,575),"NEW PERSONAL BEST!" if app.record_broken else "INTERCEPT  /  BOSS  /  SKY SECURED" if app.mission.active and app.mission_success else "Guided pilot used" if app.used_copilot else "Manual sortie",14,MUTED)
+	text(Vector2(433,575),app.result_advice,14,MUTED)
 	button("fly",Rect2(433,642,350,62),"PLAY AGAIN",true)
 	button("title",Rect2(816,642,350,62),"FLIGHT DECK")
 func draw_help() -> void:
@@ -379,3 +385,9 @@ func draw_credits() -> void:
 	var lines: Array[String] = ["SPECTRE X-26 is a fictional, game-tuned airframe.","Base aircraft: FlightGear F-35B community; GPL source included.","Canada goose: Poly by Google; CC BY 3.0.","Missile: Jarlan Perez; CC BY 3.0.","Effects and voices: Kenney; CC0.","Music: MintoDog; CC0. Goose recordings: British Library; CC BY-SA.","Environment materials: Poly Haven; CC0.","Title art: image generation. Runtime systems: original project code.","Godot 4.7.2 / MIT. Complete notices are bundled with the app."]
 	for i in range(lines.size()): text(Vector2(410,293+i*43),lines[i],17,WHITE if i==0 else MUTED)
 	button("credits",Rect2(905,733,283,51),"BACK",true)
+
+func draw_tutorial() -> void:
+	panel(Rect2(275,755,1050,140),.84)
+	var lesson: Dictionary=app.tutorial.lesson()
+	text(Vector2(300,788),lesson.title,15,CYAN,true)
+	for i in range(lesson.lines.size()):text(Vector2(300,820+i*27),str(lesson.lines[i]),17,WHITE)
