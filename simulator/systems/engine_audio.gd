@@ -6,6 +6,9 @@ var ambience: AudioStreamPlayer
 var wheels: AudioStreamPlayer
 var burner: AudioStreamPlayer
 var burner_wanted := false
+var gun_loop: AudioStreamPlayer
+var gun_wanted := false
+var gun_envelope := 0.0
 var context_mode := "hangar"
 var context_cockpit := false
 var context_contact := ""
@@ -26,6 +29,9 @@ var effects: Dictionary = {}
 var effect_players: Array[AudioStreamPlayer] = []
 
 func _ready() -> void:
+	gun_loop = AudioStreamPlayer.new()
+	gun_loop.volume_db = -80
+	add_child(gun_loop)
 	radio = Radio.new()
 	add_child(radio)
 	ambience = AudioStreamPlayer.new()
@@ -60,6 +66,8 @@ func _ready() -> void:
 		if ResourceLoader.exists("res://assets/audio/geese.ogg"):
 			geese.stream = load("res://assets/audio/geese.ogg")
 			geese.stream.loop = true
+		gun_loop.stream = loop_sample("res://assets/audio/gatling_loop.wav")
+		gun_loop.play()
 		burner.stream = loop_sample("res://assets/audio/afterburner.wav")
 		burner.play()
 		ambience.stream = load("res://assets/audio/cockpit_ambience.ogg")
@@ -134,6 +142,7 @@ func set_context(mode: String, cockpit_view: bool, contact: String, paused_value
 	context_paused = paused_value
 func reset_flight() -> void:
 	radio.reset()
+	gun_wanted = false; gun_envelope = 0; gun_loop.volume_db = -80
 	last_gear = true
 	last_flaps = 0
 	touchdown_announced = false
@@ -146,6 +155,10 @@ func observe_flight(flight: FlightDynamics) -> void:
 		last_flaps = flight.flaps
 func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> void:
 	radio.tick(dt,context_paused,muted)
+	if not context_paused: gun_envelope = move_toward(gun_envelope,1.0 if gun_wanted else 0.0,dt*(24 if gun_wanted else 7))
+	gun_loop.volume_db = -80 if muted or gun_envelope<.001 else -13+linear_to_db(gun_envelope)+duck_level*.4
+	gun_loop.pitch_scale = lerpf(.80,1.04,gun_envelope)
+	gun_loop.stream_paused = context_paused
 	duck_level = move_toward(duck_level,radio.duck_db(),dt*(70 if radio.duck_db()<duck_level else 10))
 	burner.volume_db = move_toward(burner.volume_db,-80 if muted or not burner_wanted else -17+duck_level*0.65,dt*80)
 	burner.stream_paused = context_paused
@@ -164,13 +177,14 @@ func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> 
 	player.volume_db = -80 if muted else (-29.0 + engine * 11.0 if flying else -45.0)+duck_level*0.6
 	wind.volume_db = -80 if muted or not flying else lerpf(-58,-25,clampf(speed/220,0,1))+duck_level*0.5
 
-func ping() -> void:
+func ping(pitch: float = 1.0) -> void:
 	if not muted and tone.stream != null:
+		tone.pitch_scale = pitch
 		tone.play()
 
 func _exit_tree() -> void:
 	# Release looping playback before the scene disappears during test shutdown.
-	for stream_player: AudioStreamPlayer in [player,tone,wind,music,geese,ambience,wheels,burner]:
+	for stream_player: AudioStreamPlayer in [player,tone,wind,music,geese,ambience,wheels,burner,gun_loop]:
 		if is_instance_valid(stream_player):
 			stream_player.stop()
 			stream_player.stream = null
