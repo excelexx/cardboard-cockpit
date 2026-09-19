@@ -7,6 +7,7 @@ render_mode diffuse_burley, specular_schlick_ggx;
 uniform sampler2D livery : source_color, filter_linear_mipmap_anisotropic;
 uniform sampler2D grain : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float wear = 1.0;
+uniform float darkness = 0.95;
 varying vec3 local;
 varying vec3 local_normal;
 void vertex() { local = VERTEX; local_normal = NORMAL; }
@@ -20,8 +21,11 @@ void fragment() {
 	float grime = clamp((streak - 0.52) * 2.2, 0.0, 1.0) * 0.20 + (0.5 - blotch) * 0.10;
 	paint *= 1.0 - grime * wear * mix(1.0, 0.7, top);
 	paint = mix(paint, paint * vec3(1.04, 1.0, 0.95), top * 0.5);   // sun-faded upper surfaces
-	ALBEDO = paint * 0.92;
-	METALLIC = 0.38;
-	SPECULAR = 0.5;
-	ROUGHNESS = clamp(0.40 + (blotch - 0.5) * 0.22 + (fine - 0.5) * 0.10 + grime * 0.25, 0.22, 0.75);
+	// Light camouflage grey: it has to read against dark water and hills from the chase camera.
+	ALBEDO = paint * darkness;
+	METALLIC = 0.45;
+	SPECULAR = 0.6;
+	RIM = 0.9;           // a lit edge all the way round separates the jet from ground and sky
+	RIM_TINT = 0.1;
+	ROUGHNESS = clamp(0.34 + (blotch - 0.5) * 0.22 + (fine - 0.5) * 0.10 + grime * 0.25, 0.22, 0.75);
 }

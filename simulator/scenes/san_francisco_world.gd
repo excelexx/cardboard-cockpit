@@ -14,7 +14,9 @@ var focus := Vector3.ZERO
 var _built := false
 var detailed := true
 var obstacle_cells: Dictionary={}
-const SUN_ENERGY := 3.2
+const SUN_ENERGY := 3.0
+# The panorama's sun glow is at azimuth 210.2 deg (atan2(x,-z)); the key light's is -70 deg.
+const SKY_YAW_DEGREES := -79.8
 const EXPOSURE := 1.0
 var terrain_detail: NoiseTexture2D
 const TERRAIN_SHADER := preload("res://assets/look/sf_terrain.gdshader")
@@ -29,19 +31,22 @@ func build() -> void:
 	name = "SanFranciscoBayArea"
 	region = JSON.parse_string(FileAccess.get_file_as_string(ROOT+"region.json"))
 	heights = FileAccess.get_file_as_bytes(ROOT+"heights.f32").to_float32_array()
-	var material := PanoramaSkyMaterial.new()
-	material.panorama = load(ROOT+"sky.exr")
-	material.energy_multiplier = 0.65
+	# Photographed golden-hour cumulus (Poly Haven "Kloppenheim 06 (Pure Sky)", CC0), graded
+	# by assets/look/sunset_sky.gdshader toward the key art: dark cloud bases, gold-lit edges.
+	var material := ShaderMaterial.new()
+	material.shader = load("res://assets/look/sunset_sky.gdshader")
+	material.set_shader_parameter("panorama",load("res://assets/look/kloppenheim_06_puresky_8k.hdr"))
 	var sky := Sky.new()
 	sky.sky_material = material
 	sky.radiance_size = Sky.RADIANCE_SIZE_256
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
+	env.sky_rotation = Vector3(0,deg_to_rad(SKY_YAW_DEGREES),0)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	# Golden hour: a strong warm key, a cool dim sky fill, and distance haze that
 	# takes its colour from the sky so far terrain melts into the horizon.
-	env.ambient_light_energy = .55
+	env.ambient_light_energy = .85
 	env.ambient_light_sky_contribution = 1.0
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
@@ -51,17 +56,18 @@ func build() -> void:
 	env.adjustment_contrast = 1.12
 	env.adjustment_saturation = 1.16
 	env.fog_enabled = true
-	env.fog_density = 0.000030
-	env.fog_light_color = Color(1.0,0.78,0.56)
-	env.fog_light_energy = 0.9
+	env.fog_density = 0.000026
+	# Cooler and darker than the horizon sky, so far land and sea read as a band under a bright line.
+	env.fog_light_color = Color(0.36,0.41,0.50)
+	env.fog_light_energy = 1.0
 	env.fog_sun_scatter = 0.10   # higher values white out every view toward the low sun
-	env.fog_aerial_perspective = 0.9
+	env.fog_aerial_perspective = 0.25
 	env.fog_sky_affect = 0.0
-	env.fog_height = 60.0
-	env.fog_height_density = 0.0009
+	env.fog_height = 40.0
+	env.fog_height_density = 0.0004
 	environment = WorldEnvironment.new(); environment.environment = env; add_child(environment)
-	sun = DirectionalLight3D.new(); sun.rotation_degrees = Vector3(-16,-110,0)
-	sun.light_color = Color(1.0,0.74,0.50); sun.light_energy = SUN_ENERGY
+	sun = DirectionalLight3D.new(); sun.rotation_degrees = Vector3(-10.0,-110,0)
+	sun.light_color = Color(1.0,0.66,0.38); sun.light_energy = SUN_ENERGY
 	sun.shadow_enabled = true; sun.directional_shadow_max_distance = 1400
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.directional_shadow_blend_splits = true

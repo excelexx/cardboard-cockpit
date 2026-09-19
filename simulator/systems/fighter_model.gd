@@ -40,7 +40,7 @@ static func create() -> Node3D:
 				var lamp := StandardMaterial3D.new()
 				var tint: Color = source.albedo_color
 				lamp.albedo_color = tint*0.08; lamp.albedo_color.a = 1.0; lamp.roughness = 0.12
-				lamp.emission_enabled = true; lamp.emission = tint; lamp.emission_energy_multiplier = 0.35
+				lamp.emission_enabled = true; lamp.emission = tint; lamp.emission_energy_multiplier = 0.12
 				node.set_surface_override_material(surface,lamp)
 			elif part=="pylons":
 				var pylon: StandardMaterial3D = source.duplicate()

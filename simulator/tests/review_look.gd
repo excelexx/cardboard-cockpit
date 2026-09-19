@@ -11,14 +11,15 @@ func run() -> void:
 	app=load("res://scenes/main.tscn").instantiate();root.add_child(app)
 	for i in 30:await process_frame  # let the app finish booting before driving it
 	app.audio.muted=true;app.set_quality(true)
+	app.capture_file="review"   # a capture window is never focused; this keeps the game from auto-pausing
 	if wanted.is_empty() or "title" in wanted:
 		for i in 40:await process_frame
 		await shot(folder,"title")
-	for view in ["chase","cockpit","boss","bay","cliffs","beach","gate","marin","pit","pitfight","jet","jetlow","goose"]:
+	for view in ["chase","cockpit","boss","bay","cliffs","beach","gate","marin","pit","pitfight","jet","jetlow","goose","sun","sky","burner"]:
 		if not wanted.is_empty() and view not in wanted:continue
 		app.set_process(false);app.set_physics_process(false)
 		app.start_flight("combat");app.copilot=false;app.cockpit=view in ["cockpit","pit","pitfight"];app.text_hud=true
-		var scenic:={"cliffs":[Vector3(-4200,360,-8300),0.7],"beach":[Vector3(2300,280,-13400),0.9],"gate":[Vector3(12000,300,-19300),1.45],"marin":[Vector3(16600,520,-21500),0.25],"pit":[Vector3(12000,300,-19300),1.45],"pitfight":[Vector3(12000,300,-19300),1.45],"jet":[Vector3(12000,300,-19300),1.45],"jetlow":[Vector3(12000,300,-19300),1.45],"goose":[Vector3(12000,300,-19300),1.45]}
+		var scenic:={"cliffs":[Vector3(-4200,360,-8300),0.7],"beach":[Vector3(2300,280,-13400),0.9],"gate":[Vector3(12000,300,-19300),1.45],"marin":[Vector3(16600,520,-21500),0.25],"pit":[Vector3(12000,300,-19300),1.45],"pitfight":[Vector3(12000,300,-19300),1.45],"jet":[Vector3(12000,300,-19300),1.45],"jetlow":[Vector3(12000,300,-19300),1.45],"goose":[Vector3(12000,300,-19300),1.45],"sun":[Vector3(12000,300,-19300),1.45],"sky":[Vector3(12000,300,-19300),1.45],"burner":[Vector3(12000,300,-19300),1.45]}
 		var start:=Vector3(15400,430,-10500) if view!="bay" else Vector3(9000,260,-6000)
 		if scenic.has(view):start=scenic[view][0]
 		app.flight.spawn_airborne(start,330);app.flight.gear=false;app.flight.throttle=.65
@@ -45,11 +46,20 @@ func run() -> void:
 			if is_instance_valid(chunk.node):mounted[chunk.kind]=int(mounted.get(chunk.kind,0))+1
 			elif chunk.requested:pending+=1;statuses[ResourceLoader.load_threaded_get_status(chunk.path)]=int(statuses.get(ResourceLoader.load_threaded_get_status(chunk.path),0))+1
 		print("LOOK ",view," fps=",frames/3.0," worst_ms=",worst," mounted=",mounted," pending=",pending," statuses=",statuses," draws=",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," prims=",Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)," size=",root.size)
-		if view in ["jet","jetlow","goose"]:
+		if view in ["sun","sky"]:
+			# "sun" looks straight at the key light to check the panorama is aligned with it; "sky" looks up-sun at 25 degrees.
+			app.hud.visible=false
+			var to_sun: Vector3=app.world.sun.global_basis.z
+			var aim: Vector3=to_sun if view=="sun" else (to_sun.rotated(Vector3.UP,deg_to_rad(95))+Vector3.UP*.35).normalized()
+			app.camera.global_position=app.flight.position+Vector3.UP*40;app.camera.look_at(app.camera.global_position+aim,Vector3.UP);app.camera.fov=70
+			for i in 8:await process_frame
+		if view=="burner":app.flight.afterburner=true;app.flight.engine=1.0;app.fighter_fx.update(.016)
+		if view in ["jet","jetlow","goose","burner"]:
 			# Beauty shots: park the camera by hand after the last simulated frame.
 			app.hud.visible=false
 			var subject: Vector3=app.flight.position
 			var offset: Vector3=app.flight.forward()*-9.0+app.flight.forward().cross(Vector3.UP)*10.5+Vector3.UP*3.2
+			if view=="burner":offset=app.flight.forward()*-26.0+app.flight.forward().cross(Vector3.UP)*12.0+Vector3.UP*5.0
 			if view=="jetlow":offset=app.flight.forward()*13.0+app.flight.forward().cross(Vector3.UP)*-7.5+Vector3.UP*-1.6
 			if view=="goose":
 				subject=app.combat.enemies[0].node.global_position
