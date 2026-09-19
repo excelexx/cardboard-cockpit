@@ -1,17 +1,14 @@
-# Relaxed arcade demo — version 0.9
+# SF demo — 0.11.0
 
-**Goal:** take off, enjoy clearing small, staggered groups with unlimited weapons, then land. The geese never attack. No reload, heat, steady-lock or aircraft-upgrade systems interrupt play.
+1. Open `build/Cardboard Cockpit.app`; wait for BADGE CONNECTED if using the badge.
+2. Choose **Play** for assisted flight with player weapons, or **Watch demo** for automated flight and firing.
+3. Flip cardboard primary ON (minigun + continuous beam), then salvo ON (repeated four-missile volleys). Space and T are equivalent keyboard toggles.
+4. Q rolls; W/S accelerate/brake; V changes camera; X opens the missile inset. Keep flight assistance on for a predictable judge presentation.
+5. The run escalates through SF into the boss encounter at 76 seconds. Defeating the boss leaves seven seconds of aftermath. The full run is capped below 150 seconds even without firing.
+6. R replays immediately; Escape pauses; M mutes. Switching applications pauses the game. F8 hides text while retaining world cues.
 
-- **Play / Enter:** assisted flight with player-controlled shooting. Hold Space + T, or both mouse buttons, to fire Gatling and missiles together. Bring a goose inside the six-degree ring; the crosshair tracks it and LOCK appears quickly. A small retention margin forgives drift. Unlocked missiles fly straight.
-- **Watch demo:** the same complete flight with automatic shooting, useful for an uninterrupted judge demonstration. Azure Coast takes about three minutes; Alpine Valley takes about 2 minutes 18 seconds and ends stopped on North Field's runway.
-- **ROUTE:** choose Azure Coast for Festyve’s city, villages and island tour, or Alpine Valley for the existing mountain sortie.
-- **W / S:** fast acceleration / strong airbrake, with a forgiving minimum airborne speed.
-- **Arrows:** optional manual steering. Hold for a smooth bank/pitch; release to level. H resumes route assistance.
-- **X / V:** missile inset / cockpit or chase view. Q performs a quick roll when altitude permits.
-- **Escape / R / F1:** pause / restart the current style of demo / controls. F10 changes quality.
+Badge: START start/replay/resume, HOME pause, A gear, B flaps, LEFT view, RIGHT inset, UP route assistance, DOWN text visibility. All steering/throttle/firing belongs to the cardboard controls. [Construction and switch sheet](WEAPON_SWITCHES.md).
 
-Successful clears build a five-second streak, rising point rewards and confirmation tones. Play runs can set a local personal best. Watch demo does not overwrite the player's record.
+Prepare the physical props and calibration before showing the camera mode. Real badge button input has been verified; real printed yoke-switch operation still requires a physical run. If the badge is off, the game remains playable. The release owns its bundled relay; do not launch another badge tool simultaneously.
 
-The game launches in a larger window with automatic internal render scaling. The UI remains at window resolution. If another app gains focus, resume with Escape before continuing.
-
-Cardboard controls remain optional. Use the setup guide, complete calibration in the tracker preview and enable it with C. Physical printed-prop testing is separate from synthetic software verification.
+Use one SF map throughout the presentation. Landing practice is a separate optional mode and is not part of the timed boss demo. The cinematic demo may complete around 100 seconds when the automated pilot defeats the boss quickly.

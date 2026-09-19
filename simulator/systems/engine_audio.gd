@@ -6,6 +6,12 @@ var ambience: AudioStreamPlayer
 var wheels: AudioStreamPlayer
 var burner: AudioStreamPlayer
 var burner_wanted := false
+var beam_loop: AudioStreamPlayer
+var beam_wanted:=false
+var flow_intensity:=0.0
+var acquisition:=0.0
+var acquire_clock:=0.0
+var spatial_players: Array[AudioStreamPlayer3D]=[]
 var gun_loop: AudioStreamPlayer
 var gun_wanted := false
 var gun_envelope := 0.0
@@ -29,6 +35,9 @@ var effects: Dictionary = {}
 var effect_players: Array[AudioStreamPlayer] = []
 
 func _ready() -> void:
+	beam_loop=AudioStreamPlayer.new();beam_loop.volume_db=-80;add_child(beam_loop)
+	for i in range(8):
+		var spatial:=AudioStreamPlayer3D.new();spatial.max_distance=2500;spatial.unit_size=120;spatial.attenuation_filter_cutoff_hz=8000;add_child(spatial);spatial_players.append(spatial)
 	gun_loop = AudioStreamPlayer.new()
 	gun_loop.volume_db = -80
 	add_child(gun_loop)
@@ -66,6 +75,7 @@ func _ready() -> void:
 		if ResourceLoader.exists("res://assets/audio/geese.ogg"):
 			geese.stream = load("res://assets/audio/geese.ogg")
 			geese.stream.loop = true
+		beam_loop.stream=load("res://assets/audio/plasma_beam.ogg").duplicate();beam_loop.stream.loop=true;beam_loop.play()
 		gun_loop.stream = loop_sample("res://assets/audio/gatling_loop.wav")
 		gun_loop.play()
 		burner.stream = loop_sample("res://assets/audio/afterburner.wav")
@@ -153,7 +163,22 @@ func observe_flight(flight: FlightDynamics) -> void:
 	if flight.flaps!=last_flaps:
 		play_effect("flap_motor",-25)
 		last_flaps = flight.flaps
+func play_spatial(effect_name: String,at: Vector3,volume: float=-18,pitch: float=1) -> void:
+	if muted or not effects.has(effect_name):return
+	for sound in spatial_players:
+		if not sound.playing:
+			sound.position=at;sound.stream=effects[effect_name];sound.volume_db=volume;sound.pitch_scale=pitch;sound.play();return
+
 func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> void:
+	beam_loop.stream_paused=context_paused
+	beam_loop.volume_db=move_toward(beam_loop.volume_db,-20+duck_level*.4 if beam_wanted and not muted else -80,dt*220)
+	beam_loop.pitch_scale=1.0+sin(Time.get_ticks_msec()*.0017)*.015
+	acquire_clock-=dt
+	if acquisition>0 and acquisition<1 and acquire_clock<=0 and not context_paused:
+		ping(.65+acquisition*.6);acquire_clock=.085
+	for sound in spatial_players:
+		sound.stream_paused=context_paused
+		if muted:sound.stop()
 	radio.tick(dt,context_paused,muted)
 	if not context_paused: gun_envelope = move_toward(gun_envelope,1.0 if gun_wanted else 0.0,dt*(24 if gun_wanted else 7))
 	gun_loop.volume_db = -80 if muted or gun_envelope<.001 else -13+linear_to_db(gun_envelope)+duck_level*.4
@@ -162,8 +187,8 @@ func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> 
 	duck_level = move_toward(duck_level,radio.duck_db(),dt*(70 if radio.duck_db()<duck_level else 10))
 	burner.volume_db = move_toward(burner.volume_db,-80 if muted or not burner_wanted else -17+duck_level*0.65,dt*80)
 	burner.stream_paused = context_paused
-	music.volume_db = -80 if muted else -22+duck_level
-	geese.volume_db = -80 if muted else -31+duck_level*0.7
+	music.volume_db = -80 if muted else lerpf(-26,-18,flow_intensity)+duck_level
+	geese.volume_db = -80 if muted else lerpf(-34,-27,flow_intensity)+duck_level*0.7
 	ambience.volume_db = -80 if muted else (-37 if context_cockpit and flying else -43 if context_mode in ["hangar","title","briefing"] else -80)+duck_level*0.6
 	wheels.volume_db = -80 if muted or context_contact!="landed" or speed<0.2 else lerpf(-42,-20,clampf(speed/65,0,1))+duck_level*0.7
 	wheels.pitch_scale = lerpf(0.6,1.15,clampf(speed/70,0,1))
@@ -184,7 +209,7 @@ func ping(pitch: float = 1.0) -> void:
 
 func _exit_tree() -> void:
 	# Release looping playback before the scene disappears during test shutdown.
-	for stream_player: AudioStreamPlayer in [player,tone,wind,music,geese,ambience,wheels,burner,gun_loop]:
+	for stream_player: AudioStreamPlayer in [player,tone,wind,music,geese,ambience,wheels,burner,gun_loop,beam_loop]:
 		if is_instance_valid(stream_player):
 			stream_player.stop()
 			stream_player.stream = null

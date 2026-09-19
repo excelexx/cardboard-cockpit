@@ -1,0 +1,7 @@
+# Build-only alternative layout. Back up ALL 4MB before choosing to flash.
+# This firmware never mounts or formats the existing filesystem.
+# Name,Type,SubType,Offset,Size,Flags
+nvs,data,nvs,0x9000,0x5000,
+factory,app,factory,0x10000,0x280000,
+littlefs,data,spiffs,0x2b0000,0x140000,
+coredump,data,coredump,0x3f0000,0x10000,

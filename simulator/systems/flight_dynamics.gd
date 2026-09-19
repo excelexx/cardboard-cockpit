@@ -162,7 +162,7 @@ func effective_rotation_speed() -> float:
 	return float(profile.rotation_speed)*(1-clampi(flaps,0,2)*0.06)
 func get_heading_degrees() -> float: return fposmod(rad_to_deg(heading),360)
 func start_barrel_roll(direction: float = 1) -> bool:
-	if not airborne or position.y-last_ground<80 or barrel_remaining>0 or contact!="": return false
+	if not airborne or position.y-last_ground<35 or barrel_remaining>0 or contact!="": return false
 	barrel_start = roll; barrel_direction = -1 if direction<0 else 1; barrel_remaining = BARREL_DURATION
 	return true
 func landing_score() -> int:

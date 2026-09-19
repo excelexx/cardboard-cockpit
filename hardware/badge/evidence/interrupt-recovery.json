@@ -1,0 +1,18 @@
+{
+  "watcher_exit_code": 0,
+  "first_state": {
+    "seconds": 0.028,
+    "shift_raw": "0xfe",
+    "raw_held_mask": "0x080",
+    "held_mask": "0x000",
+    "held_codes": [],
+    "held_buttons": [],
+    "start": false,
+    "pressed": [],
+    "released": []
+  },
+  "gpio_configuration_restored": true,
+  "preexisting_halt_preserved": true,
+  "stderr": "",
+  "cpu_resumed_after_test": true
+}

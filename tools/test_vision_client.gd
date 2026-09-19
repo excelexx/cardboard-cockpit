@@ -82,6 +82,17 @@ func _validation_tests() -> bool:
 	if not client._accept_packet(JSON.stringify(independent).to_utf8_buffer(), 200) or client.throttle_confidence < 0.9:
 		_fail("Independent throttle rejected when yoke lost")
 		return false
+	var switched: Dictionary=_valid(3)
+	switched.weapons={"primary":true,"salvo":true,"primary_confidence":1.0,"salvo_confidence":1.0}
+	if not client._accept_packet(JSON.stringify(switched).to_utf8_buffer(),210) or not (client.primary_switch and client.salvo_switch):
+		_fail("Valid physical weapon switches rejected");return false
+	var revision: int=client.weapons_revision
+	switched.sequence=4;switched.weapons.salvo="true"
+	if client._accept_packet(JSON.stringify(switched).to_utf8_buffer(),220) or client.weapons_revision!=revision:
+		_fail("Malformed weapon extension mutated state");return false
+	client.enabled=true;client.enabled=false
+	if client.primary_switch or client.salvo_switch or client.weapons_revision==revision:
+		_fail("Disabling camera did not release physical weapons");return false
 	print("VISION VALIDATION PASS: %d malformed packets rejected without state mutation" % (invalid.size() + 4))
 	return true
 
