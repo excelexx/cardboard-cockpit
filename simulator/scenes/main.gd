@@ -26,6 +26,7 @@ var result_code:=""
 var landed_early:=false
 const Approach = preload("res://systems/approach_guidance.gd")
 var badge: BadgeLink=Badge.new()
+var pilot_number:=1
 var cv_weapon_revision:=-1
 var primary_latched:=false
 var salvo_latched:=false
@@ -267,6 +268,8 @@ func take_manual_control(steering: bool) -> void:
 	vision.enabled = false; vision.status = "KEYBOARD / MOUSE"
 func on_action(action: String) -> void:
 	match action:
+		"next_pilot":
+			pilot_number=pilot_number%9999+1;on_action("title")
 		"route": pass
 		"fly":
 			start_flight();copilot=not vision.enabled;used_copilot=copilot;demo_auto_fire=false
