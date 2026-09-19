@@ -24,7 +24,7 @@ func run() -> void:
 		var at: Vector3=app.flight.position
 		if at.x>14000 and at.x<21000 and at.z< -9000 and at.z> -21000:
 			city_flyover_frames+=1
-		if app.flight.position.distance_to(previous)>app.flight.velocity.length()/60.0+1.0:
+		if app.landing_transition<=0 and app.flight.position.distance_to(previous)>app.flight.velocity.length()/60.0+1.0:
 			floor_corrections += 1
 		if app.mission.route_index!=previous_index:
 			previous_index = app.mission.route_index
