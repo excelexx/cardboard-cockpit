@@ -15,6 +15,7 @@ func run() -> void:
 	app.on_action("demo")
 	app.capture_file="city-review"
 	var city: Node3D=app.world.metropolis
+	check(app.world.village_home_count==60,"Five countryside settlements contain sixty assembled homes")
 	if city.photo_tiles>0:
 		check(city.photo_tiles==128,"Both photograph-derived districts are loaded completely")
 		check(city.photo_tiles<=256,"Photogrammetry remains bounded")
@@ -56,6 +57,9 @@ func run() -> void:
 		DirAccess.make_dir_recursive_absolute(destination)
 		app.world.set_conditions("golden")
 		var shots: Array[Dictionary]=[
+			{"name":"kominka-detail","eye":Vector3(1715,31,-2500),"target":Vector3(1750,17,-2580)},
+			{"name":"coastal-village","eye":Vector3(1600,75,-2350),"target":Vector3(1750,17,-2650)},
+			{"name":"country-panorama","eye":Vector3(800,300,-7700),"target":Vector3(2050,15,-8600)},
 			{"name":"airport-grounding","eye":Vector3(-230,145,1000),"target":Vector3(410,5,100)},
 			{"name":"metropolitan-overview","eye":Vector3(-1300,1200,-2200),"target":Vector3(1300,0,-5200)},
 			{"name":"downtown-waterfront","eye":Vector3(200,450,-3800),"target":Vector3(1550,60,-5100)},
@@ -63,6 +67,7 @@ func run() -> void:
 			{"name":"city-cockpit","eye":Vector3(-1300,360,-5450),"target":Vector3(500,200,-6500)}
 		]
 		for shot in shots:
+			if "--countryside" in OS.get_cmdline_user_args() and shot.name not in ["kominka-detail","coastal-village","country-panorama"]: continue
 			if shot.name=="city-cockpit": app.apply_campaign_aircraft(app.combat.plane_profile(1))
 			app.flight.position=shot.eye
 			app.flight.airborne=true
@@ -81,6 +86,12 @@ func run() -> void:
 				app.camera.look_at(shot.target)
 				app.camera.fov=65
 			else: app.hud.visible=true
+			if shot.name=="city-cockpit":
+				for lever: Node3D in app.cockpit_frame.throttles:
+					var grip: Vector3=lever.to_global(Vector3(0,0.159,0))
+					var projected: Vector2=app.camera.unproject_position(grip)
+					check(not app.camera.is_position_behind(grip),"Throttle is in front of the pilot")
+					check(Rect2(Vector2(40,40),Vector2(root.size)-Vector2(80,80)).has_point(projected),"Throttle grip fits inside default cockpit view")
 			for i in range(12):
 				RenderingServer.force_draw()
 				await process_frame

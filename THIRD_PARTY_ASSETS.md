@@ -1,5 +1,13 @@
 # Third-party aircraft assets
 
+## Countryside architecture
+
+Kominka Modular Home Pack Lite by Rice Studio Lab, MIT license. Source:
+https://store.godotengine.org/asset/rice-studio-lab/kominka-modular-home-pack-lite/
+License and conversion notes are in `simulator/assets/kominka/`. The exterior
+assembly layout and 24 modules are included; textures are shared and reduced to
+512 px for aerial viewing. Publisher demo scripts are not used.
+
 The playable client contains real exterior geometry and textures converted from the open-source FlightGear aircraft listed below. No Microsoft Flight Simulator assets are used. The original source files, relevant model assembly XML, attribution and license texts are supplied under `simulator/assets/aircraft/<id>/source/`.
 
 | Aircraft / scene | Upstream source | Credited source authors | Asset license |
