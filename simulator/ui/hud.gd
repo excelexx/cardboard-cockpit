@@ -146,26 +146,40 @@ func draw_hangar() -> void:
 		text(rect.position+Vector2(18,59),str(AircraftCatalog.PLANES[i].short),27,WHITE if selected else MUTED)
 		text(rect.position+Vector2(18,84),str(AircraftCatalog.PLANES[i].label),10,MUTED,true)
 	text(Vector2(60,954),"KEYBOARD + MOUSE READY",12,GREEN,true)
-	text(Vector2(353,954),"MOUNTAIN VALLEY  /  GOLDEN HOUR",12,MUTED,true)
+	text(Vector2(353,954),"MOUNTAIN VALLEY  /  " + app.world.get_condition_name().to_upper(),12,MUTED,true)
 	button("help",Rect2(1018,924,200,48),"Controls  /  F1")
 	button("brief",Rect2(1240,920,302,56),"PREPARE FLIGHT   →",true)
 
 func draw_briefing() -> void:
 	zones.clear()
-	draw_rect(Rect2(0,0,1600,1000),Color(0.015,0.03,0.045,0.78))
-	panel(Rect2(350,170,900,660))
-	text(Vector2(406,225),"02  /  FLIGHT BRIEFING",13,AMBER,true)
-	text(Vector2(404,280),"The valley is yours.",40)
-	text(Vector2(406,324),"ALPINE DEPARTURE   →   FIVE CHECKPOINTS   →   NORTH FIELD",13,MUTED,true)
-	line(Vector2(406,349),Vector2(1194,349))
-	var items: Array[String] = ["01   DEPART     Hold W for power. At %d kt, hold ↑ to lift off." % int(float(app.profile().rotation_speed)*1.94384),"02   EXPLORE    Follow the glowing rings through the valley.","03   ARRIVE      After ring 5, lower gear and follow the approach."]
+	draw_rect(Rect2(0,0,1600,1000),Color(0.015,0.03,0.045,0.84))
+	panel(Rect2(300,116,1000,772))
+	text(Vector2(355,171),"02  /  FLIGHT BRIEFING",13,AMBER,true)
+	text(Vector2(353,225),"Choose your next horizon.",38)
+	text(Vector2(355,263),str(app.profile().name)+"  /  "+str(app.profile().type),13,MUTED,true)
+	var kinds: Array[String] = ["valley","approach","free"]
+	var titles: Array[String] = ["Valley mission","Landing practice","Free flight"]
 	for i: int in 3:
-		text(Vector2(406,402+i*55),items[i],18,WHITE)
-	text(Vector2(406,595),"↑ / ↓ pitch    ← / → bank    A / D rudder    W / S power",16,MUTED,true)
-	text(Vector2(406,626),"V camera    G gear    SPACE brakes    R reset    ESC pause",16,MUTED,true)
-	text(Vector2(406,676),"First time? Press H in flight for a training copilot. Take over anytime.",17,GREEN)
-	button("hangar",Rect2(406,725,205,54),"Back to hangar")
-	button("fly",Rect2(883,725,311,54),"CLEARED FOR TAKEOFF  →",true)
+		button("kind_"+kinds[i],Rect2(355+i*305,295,280,53),titles[i],app.flight_kind==kinds[i])
+	var details: Dictionary = {
+		"valley":["ALPINE DEPARTURE  →  FIVE CHECKPOINTS  →  NORTH FIELD","Take off, follow five glowing rings, then fly the final approach.","Lower gear, set flaps, touch down and brake to a full stop."],
+		"approach":["NORTH FIELD  /  RUNWAY 36  /  STRAIGHT-IN APPROACH","Begin airborne with gear down and approach flaps set.","Follow the guidance diamonds. Flare gently, then hold SPACE to brake."],
+		"free":["TWO AIRPORTS  /  MOUNTAINS  /  YOUR OWN ROUTE","Depart Alpine and explore the valley without checkpoints.","Land at either airport and brake to a stop to complete your flight."]}
+	var lines: Array = details.get(app.flight_kind,details.valley)
+	text(Vector2(355,393),str(lines[0]),12,AMBER,true)
+	text(Vector2(355,435),str(lines[1]),18)
+	text(Vector2(355,465),str(lines[2]),18,MUTED)
+	line(Vector2(355,493),Vector2(1245,493))
+	text(Vector2(355,527),"SKY CONDITIONS",11,MUTED,true)
+	var skies: Array[String] = ["golden","clear","overcast"]
+	var sky_names: Array[String] = ["Golden hour","Clear midday","High overcast"]
+	for i: int in 3:
+		button("weather_"+skies[i],Rect2(355+i*305,547,280,46),sky_names[i],app.conditions==skies[i])
+	text(Vector2(355,626),"%s  ·  %s km visibility  ·  calm winds" % [app.world.get_conditions().time_of_day,app.world.get_conditions().visibility_km],13,MUTED,true)
+	text(Vector2(355,681),"W/S power   Arrows pitch/bank   G gear   F flaps   SPACE brakes",14,WHITE,true)
+	text(Vector2(355,716),"H enables a training copilot. V changes view. F1 shows all controls.",17,GREEN)
+	button("hangar",Rect2(355,775,250,57),"Back to hangar")
+	button("fly",Rect2(926,775,319,57),"BEGIN APPROACH  →" if app.flight_kind=="approach" else "CLEARED FOR TAKEOFF  →",true)
 
 func draw_flight() -> void:
 	var f: FlightDynamics = app.flight
@@ -173,8 +187,8 @@ func draw_flight() -> void:
 	text(Vector2(51,59),"C / C",24,AMBER)
 	text(Vector2(151,52),str(app.profile().name),15)
 	text(Vector2(151,76),app.phase_label(),11,GREEN,true)
-	text(Vector2(598,53),"ALPINE  →  NORTH FIELD",14,WHITE,true)
-	text(Vector2(599,78),"CHECKPOINTS  %d / 5" % app.ring_index,12,MUTED,true)
+	text(Vector2(598,53),app.flight_kind_label(),14,WHITE,true)
+	text(Vector2(599,78),("CHECKPOINTS  %d / 5" % app.ring_index if app.flight_kind=="valley" else app.world.get_condition_name().to_upper()),12,MUTED,true)
 	text(Vector2(1130,53),"%02d:%02d" % [int(f.elapsed)/60,int(f.elapsed)%60],21,WHITE,true)
 	text(Vector2(1280,51),"COPILOT" if app.copilot else "MANUAL FLIGHT",13,AMBER if app.copilot else GREEN,true)
 	text(Vector2(1280,76),"%s   ·   %d FPS" % ["COCKPIT" if app.cockpit else "CHASE",Engine.get_frames_per_second()],11,MUTED,true)
@@ -200,7 +214,7 @@ func draw_flight() -> void:
 	var target: Vector3 = app.target_position()
 	var distance: float = f.position.distance_to(target)
 	panel(Rect2(28,122,346,98),Color(0.03,0.06,0.08,0.78))
-	text(Vector2(49,151),"NEXT  /  " + ("CHECKPOINT %02d" % (app.ring_index+1) if app.ring_index<5 else "RUNWAY 36"),11,AMBER,true)
+	text(Vector2(49,151),"NEXT  /  " + ("CHECKPOINT %02d" % (app.ring_index+1) if app.ring_index<5 and app.flight_kind=="valley" else "NORTH FIELD / RWY 36"),11,AMBER,true)
 	text(Vector2(48,184),"%.1f km" % (distance/1000.0),27)
 	text(Vector2(207,182),"%d FT MSL" % int(target.y*3.28084),12,MUTED,true)
 	text(Vector2(49,207),"H  TRAINING COPILOT / TAKE OVER",10,GREEN if app.copilot else MUTED,true)
@@ -211,29 +225,49 @@ func draw_flight() -> void:
 		text(Vector2(1240,219),"A webcam sees cardboard controls",16)
 		text(Vector2(1240,244),"and turns movement into flight.",16)
 		text(Vector2(1240,278),"C  CAMERA SETUP    ·    TAB  HIDE",10,MUTED,true)
-	# Lower cockpit-style instrument strip.
-	panel(Rect2(28,831,1544,140),Color(0.025,0.05,0.065,0.92))
-	var labels: Array[String] = ["AIRSPEED", "ALTITUDE MSL", "VERTICAL SPEED", "ENGINE POWER", "HEADING", "LANDING GEAR"]
-	var values: Array[String] = ["%03d" % int(f.speed*1.94384),"%05d" % int(f.position.y*3.28084),"%+05d" % int(f.vertical_speed*196.85),"%03d" % int(f.throttle*100),"%03d°" % int(f.get_heading_degrees()),"DOWN" if f.gear else "UP"]
-	var units: Array[String] = ["KNOTS", "FEET", "FT / MIN", "PERCENT", "MAGNETIC", "G TO TOGGLE"]
-	for i: int in 6:
-		var x: float = 54+i*254
-		text(Vector2(x,860),labels[i],11,MUTED,true)
-		text(Vector2(x-1,911),values[i],36,GREEN if i==5 and f.gear else WHITE,true)
-		text(Vector2(x,944),units[i],10,MUTED,true)
-		if i<5:
-			line(Vector2(x+228,855),Vector2(x+228,947))
-	line(Vector2(815,956),Vector2(1025,956),MUTED,3)
-	line(Vector2(815,956),Vector2(815+210*f.throttle,956),AMBER,3)
+	if app.ring_index>=5 and app.flight_kind!="free" and f.airborne:
+		draw_approach()
+	if not app.cockpit or app.expanded_hud:
+		panel(Rect2(28,831,1544,140),Color(0.025,0.05,0.065,0.92))
+		var labels: Array[String] = ["AIRSPEED", "ALTITUDE MSL", "VERTICAL SPEED", "ENGINE POWER", "HEADING", "LANDING GEAR"]
+		var values: Array[String] = ["%03d" % int(f.speed*1.94384),"%05d" % int(f.position.y*3.28084),"%+05d" % int(f.vertical_speed*196.85),"%03d" % int(f.throttle*100),"%03d°" % int(f.get_heading_degrees()),"DOWN" if f.gear else "UP"]
+		var units: Array[String] = ["KNOTS", "FEET", "FT / MIN", "PERCENT", "MAGNETIC", "G TO TOGGLE"]
+		for i: int in 6:
+			var x: float = 54+i*254
+			text(Vector2(x,860),labels[i],11,MUTED,true)
+			text(Vector2(x-1,911),values[i],36,GREEN if i==5 and f.gear else WHITE,true)
+			text(Vector2(x,944),units[i],10,MUTED,true)
+			if i<5:
+				line(Vector2(x+228,855),Vector2(x+228,947))
+		line(Vector2(815,956),Vector2(1025,956),MUTED,3)
+		line(Vector2(815,956),Vector2(815+210*f.throttle,956),AMBER,3)
 	var prompt: String = app.flight_prompt()
 	var tw: float = font.get_string_size(prompt,HORIZONTAL_ALIGNMENT_LEFT,-1,20).x
-	panel(Rect2(800-tw*0.5-24,751,tw+48,49),Color(0.04,0.085,0.11,0.86))
-	text(Vector2(800-tw*0.5,782),prompt,20,AMBER if f.stall_time>1 else WHITE)
-	text(Vector2(36,993),"W/S POWER   ARROWS PITCH / BANK   A/D RUDDER   V CAMERA   G GEAR   H COPILOT   F1 HELP   ESC PAUSE",10,MUTED,true)
+	var prompt_y: float = 751 if not app.cockpit or app.expanded_hud else 323
+	panel(Rect2(800-tw*0.5-24,prompt_y,tw+48,49),Color(0.04,0.085,0.11,0.86))
+	text(Vector2(800-tw*0.5,prompt_y+31),prompt,20,AMBER if f.stall_time>1 else WHITE)
+	text(Vector2(36,993),"W/S POWER   ARROWS PITCH / BANK   A/D RUDDER   V VIEW   G GEAR   F FLAPS   H COPILOT   F2 INSTRUMENTS   F1 HELP   ESC PAUSE",10,MUTED,true)
 	if app.toast_time>0:
 		var w: float = font.get_string_size(app.toast,HORIZONTAL_ALIGNMENT_LEFT,-1,24).x
 		panel(Rect2(800-w/2-28,247,w+56,60))
 		text(Vector2(800-w/2,286),app.toast,24,GREEN)
+
+func draw_approach() -> void:
+	var guidance: Dictionary = app.approach_data()
+	var center := Vector2(800,435)
+	var magenta := Color(0.92,0.48,0.9,0.92)
+	line(center+Vector2(-130,120),center+Vector2(130,120),Color(0.72,0.83,0.85,0.55))
+	line(center+Vector2(180,-100),center+Vector2(180,100),Color(0.72,0.83,0.85,0.55))
+	for i: int in [-2,-1,0,1,2]:
+		draw_circle(center+Vector2(i*60,120),2,WHITE)
+		draw_circle(center+Vector2(180,i*45),2,WHITE)
+	var loc := center+Vector2(float(guidance.localizer)*120,120)
+	var glide := center+Vector2(180,-float(guidance.glideslope)*90)
+	for point: Vector2 in [loc,glide]:
+		draw_colored_polygon(PackedVector2Array([point+Vector2(0,-7),point+Vector2(7,0),point+Vector2(0,7),point+Vector2(-7,0)]),magenta)
+	text(center+Vector2(-124,146),"LOC",10,magenta,true)
+	text(center+Vector2(194,-88),"GS",10,magenta,true)
+	text(center+Vector2(-50,146),"3° APPROACH",10,MUTED,true)
 
 func draw_pause() -> void:
 	zones.clear()
@@ -242,7 +276,7 @@ func draw_pause() -> void:
 	text(Vector2(598,300),"FLIGHT PAUSED",13,AMBER,true)
 	text(Vector2(596,355),"Take a moment.",35)
 	button("resume",Rect2(598,401,404,58),"RESUME FLIGHT",true)
-	button("restart",Rect2(598,478,404,52),"Restart from runway")
+	button("restart",Rect2(598,478,404,52),"Restart flight")
 	button("hangar",Rect2(598,545,404,52),"Choose another aircraft")
 	button("help",Rect2(598,612,192,50),"Controls")
 	button("mute",Rect2(810,612,192,50),"Sound: OFF" if app.audio.muted else "Sound: ON")
@@ -254,16 +288,16 @@ func draw_results() -> void:
 	panel(Rect2(370,200,860,605))
 	var success: bool = app.mission_success
 	text(Vector2(428,254),"FLIGHT DEBRIEF",13,AMBER,true)
-	text(Vector2(426,319),"Welcome to North Field." if success else "Every flight teaches you.",36)
+	text(Vector2(426,319),("Welcome back, captain." if app.flight_kind=="free" else "Welcome to North Field.") if success else "Every flight teaches you.",36)
 	text(Vector2(428,363),app.result_reason,18,GREEN if success else MUTED)
 	line(Vector2(428,397),Vector2(1170,397))
 	var f: FlightDynamics = app.flight
-	var names: Array[String] = ["FLIGHT TIME", "CHECKPOINTS", "SMOOTHNESS"]
-	var values: Array[String] = ["%02d:%02d" % [int(f.elapsed)/60,int(f.elapsed)%60],"%d / 5" % app.ring_index,"%d%%" % f.get_smoothness()]
+	var names: Array[String] = ["FLIGHT TIME", "LANDING SCORE", "TOUCHDOWN"]
+	var values: Array[String] = ["%02d:%02d" % [int(f.elapsed)/60,int(f.elapsed)%60],"%d / 100" % f.landing_score() if f.contact=="landed" else "—","%d FPM" % int(absf(f.touchdown_sink)*196.85)]
 	for i: int in 3:
 		text(Vector2(428+i*263,438),names[i],11,MUTED,true)
 		text(Vector2(427+i*263,486),values[i],36,WHITE,true)
-	text(Vector2(428,560),"CAPTAIN" if success and f.get_smoothness()>80 else "CADET PILOT" if success else "PILOT IN TRAINING",24,AMBER)
+	text(Vector2(428,560),"CAPTAIN" if success and f.landing_score()>80 else "CADET PILOT" if success else "PILOT IN TRAINING",24,AMBER)
 	text(Vector2(428,597),"%s  ·  %s" % [str(app.profile().short), "Training copilot used" if app.used_copilot else "Manual flight"],16,MUTED)
 	button("restart",Rect2(428,674,349,62),"FLY AGAIN  →",true)
 	button("hangar",Rect2(800,674,370,62),"NEXT PILOT / HANGAR")
@@ -274,10 +308,10 @@ func draw_help() -> void:
 	panel(Rect2(315,105,970,785))
 	text(Vector2(370,166),"YOUR FLIGHT CONTROLS",14,AMBER,true)
 	text(Vector2(368,222),"A little input goes a long way.",35)
-	var rows: Array[Array] = [["W / S", "Increase / decrease engine power"],["↑ / ↓", "Nose up / nose down"],["← / →", "Bank left / right"],["A / D", "Rudder and runway steering"],["RIGHT MOUSE", "Hold and drag to look around"],["B", "Toggle mouse yoke (move cursor to steer)"],["G  /  SPACE", "Landing gear / wheel brakes"],["V  /  H", "Cockpit or chase view / training copilot"],["R  /  M", "Reset aircraft / mute sound"],["TAB  /  C", "Spectator panel / camera setup"],["ESC  /  Q", "Pause / change render quality"]]
+	var rows: Array[Array] = [["W / S", "Increase / decrease engine power"],["↑ / ↓", "Nose up / nose down"],["← / →", "Bank left / right"],["A / D", "Rudder and runway steering"],["RIGHT MOUSE", "Hold and drag to look around"],["B", "Toggle mouse yoke (move cursor to steer)"],["G  /  SPACE", "Landing gear / wheel brakes"],["F  /  F2", "Flaps UP / 15 / 30 · show instrument overlay"],["V  /  H", "Cockpit or chase view / training copilot"],["R  /  M", "Reset aircraft / mute sound"],["TAB  /  C", "Spectator panel / camera setup"],["ESC  /  Q", "Pause / change render quality"]]
 	for i: int in rows.size():
-		text(Vector2(373,272+i*41),str(rows[i][0]),15,WHITE,true)
-		text(Vector2(657,272+i*41),str(rows[i][1]),17,MUTED)
+		text(Vector2(373,268+i*40),str(rows[i][0]),15,WHITE,true)
+		text(Vector2(657,268+i*40),str(rows[i][1]),17,MUTED)
 	button("help",Rect2(943,802,283,52),"GOT IT  /  F1",true)
 	button("credits",Rect2(373,802,283,52),"Credits & sources")
 

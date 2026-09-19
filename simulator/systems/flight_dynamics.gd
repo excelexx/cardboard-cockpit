@@ -22,6 +22,9 @@ var touchdown_speed: float = 0.0
 var touchdown_sink: float = 0.0
 var touchdown_bank: float = 0.0
 var stall_time: float = 0.0
+var flaps: int = 0
+var rollout_elapsed: float = 0.0
+var touchdown_center: float = 0.0
 
 func reset(aircraft: Dictionary) -> void:
 	profile = aircraft
@@ -45,16 +48,20 @@ func reset(aircraft: Dictionary) -> void:
 	touchdown_speed = 0.0
 	touchdown_sink = 0.0
 	touchdown_bank = 0.0
+	flaps = 0
+	rollout_elapsed = 0.0
+	touchdown_center = 0.0
 
 func step(dt: float, control: Vector3, brakes: bool, ground: float, runway: bool) -> void:
 	if contact != "":
 		return
 	elapsed += dt
 	engine = move_toward(engine, throttle, dt * 0.32)
-	var rotation_speed: float = profile.rotation_speed
+	var rotation_speed: float = effective_rotation_speed()
 	var max_speed: float = profile.max_speed
 	var acceleration: float = profile.acceleration
 	var drag: float = acceleration * pow(speed / max_speed, 2.0) + (0.45 if gear else 0.12)
+	drag += float(flaps) * (0.22 + speed * 0.006)
 	if not airborne:
 		drag += 0.25 + (18.0 if brakes else 0.0)
 	speed = clampf(speed + (engine * acceleration - drag - sin(pitch) * 3.4) * dt, 0.0, max_speed * 1.12)
@@ -95,6 +102,7 @@ func step(dt: float, control: Vector3, brakes: bool, ground: float, runway: bool
 		touchdown_speed = speed
 		touchdown_sink = vertical_speed
 		touchdown_bank = roll
+		touchdown_center = absf(position.x)
 		if runway and gear and speed < 105.0 and vertical_speed > -10.0 and absf(roll) < 0.40:
 			airborne = false
 			position.y = ground + float(profile.clearance)
@@ -112,3 +120,26 @@ func get_heading_degrees() -> float:
 
 func get_smoothness() -> int:
 	return clampi(int(100.0 - roughness / maxf(elapsed, 1.0) * 220.0 - stall_time), 0, 100)
+
+func effective_rotation_speed() -> float:
+	# Three assisted flap detents: retracted, takeoff, approach.
+	return float(profile.rotation_speed) * (1.0 - clampi(flaps,0,2)*0.06)
+
+func rollout_step(dt: float, brakes: bool, steering: float, on_runway: bool) -> void:
+	if contact != "landed":
+		return
+	elapsed += dt
+	rollout_elapsed += dt
+	throttle = 0.0
+	engine = move_toward(engine,0.0,dt*0.5)
+	speed = maxf(0.0,speed-(1.4 + (4.8 if brakes else 0.0))*dt)
+	heading += clampf(steering,-1,1)*0.11*clampf(speed/20.0,0,1)*dt
+	position += Vector3(sin(heading),0,-cos(heading))*speed*dt
+	distance += speed*dt
+	if not on_runway:
+		contact = "overrun"
+
+func landing_score() -> int:
+	var target: float = float(profile.rotation_speed)*1.15
+	var penalty: float = absf(touchdown_sink)*7.0 + absf(rad_to_deg(touchdown_bank))*0.8 + touchdown_center*0.45 + maxf(0,touchdown_speed-target)*0.7
+	return clampi(int(100.0-penalty),0,100)
