@@ -24,6 +24,7 @@ var _since := 0.0
 var telemetry_clock:=0.0
 
 func _init() -> void:
+	if DisplayServer.get_name()=="headless":return
 	_open = _udp.connect_to_host(HOST, PORT) == OK
 
 func phase_for(app: Node) -> String:
@@ -146,4 +147,4 @@ func instrument_snapshot(app: Node) -> Dictionary:
 			var delta: Vector3=shot.position-f.position
 			contacts.append({"x":clampf(delta.dot(right),-32767,32767),"y":clampf(delta.dot(forward),-32767,32767),"kind":4 if shot.kind=="hostile_missile" else 3,"selected":0})
 	var target: Dictionary=c.target()
-	return {"kind":"instrument","version":1,"mode":mode_value,"flags":flags,"roll":clampf(rad_to_deg(f.roll),-180,180),"pitch":clampf(rad_to_deg(f.pitch),-90,90),"heading":fposmod(f.get_heading_degrees()+(298 if app.route_id=="sf" else 0),360),"speed":clampf(f.speed*1.94384,0,2000),"altitude":clampf(f.position.y*3.28084,-2000,1000000),"score":maxi(0,c.score),"kills":mini(c.kills,65535),"pilot":app.pilot_number,"name":"PILOT","landing":1 if f.contact=="landed" and f.speed<=.1 else 2 if app.landing_started else 0,"range":clampf(f.position.distance_to(target.position),0,65535) if not target.is_empty() else 0,"contacts":contacts.slice(0,12)}
+	return {"kind":"instrument","version":1,"sender_pid":OS.get_process_id(),"phase":phase_for(app),"mode":mode_value,"flags":flags,"roll":clampf(rad_to_deg(f.roll),-180,180),"pitch":clampf(rad_to_deg(f.pitch),-90,90),"heading":fposmod(f.get_heading_degrees()+(298 if app.route_id=="sf" else 0),360),"speed":clampf(f.speed*1.94384,0,2000),"altitude":clampf(f.position.y*3.28084,-2000,1000000),"score":maxi(0,c.score),"kills":mini(c.kills,65535),"pilot":app.pilot_number,"name":"PILOT","landing":1 if f.contact=="landed" and f.speed<=.1 else 2 if app.landing_started else 0,"range":clampf(f.position.distance_to(target.position),0,65535) if not target.is_empty() else 0,"contacts":contacts.slice(0,12)}

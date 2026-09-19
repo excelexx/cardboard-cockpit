@@ -23,7 +23,8 @@ def decode(data):
  return mask
 
 class Relay:
- def __init__(self,phase_port=8770,input_port=8771):
+ def __init__(self,phase_port=8770,input_port=8771,parent_pid=0):
+  self.parent_pid=parent_pid
   self.socket=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
   try:self.socket.bind(('127.0.0.1',phase_port))
   except OSError:self.socket.close();raise
@@ -38,11 +39,15 @@ class Relay:
    if len(data)>4096:continue
    text=data.decode('utf-8','ignore').strip()
    if text.startswith('{'):
-    try:self.telemetry=validate(json.loads(text));self.telemetry_at=time.monotonic()
+    try:
+     incoming=json.loads(text)
+     if self.parent_pid and incoming.get('sender_pid')!=self.parent_pid:continue
+     self.telemetry=validate(incoming);self.telemetry_at=time.monotonic()
+     if incoming.get('phase') in PHASES:self.phase=PHASES[incoming['phase']];self.phase_at=time.monotonic()
     except (ValueError,TypeError):pass
     continue
    text=text.lower()
-   if text in PHASES:self.phase=PHASES[text];self.phase_at=time.monotonic()
+   if not self.parent_pid and text in PHASES:self.phase=PHASES[text];self.phase_at=time.monotonic()
   return self.phase if time.monotonic()-self.phase_at<3 else 0
  def send(self):
   self.sequence+=1
@@ -123,7 +128,7 @@ def main():
    sys.stdout=open(folder/'badge.log','w',buffering=1);sys.stderr=sys.stdout
   except OSError:pass
  parser=argparse.ArgumentParser();parser.add_argument('--port',type=int,default=8770);parser.add_argument('--input-port',type=int,default=8771);parser.add_argument('--once',action='store_true');parser.add_argument('--simulate',action='store_true');parser.add_argument('--parent-pid',type=int,default=0);args=parser.parse_args()
- try:relay=Relay(args.port,args.input_port)
+ try:relay=Relay(args.port,args.input_port,args.parent_pid)
  except OSError as exc:
   print('Badge relay already owned or port unavailable: '+str(exc),flush=True);return
  try:
