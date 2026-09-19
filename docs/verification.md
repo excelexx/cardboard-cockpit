@@ -50,3 +50,5 @@ The user explicitly deferred the webcam/printed-marker test and the design polis
 Claude's work from `origin/main` through `0a1a4ef` was merged, including perspective yoke input, printable marker sheets and cockpit/instrument refinements. Legacy coastal scenery remains available only as source/test fixtures; the SF combat menu and timed boss flow are preserved. The integrated tracker handles the single-card detector without requiring weapon-switch observations.
 
 Final integrated verification: `tools/verify.sh` passed after the merge, including Claude's sticker input and urban fixture checks. The combined Python suite now contains **41 passing tests**. Camera access remains deferred by the user; no webcam tracker is running.
+
+Final wireless recheck: after restarting the signed release, its own child `BadgeBridge` connected to the real badge and read back phase `[0]`. A local diagnostic log is now retained at `~/Library/Logs/Cardboard Cockpit/badge.log` to diagnose intermittent startup/reconnect delays. No standalone relay or webcam process is required or left running. PR #8 passed both GitHub checks and was merged into `main`.
