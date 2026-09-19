@@ -1,3 +1,5 @@
+> Historical planning / release notes. Current gameplay and controls are documented in [README](../README.md) and [SPECTRE runbook](DEMO_RUNBOOK.md).
+
 # Current delivery status
 
 The user asked to continue without phase checkpoints. The original phase-by-phase pause requirement is superseded.

@@ -4,8 +4,8 @@ const Radio = preload("res://systems/radio_director.gd")
 var radio: RadioDirector
 var ambience: AudioStreamPlayer
 var wheels: AudioStreamPlayer
-var beam: AudioStreamPlayer
-var beam_wanted := false
+var burner: AudioStreamPlayer
+var burner_wanted := false
 var context_mode := "hangar"
 var context_cockpit := false
 var context_contact := ""
@@ -31,9 +31,9 @@ func _ready() -> void:
 	ambience = AudioStreamPlayer.new()
 	ambience.volume_db = -80
 	add_child(ambience)
-	beam = AudioStreamPlayer.new()
-	beam.volume_db = -80
-	add_child(beam)
+	burner = AudioStreamPlayer.new()
+	burner.volume_db = -80
+	add_child(burner)
 	wheels = AudioStreamPlayer.new()
 	wheels.volume_db = -80
 	add_child(wheels)
@@ -60,9 +60,8 @@ func _ready() -> void:
 		if ResourceLoader.exists("res://assets/audio/geese.ogg"):
 			geese.stream = load("res://assets/audio/geese.ogg")
 			geese.stream.loop = true
-		beam.stream = load("res://assets/audio/plasma_beam.ogg")
-		beam.stream.loop = true
-		beam.play()
+		burner.stream = loop_sample("res://assets/audio/afterburner.wav")
+		burner.play()
 		ambience.stream = load("res://assets/audio/cockpit_ambience.ogg")
 		ambience.stream.loop = true
 		ambience.play()
@@ -73,8 +72,8 @@ func _ready() -> void:
 		wind.play()
 		tone.stream = make_sound(0.22, true)
 		player.play()
-		for effect_name: String in ["cannon","missile","explosion","impact","flare","eject","plasma","gear_motor","flap_motor","touchdown_tires","touchdown_thump"]:
-			effects[effect_name] = load("res://assets/audio/%s.%s" % [effect_name,"wav" if effect_name in ["cannon","gear_motor","flap_motor","touchdown_tires","touchdown_thump"] else "ogg"])
+		for effect_name: String in ["cannon","missile","explosion","impact","flare","eject","sonic","gear_motor","flap_motor","touchdown_tires","touchdown_thump"]:
+			effects[effect_name] = load("res://assets/audio/%s.%s" % [effect_name,"wav" if effect_name in ["cannon","gear_motor","flap_motor","touchdown_tires","touchdown_thump","sonic"] else "ogg"])
 		for index in range(12):
 			var effect := AudioStreamPlayer.new()
 			add_child(effect)
@@ -148,8 +147,8 @@ func observe_flight(flight: FlightDynamics) -> void:
 func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> void:
 	radio.tick(dt,context_paused,muted)
 	duck_level = move_toward(duck_level,radio.duck_db(),dt*(70 if radio.duck_db()<duck_level else 10))
-	beam.volume_db = move_toward(beam.volume_db,-80 if muted or not beam_wanted else -19+duck_level*0.65,dt*120)
-	beam.stream_paused = context_paused
+	burner.volume_db = move_toward(burner.volume_db,-80 if muted or not burner_wanted else -17+duck_level*0.65,dt*80)
+	burner.stream_paused = context_paused
 	music.volume_db = -80 if muted else -22+duck_level
 	geese.volume_db = -80 if muted else -31+duck_level*0.7
 	ambience.volume_db = -80 if muted else (-37 if context_cockpit and flying else -43 if context_mode in ["hangar","title","briefing"] else -80)+duck_level*0.6
@@ -171,12 +170,12 @@ func ping() -> void:
 
 func _exit_tree() -> void:
 	# Release looping playback before the scene disappears during test shutdown.
-	for stream_player: AudioStreamPlayer in [player,tone,wind,music,geese,ambience,wheels,beam]:
+	for stream_player: AudioStreamPlayer in [player,tone,wind,music,geese,ambience,wheels,burner]:
 		if is_instance_valid(stream_player):
 			stream_player.stop()
 			stream_player.stream = null
 
-func campaign_audio(enabled: bool) -> void:
+func set_music_active(enabled: bool) -> void:
 	for sound: AudioStreamPlayer in [music,geese]:
 		if enabled and sound.stream!=null and not sound.playing: sound.play()
 		elif not enabled and not context_paused: sound.stop()

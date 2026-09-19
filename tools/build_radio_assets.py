@@ -17,11 +17,6 @@ OUT = ROOT / 'simulator/assets/audio/radio'
 RATE = 22050
 CUES = {
  'intro': ('CONTROL', 'Ready? Go!', ['Male/ready.ogg','Male/go.ogg'], 2, 10),
- 'stage_2': ('CONTROL','Level two. Power up!',['Male/level.ogg','Male/2.ogg','Male/power_up.ogg'],2,10),
- 'stage_3': ('CONTROL','Level three. Target engaged.',['Male/level.ogg','Male/3.ogg','Male/war_target_engaged.ogg'],2,10),
- 'stage_4': ('CONTROL','Level four. Call for backup!',['Male/level.ogg','Male/4.ogg','Male/war_call_for_backup.ogg'],2,10),
- 'stage_5': ('CONTROL','Level five. Power up!',['Male/level.ogg','Male/5.ogg','Male/power_up.ogg'],2,10),
- 'stage_6': ('CONTROL','Final round. Go!',['Male/final_round.ogg','Male/go.ogg'],2,10),
  'target_locked': ('PILOT','Target engaged.',['Female/war_target_engaged.ogg'],0,16),
  'target_down': ('PILOT','Target destroyed.',['Female/war_target_destroyed.ogg'],0,10),
  'target_down_alt': ('CONTROL','Target destroyed.',['Male/war_target_destroyed.ogg'],0,10),

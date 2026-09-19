@@ -1,179 +1,165 @@
 extends RefCounted
 class_name FlightDynamics
-
+## Fictional fly-by-wire dynamics: filtered angular rates, momentum and energy.
 var profile: Dictionary
-var position := Vector3(0, 4, 1100)
-var speed: float = 0.0
-var throttle: float = 0.0
-var engine: float = 0.0
-var pitch: float = 0.0
-var roll: float = 0.0
-var heading: float = 0.0
-var vertical_speed: float = 0.0
+var position := Vector3.ZERO
+var velocity := Vector3.ZERO
+var speed := 0.0
+var throttle := 0.0
+var engine := 0.0
+var afterburner := false
+var pitch := 0.0
+var roll := 0.0
+var heading := 0.0
+var pitch_velocity := 0.0
+var roll_velocity := 0.0
+var yaw_velocity := 0.0
+var vertical_speed := 0.0
+var g_load := 1.0
 var airborne := false
 var ever_airborne := false
 var gear := true
-var elapsed: float = 0.0
-var airborne_time: float = 0.0
-var distance: float = 0.0
-var roughness: float = 0.0
+var flaps := 0
+var elapsed := 0.0
+var airborne_time := 0.0
+var distance := 0.0
+var roughness := 0.0
 var contact := ""
-var touchdown_speed: float = 0.0
-var touchdown_sink: float = 0.0
-var touchdown_bank: float = 0.0
-var stall_time: float = 0.0
-var barrel_remaining: float = 0.0
-var barrel_direction: float = 1.0
-var barrel_start: float = 0.0
-const BARREL_DURATION := 1.8
-var flaps: int = 0
-var rollout_elapsed: float = 0.0
-var touchdown_center: float = 0.0
+var touchdown_speed := 0.0
+var touchdown_sink := 0.0
+var touchdown_bank := 0.0
+var touchdown_center := 0.0
+var rollout_elapsed := 0.0
+var stall_time := 0.0
+var barrel_remaining := 0.0
+var barrel_direction := 1.0
+var barrel_start := 0.0
+var last_ground := 0.0
+const BARREL_DURATION := 1.7
 
 func reset(aircraft: Dictionary) -> void:
-	profile = aircraft
-	position = Vector3(0, float(profile.clearance), 1100)
-	speed = 0.0
-	throttle = 0.0
-	engine = 0.0
-	pitch = 0.0
-	roll = 0.0
-	heading = 0.0
-	vertical_speed = 0.0
-	airborne = false
-	ever_airborne = false
-	gear = true
-	elapsed = 0.0
-	airborne_time = 0.0
-	distance = 0.0
-	roughness = 0.0
-	contact = ""
-	stall_time = 0.0
-	barrel_remaining = 0.0
-	touchdown_speed = 0.0
-	touchdown_sink = 0.0
-	touchdown_bank = 0.0
-	flaps = 0
-	rollout_elapsed = 0.0
-	touchdown_center = 0.0
+	profile = aircraft.duplicate(true)
+	position = Vector3(0,float(profile.clearance),1100)
+	velocity = Vector3.ZERO
+	speed = 0; throttle = 0; engine = 0
+	pitch = 0; roll = 0; heading = 0
+	pitch_velocity = 0; roll_velocity = 0; yaw_velocity = 0
+	vertical_speed = 0; g_load = 1
+	airborne = false; ever_airborne = false; gear = true; afterburner = false
+	flaps = 0; elapsed = 0; airborne_time = 0; distance = 0; roughness = 0
+	contact = ""; stall_time = 0; barrel_remaining = 0; rollout_elapsed = 0
+	touchdown_speed = 0; touchdown_sink = 0; touchdown_bank = 0; touchdown_center = 0
 
-func step(dt: float, control: Vector3, brakes: bool, ground: float, runway: bool, resolve_surface: bool = true) -> void:
-	if contact != "":
-		return
+func spawn_airborne(at: Vector3, airspeed: float) -> void:
+	position = at
+	speed = airspeed
+	throttle = 0.55; engine = 0.55
+	airborne = true; ever_airborne = true; airborne_time = 30
+	gear = false; contact = ""
+	velocity = forward()*speed
+
+func forward() -> Vector3:
+	return Vector3(sin(heading)*cos(pitch),sin(pitch),-cos(heading)*cos(pitch))
+
+func step(dt: float, controls: Vector3, brakes: bool, ground: float, runway: bool, resolve_surface: bool = true) -> void:
+	if contact!="" or dt<=0: return
+	last_ground = ground
+	var bounded: float = minf(dt,0.5)
+	var steps: int = maxi(1,int(ceil(bounded*120)))
+	for i in range(steps):
+		integrate(bounded/steps,controls.clamp(-Vector3.ONE,Vector3.ONE),brakes,ground)
+		if resolve_surface:
+			resolve_contact(ground,runway)
+			if contact!="": break
+
+func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> void:
 	elapsed += dt
-	engine = move_toward(engine, throttle, dt * 0.32)
-	var rotation_speed: float = effective_rotation_speed()
-	var max_speed: float = profile.max_speed
-	var acceleration: float = profile.acceleration
-	var drag: float = acceleration * pow(speed / max_speed, 2.0) + (0.45 if gear else 0.12)
-	drag += float(flaps) * (0.22 + speed * 0.006)
-	if not airborne:
-		drag += 0.25 + (18.0 if brakes else 0.0)
-	speed = clampf(speed + (engine * acceleration - drag - sin(pitch) * 3.4) * dt, 0.0, max_speed * 1.12)
-	var authority: float = clampf(speed / rotation_speed, 0.0, 1.5)
+	engine = move_toward(engine,throttle,dt*(0.52 if throttle>engine else 0.7))
+	var thrust: float = float(profile.acceleration)*engine*(1.46 if afterburner and not gear else 1.0)
+	var drag: float = float(profile.acceleration)*pow(speed/float(profile.max_speed),2)
+	drag += (0.70 if gear else 0.15)+flaps*(0.35+speed*0.007)
+	if not airborne: drag += 0.45+(19 if brakes else 0)
+	speed = clampf(speed+(thrust-drag-sin(pitch)*5.0)*dt,0,float(profile.max_speed)*(1.19 if afterburner else 1.03))
+	var previous_velocity: Vector3 = velocity
 	if airborne:
-		var rolling: bool = barrel_remaining > 0
+		var authority: float = clampf(speed/effective_rotation_speed(),0.15,1.25)
+		roll_velocity = lerpf(roll_velocity,controls.x*float(profile.roll_rate),1-exp(-dt*10.0))
+		pitch_velocity = lerpf(pitch_velocity,controls.y*float(profile.pitch_rate)*authority,1-exp(-dt*8.5))
+		var rolling: bool = barrel_remaining>0
 		if rolling:
 			barrel_remaining = maxf(0,barrel_remaining-dt)
-			var progress: float = 1.0-barrel_remaining/BARREL_DURATION
-			roll = barrel_start+barrel_direction*TAU*smoothstep(0.0,1.0,progress)
+			roll = wrapf(barrel_start+barrel_direction*TAU*smoothstep(0,1,1-barrel_remaining/BARREL_DURATION),-PI,PI)
 			if barrel_remaining==0: roll = barrel_start
 		else:
-			roll += control.x * float(profile.roll_rate) * dt
-			roll = move_toward(roll, 0.0, dt * (0.10 if absf(control.x) < 0.05 else 0.0))
-			roll = clampf(roll, -0.95, 0.95)
-		pitch += control.y * float(profile.pitch_rate) * dt * authority
-		pitch = move_toward(pitch, 0.0, dt * (0.018 if absf(control.y) < 0.05 else 0.0))
-		pitch = clampf(pitch, -0.40, 0.48)
-		if not rolling:
-			heading += (tan(roll) * (30.0 if str(profile.id)=="f35" else 18.0) / maxf(speed, 30.0) + control.z * (0.15 if str(profile.id)=="f35" else 0.06)) * dt
-		var lift_factor: float = clampf(speed / (rotation_speed * 0.85), 0.0, 1.0)
-		var desired_vertical: float = sin(pitch) * speed - (1.0 - lift_factor) * 32.0
-		# Forgiving initial departure, but landing remains under player control.
-		if airborne_time < 8.0 and position.y - ground < 30.0 and desired_vertical < 1.0:
-			desired_vertical = 2.0
-		vertical_speed = lerpf(vertical_speed, desired_vertical, 1.0 - exp(-dt * 2.5))
-		position.y += vertical_speed * dt
+			roll = wrapf(roll+roll_velocity*dt,-PI,PI)
+			if absf(controls.x)<0.03:
+				roll = move_toward(roll,0,dt*0.18)
+		pitch = clampf(pitch+pitch_velocity*dt,-1.10,1.20)
+		if absf(controls.y)<0.03: pitch = move_toward(pitch,0,dt*0.008)
+		var coordinated: float = sin(roll)*52.0/maxf(speed,55.0)
+		var desired_yaw: float = coordinated+controls.z*0.13
+		yaw_velocity = lerpf(yaw_velocity,0.0 if rolling else desired_yaw,1-exp(-dt*5.0))
+		heading = wrapf(heading+yaw_velocity*dt,-PI,PI)
+		var lift: float = clampf(speed/(effective_rotation_speed()*0.82),0,1)
+		var sink: float = (1-lift)*28.0+(1-maxf(cos(roll),0.0))*6.0
+		var desired_vertical: float = sin(pitch)*speed-sink
+		if airborne_time<5 and position.y-ground<25: desired_vertical = maxf(desired_vertical,2)
+		vertical_speed = lerpf(vertical_speed,desired_vertical,1-exp(-dt*3.0))
+		var horizontal := Vector3(sin(heading),0,-cos(heading))*speed*cos(pitch)
+		if velocity.length()<0.01 and speed>1: velocity = Vector3(horizontal.x,vertical_speed,horizontal.z)
+		velocity.x = lerpf(velocity.x,horizontal.x,1-exp(-dt*4.0))
+		velocity.z = lerpf(velocity.z,horizontal.z,1-exp(-dt*4.0))
+		velocity.y = vertical_speed
+		position += velocity*dt
 		airborne_time += dt
-		stall_time = stall_time + dt if lift_factor < 0.85 else 0.0
-		roughness += (absf(control.x) * 0.2 + absf(control.y) * 0.15) * dt
+		stall_time = stall_time+dt if lift<0.85 else 0
+		roughness += (absf(controls.x)*0.15+absf(controls.y)*0.10)*dt
+		var acceleration: float = (velocity-previous_velocity).length()/maxf(dt,0.001)
+		g_load = lerpf(g_load,clampf(1+acceleration/9.81,0.2,9.0),1-exp(-dt*3))
 	else:
-		heading += control.z * 0.35 * clampf(speed / 20.0, 0.0, 1.0) * dt
-		roll = 0.0
-		pitch = move_toward(pitch, maxf(control.y, 0.0) * 0.14, dt * 0.12)
-		position.y = ground + float(profile.clearance)
-		vertical_speed = 0.0
-		if speed >= rotation_speed and control.y > 0.12:
-			airborne = true
-			ever_airborne = true
-			vertical_speed = 4.0
-			position.y += 0.3
-	var forward := Vector3(sin(heading), 0, -cos(heading))
-	position += forward * speed * cos(pitch) * dt
-	distance += speed * dt
-	if resolve_surface:
-		resolve_contact(ground, runway)
+		heading = wrapf(heading+controls.z*0.38*clampf(speed/20,0,1)*dt,-PI,PI)
+		pitch = move_toward(pitch,maxf(controls.y,0)*0.14,dt*0.13)
+		roll = 0; vertical_speed = 0; g_load = 1
+		position.y = ground+float(profile.clearance)
+		velocity = Vector3(sin(heading),0,-cos(heading))*speed
+		position += velocity*dt
+		if speed>=effective_rotation_speed() and controls.y>0.12:
+			airborne = true; ever_airborne = true
+			vertical_speed = 4; position.y += 0.12
+	distance += speed*dt
 
 func resolve_contact(ground: float, runway: bool) -> void:
-	if contact != "":
-		return
-	if airborne and position.y <= ground + float(profile.clearance):
-		touchdown_speed = speed
-		touchdown_sink = vertical_speed
-		touchdown_bank = roll
-		touchdown_center = absf(position.x)
-		if runway and gear and speed < 105.0 and vertical_speed > -10.0 and absf(roll) < 0.40:
-			airborne = false
-			position.y = ground + float(profile.clearance)
-			# Contact stops vertical penetration, not angular motion. Let the
-			# nose and wings settle during rollout instead of snapping the view.
-			vertical_speed = 0.0
-			contact = "landed"
-		else:
-			contact = "crash"
-	if not airborne and not runway and speed > 50.0:
-		contact = "excursion"
-
-func get_heading_degrees() -> float:
-	return fposmod(rad_to_deg(heading), 360.0)
-
-func start_barrel_roll(direction: float = 1.0) -> bool:
-	if str(profile.id)!="f35" or not airborne or position.y<80 or barrel_remaining>0 or contact!="":
-		return false
-	barrel_remaining = BARREL_DURATION
-	barrel_direction = -1.0 if direction<0 else 1.0
-	barrel_start = roll
-	return true
-
-func get_smoothness() -> int:
-	var landing_penalty: float = 0.0
-	if contact == "landed":
-		landing_penalty = maxf(absf(touchdown_sink) - 1.0, 0.0) * 3.0
-		landing_penalty += maxf(touchdown_speed / float(profile.rotation_speed) - 1.1, 0.0) * 50.0
-		landing_penalty += absf(touchdown_bank) * 30.0
-	return clampi(int(100.0 - roughness / maxf(elapsed, 1.0) * 220.0 - stall_time - landing_penalty), 0, 100)
-
-func effective_rotation_speed() -> float:
-	# Three assisted flap detents: retracted, takeoff, approach.
-	return float(profile.rotation_speed) * (1.0 - clampi(flaps,0,2)*0.06)
+	if contact!="": return
+	if airborne and position.y<=ground+float(profile.clearance):
+		touchdown_speed = speed; touchdown_sink = vertical_speed; touchdown_bank = roll; touchdown_center = absf(position.x)
+		if runway and gear and speed<105 and vertical_speed>-10 and absf(roll)<0.4:
+			airborne = false; position.y = ground+float(profile.clearance)
+			vertical_speed = 0; velocity.y = 0; contact = "landed"
+		else: contact = "crash"
+	if not airborne and not runway and speed>50: contact = "excursion"
 
 func rollout_step(dt: float, brakes: bool, steering: float, on_runway: bool) -> void:
-	if contact != "landed":
-		return
-	elapsed += dt
-	rollout_elapsed += dt
-	pitch = move_toward(pitch,0.0,dt*0.10)
-	roll = move_toward(roll,0.0,dt*0.18)
-	throttle = 0.0
-	engine = move_toward(engine,0.0,dt*0.5)
-	speed = maxf(0.0,speed-(1.4 + (4.8 if brakes else 0.0))*dt)
-	heading += clampf(steering,-1,1)*0.11*clampf(speed/20.0,0,1)*dt
-	position += Vector3(sin(heading),0,-cos(heading))*speed*dt
-	distance += speed*dt
-	if not on_runway:
-		contact = "overrun"
+	if contact!="landed": return
+	elapsed += dt; rollout_elapsed += dt
+	pitch = move_toward(pitch,0,dt*0.10)
+	roll = move_toward(roll,0,dt*0.18)
+	pitch_velocity = move_toward(pitch_velocity,0,dt)
+	roll_velocity = move_toward(roll_velocity,0,dt)
+	throttle = 0; afterburner = false; engine = move_toward(engine,0,dt*0.5)
+	speed = maxf(0,speed-(1.4+(5.2 if brakes else 0))*dt)
+	heading += clampf(steering,-1,1)*0.11*clampf(speed/20,0,1)*dt
+	velocity = Vector3(sin(heading),0,-cos(heading))*speed
+	position += velocity*dt; distance += speed*dt
+	if not on_runway: contact = "overrun"
 
+func effective_rotation_speed() -> float:
+	return float(profile.rotation_speed)*(1-clampi(flaps,0,2)*0.06)
+func get_heading_degrees() -> float: return fposmod(rad_to_deg(heading),360)
+func start_barrel_roll(direction: float = 1) -> bool:
+	if not airborne or position.y-last_ground<80 or barrel_remaining>0 or contact!="": return false
+	barrel_start = roll; barrel_direction = -1 if direction<0 else 1; barrel_remaining = BARREL_DURATION
+	return true
 func landing_score() -> int:
-	var target: float = float(profile.rotation_speed)*1.15
-	var penalty: float = absf(touchdown_sink)*7.0 + absf(rad_to_deg(touchdown_bank))*0.8 + touchdown_center*0.45 + maxf(0,touchdown_speed-target)*0.7
-	return clampi(int(100.0-penalty),0,100)
+	return clampi(int(100-absf(touchdown_sink)*7-absf(rad_to_deg(touchdown_bank))*0.8-touchdown_center*0.45-maxf(0,touchdown_speed-float(profile.rotation_speed)*1.15)*0.7),0,100)
+func get_smoothness() -> int:
+	return clampi(int(100-roughness/maxf(elapsed,1)*180-stall_time),0,100)

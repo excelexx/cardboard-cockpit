@@ -9,7 +9,7 @@ const TERRAIN_X_MIN: float = -16500.0
 const TERRAIN_X_MAX: float = 16500.0
 const TERRAIN_Z_MIN: float = -25500.0
 const TERRAIN_Z_MAX: float = 9500.0
-const TERRAIN_STEP: float = 110.0
+const TERRAIN_STEP: float = 55.0
 const RIVER_Y: float = -8.5
 const CONDITIONS: Dictionary = {
 	"golden": {"id": "golden", "name": "Golden hour", "time_of_day": "17:40", "cloud_cover": 0.30, "visibility_km": 30.0, "description": "Warm evening light · scattered high cloud", "visual_only": true},
@@ -27,6 +27,10 @@ var _sun: DirectionalLight3D
 var _condition_id: String = "golden"
 var _condition_skies: Dictionary = {}
 var _airport_obstacles: Array[AABB] = []
+var _forest_transforms: Array[Transform3D] = []
+var _forest_shadow: MultiMeshInstance3D
+var _shadow_refresh := 0.0
+var _quality_high := true
 
 
 func _init() -> void:
@@ -146,7 +150,7 @@ func _build_atmosphere() -> void:
 	environment.background_mode = Environment.BG_SKY
 	environment.sky = sky
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	environment.ambient_light_energy = 0.32
+	environment.ambient_light_energy = 0.25
 	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	environment.tonemap_exposure = 0.85
 	environment.fog_enabled = true
@@ -217,10 +221,10 @@ func set_conditions(preset: String) -> void:
 			environment.fog_aerial_perspective = 0.86
 			environment.fog_sky_affect = 0.22
 		_:
-			_sun.rotation_degrees = Vector3(-31.0, -38.0, 0.0)
-			_sun.light_color = Color(1.0, 0.93, 0.81)
-			_sun.light_energy = 1.25
-			environment.ambient_light_energy = 0.32
+			_sun.rotation_degrees = Vector3(-22.0, -48.0, 0.0)
+			_sun.light_color = Color(1.0, 0.85, 0.66)
+			_sun.light_energy = 1.65
+			environment.ambient_light_energy = 0.25
 			environment.tonemap_exposure = 0.85
 			environment.fog_light_color = Color(0.62, 0.73, 0.80)
 			environment.fog_light_energy = 0.85
@@ -308,7 +312,7 @@ func _build_terrain() -> void:
 	terrain.name = "AlpineTerrain"
 	terrain.mesh = terrain_mesh
 	terrain.material_override = material
-	terrain.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	terrain.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	add_child(terrain)
 
 
@@ -562,7 +566,7 @@ func _build_forests() -> void:
 	var groves: Array[Vector2] = []
 	for grove_index in range(100):
 		var side: float = -1.0 if grove_index % 2 == 0 else 1.0
-		groves.append(Vector2(side * _rng.randf_range(850.0, 4100.0), _rng.randf_range(-22000.0, 5700.0)))
+		groves.append(Vector2(side * (_rng.randf_range(180.0, 850.0) if grove_index%3==0 else _rng.randf_range(850.0, 4100.0)), _rng.randf_range(-22000.0, 5700.0)))
 	for attempt in range(39000):
 		var x: float = _rng.randf_range(-9100.0, 9200.0)
 		var z: float = _rng.randf_range(-23800.0, 7400.0)
@@ -574,9 +578,9 @@ func _build_forests() -> void:
 			z = grove.y + sin(angle) * radius
 		var h: float = ground_height(x, z)
 		var nearest_airport: float = minf(absf(z), absf(z - DESTINATION_Z))
-		if absf(x) < 540.0 or (absf(x) < 1180.0 and nearest_airport < 2580.0):
+		if absf(x) < 140.0 or (absf(x) < 1180.0 and nearest_airport < 2580.0):
 			continue
-		if h < -3.0 or h > 1600.0 or absf(x - _river_center(z)) < 215.0:
+		if h < -15.0 or h > 1600.0 or absf(x - _river_center(z)) < 215.0:
 			continue
 		var forest_density: float = _noise.get_noise_2d(x * 3.0 + 1200.0, z * 3.0)
 		if forest_density < -0.14:
@@ -601,6 +605,16 @@ func _build_forests() -> void:
 	forest.multimesh = multimesh
 	forest.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(forest)
+	_forest_transforms = transforms
+	_forest_shadow = MultiMeshInstance3D.new()
+	var shadow_mesh := MultiMesh.new()
+	shadow_mesh.transform_format = MultiMesh.TRANSFORM_3D
+	shadow_mesh.mesh = mesh
+	shadow_mesh.instance_count = 400
+	shadow_mesh.visible_instance_count = 0
+	_forest_shadow.multimesh = shadow_mesh
+	_forest_shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+	add_child(_forest_shadow)
 
 
 func _build_clouds() -> void:
@@ -718,3 +732,57 @@ func ground_height(x: float, z: float) -> float:
 		return a + u * (b - a) + v * (c - a)
 	var d: float = _terrain_height(x0 + TERRAIN_STEP, z0 + TERRAIN_STEP)
 	return d + (1.0 - u) * (c - d) + (1.0 - v) * (b - d)
+
+var _fog_volumes: Array[FogVolume] = []
+func apply_quality(high: bool) -> void:
+	_quality_high = high
+	if _environment == null: return
+	var environment: Environment = _environment.environment
+	environment.adjustment_enabled = true
+	environment.adjustment_contrast = 1.12
+	environment.adjustment_saturation = 0.92
+	var capable: bool = RenderingServer.get_current_rendering_method() == "forward_plus"
+	environment.glow_enabled = high and capable
+	environment.glow_intensity = 0.38
+	environment.glow_bloom = 0.06
+	environment.ssao_enabled = high and capable
+	environment.ssao_radius = 2.4
+	environment.ssao_intensity = 1.1
+	environment.ssr_enabled = high and capable
+	environment.volumetric_fog_enabled = high and capable
+	environment.volumetric_fog_density = 0.00015
+	environment.volumetric_fog_length = 1500
+	environment.volumetric_fog_albedo = Color(0.78,0.84,0.91)
+	environment.volumetric_fog_emission = Color(0.12,0.16,0.22)
+	if high and capable and _fog_volumes.is_empty() and DisplayServer.get_name()!="headless":
+		var noise := FastNoiseLite.new(); noise.seed = 26026; noise.frequency = 0.04
+		var texture := NoiseTexture3D.new(); texture.width = 64; texture.height = 32; texture.depth = 64; texture.noise = noise
+		for index in range(8):
+			var cloud := FogVolume.new()
+			cloud.shape = RenderingServer.FOG_VOLUME_SHAPE_ELLIPSOID
+			cloud.size = Vector3(1300,330,1900)
+			cloud.position = Vector3((-1 if index%2 else 1)*(2200+index*170),1500+index*85,-2000-index*2100)
+			var material := FogMaterial.new(); material.density = 0.009; material.albedo = Color(0.88,0.91,0.94); material.density_texture = texture
+			cloud.material = material
+			add_child(cloud); _fog_volumes.append(cloud)
+		for index in range(5):
+			var mist := FogVolume.new(); mist.size = Vector3(800,95,1800)
+			mist.position = Vector3(_river_center(-4500-index*2000),30,-4500-index*2000)
+			var material := FogMaterial.new(); material.density = 0.0025; material.albedo = Color(0.68,0.78,0.86)
+			mist.material = material; add_child(mist); _fog_volumes.append(mist)
+	for volume: FogVolume in _fog_volumes: volume.visible = high and capable
+
+func update_local_shadows(at: Vector3, dt: float) -> void:
+	if not is_instance_valid(_forest_shadow): return
+	_forest_shadow.visible = _quality_high
+	if not _quality_high: return
+	_shadow_refresh -= dt
+	if _shadow_refresh>0: return
+	_shadow_refresh = 1.0
+	var count := 0
+	for transform: Transform3D in _forest_transforms:
+		if Vector2(transform.origin.x-at.x,transform.origin.z-at.z).length_squared()<810000:
+			_forest_shadow.multimesh.set_instance_transform(count,transform)
+			count += 1
+			if count>=400: break
+	_forest_shadow.multimesh.visible_instance_count = count

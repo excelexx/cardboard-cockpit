@@ -1,3 +1,5 @@
+> Version 0.6: only the modified F-35B-derived SPECTRE is playable. Other aircraft are retained as licensed source provenance and excluded from the executable. Current art/audio modifications and credits are in [SPECTRE asset credits](docs/demo-assets.md).
+
 # Third-party aircraft assets
 
 The playable client contains real exterior geometry and textures converted from the open-source FlightGear aircraft listed below. No Microsoft Flight Simulator assets are used. The original source files, relevant model assembly XML, attribution and license texts are supplied under `simulator/assets/aircraft/<id>/source/`.

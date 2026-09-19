@@ -1,3 +1,5 @@
+> Historical planning / release notes. Current gameplay and controls are documented in [README](../README.md) and [SPECTRE runbook](DEMO_RUNBOOK.md).
+
 # Version 0.3 — camera views
 
 - Seven views: cockpit, chase, tail, top down, left side, right side and nose.
