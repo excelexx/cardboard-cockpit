@@ -1,7 +1,7 @@
 extends Node3D
 const Catalog = preload("res://data/aircraft.gd")
 const Dynamics = preload("res://systems/flight_dynamics.gd")
-const World = preload("res://scenes/world.gd")
+const World = preload("res://scenes/coastal_world.gd")
 const Model = preload("res://systems/fighter_model.gd")
 const Visuals = preload("res://systems/aircraft_visuals.gd")
 const Effects = preload("res://systems/fighter_effects.gd")
@@ -30,7 +30,7 @@ var cockpit_frame: DetailedCockpit
 var combat: CombatDirector
 var audio: EngineAudio
 var hud: CockpitHUD
-var cockpit := false
+var cockpit := true
 var copilot := false
 var used_copilot := false
 var demo_auto_fire := true
@@ -227,7 +227,6 @@ func _process(dt: float) -> void:
 			aircraft_visuals._engine_material.emission_energy_multiplier = flight.engine*(2.0 if flight.afterburner else 0.35)
 		if not paused and DisplayServer.get_name()!="headless":
 			fighter_fx.update(dt)
-			world.update_local_shadows(flight.position,dt)
 		if cockpit:
 			cockpit_frame.update_instruments(flight,control,dt if active else 0)
 			cockpit_frame.set_navigation("free",0)

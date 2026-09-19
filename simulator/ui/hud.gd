@@ -24,7 +24,7 @@ func _ready() -> void:
 func _process(dt: float) -> void:
 	clock += dt; queue_redraw()
 func text(at: Vector2, value: String, size: int = 18, color: Color = WHITE, technical: bool = false) -> void:
-	draw_string_outline(mono if technical else font,at,value,HORIZONTAL_ALIGNMENT_LEFT,-1,maxi(size,12),3,Color(0.005,0.015,0.025,color.a*.95))
+	draw_string(mono if technical else font,at+Vector2(0,1),value,HORIZONTAL_ALIGNMENT_LEFT,-1,maxi(size,12),Color(0.005,0.015,0.025,color.a*.85))
 	draw_string(mono if technical else font,at,value,HORIZONTAL_ALIGNMENT_LEFT,-1,maxi(size,12),color)
 func line(a: Vector2,b: Vector2,color: Color=MUTED,width: float=1) -> void:
 	draw_line(a,b,Color(0.005,0.015,0.025,color.a*0.48),width+1.8,true)
@@ -147,7 +147,6 @@ func draw_flight() -> void:
 		line(Vector2(20,270),Vector2(20,660),Color(1,0.25,0.15,c.hit_flash*1.7),4)
 		line(Vector2(1580,270),Vector2(1580,660),Color(1,0.25,0.15,c.hit_flash*1.7),4)
 	draw_scope(Vector2(1450,830),c)
-	panel(Rect2(30,831,524,115),.70)
 	for i in range(3):
 		var x: float = 47+i*171
 		text(Vector2(x,860),["SPACE / LMB","T / RMB","STREAK"][i],18,WHITE,true)
@@ -169,8 +168,7 @@ func draw_flight() -> void:
 		var instruction: String = app.mission.instruction()
 		if app.copilot and app.mission.phase!="combat": instruction = "FLIGHT ASSIST ON  /  ENJOY THE RIDE — STEERING IS OPTIONAL"
 		var width: float = mono.get_string_size(instruction,HORIZONTAL_ALIGNMENT_LEFT,-1,15).x
-		panel(Rect2(800-width/2-16,777,width+32,39),.64)
-		text(Vector2(800-width/2,803),instruction,15,CYAN,true)
+		text(Vector2(800-width/2,595),instruction,15,CYAN,true)
 	elif app.mode=="rollout": text(Vector2(630,739),"TOUCHDOWN / HOLD SPACE TO BRAKE",13,GREEN,true)
 	if app.eject_hold>0: text(Vector2(663,730),"EJECT  %03d%%" % int(app.eject_hold/.9*100),15,AMBER,true)
 	if app.mode=="ejected": text(Vector2(660,730),"EJECTION CONFIRMED",16,CYAN,true)
@@ -181,9 +179,8 @@ func draw_flight() -> void:
 	if not app.audio.radio.caption.is_empty():
 		var caption: String = app.audio.radio.caption
 		var width: float = font.get_string_size(caption,HORIZONTAL_ALIGNMENT_LEFT,-1,17).x
-		panel(Rect2(800-width/2-20,826,width+40,61),.75)
-		text(Vector2(800-width/2,846),app.audio.radio.speaker,9,CYAN,true)
-		text(Vector2(800-width/2,874),caption,17,WHITE)
+		text(Vector2(800-width/2,620),app.audio.radio.speaker,9,CYAN,true)
+		text(Vector2(800-width/2,644),caption,17,WHITE)
 	if app.vision.tracking or app.developer_mode: draw_control_feedback()
 	if app.developer_mode: text(Vector2(610,960),"%d FPS / %.1f M/S / %s" % [Engine.get_frames_per_second(),f.speed,"HIGH" if app.high_quality else "BALANCED"],11,MUTED,true)
 func draw_scope(center: Vector2,c: CombatDirector) -> void:

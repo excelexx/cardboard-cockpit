@@ -1,6 +1,9 @@
 extends RefCounted
 class_name DemoMission
 ## A continuous departure, valley engagement, recovery and landing.
+const Route=preload("res://systems/scenic_route.gd")
+var route_index:=0
+var visited_route: Array[int]=[]
 var app: Node
 var active := false
 var phase := "takeoff"
@@ -11,6 +14,7 @@ var nearest_runway_distance := INF
 func reset(enabled: bool) -> void:
 	active = enabled; phase = "takeoff"; clock = 0; phase_clock = 0
 	history.clear(); nearest_runway_distance = INF
+	route_index=0; visited_route.clear()
 	if enabled: history.append({"phase":phase,"time":0.0,"position":app.flight.position})
 func transition(next: String) -> void:
 	if phase==next: return
@@ -26,10 +30,14 @@ func tick(dt: float) -> void:
 	var f: FlightDynamics = app.flight
 	if phase=="takeoff" and f.airborne and f.position.y-app.world.ground_height(f.position.x,f.position.z)>45:
 		transition("combat")
-	elif phase=="combat" and (f.position.z<-9000 or phase_clock>85):
+	elif phase=="combat" and route_index>=8:
 		transition("return")
-	elif phase=="return" and f.position.z<-10300 and f.position.z>-13200 and absf(f.position.x)<350 and absf(f.heading)<.45:
+	elif phase=="return" and route_index>=Route.POINTS.size() and f.position.z>-13200 and absf(f.position.x)<350 and absf(f.heading)<.45:
 		transition("approach")
+	if phase in ["combat","return"] and route_index<Route.POINTS.size():
+		if f.position.distance_to(Route.POINTS[route_index])<330:
+			visited_route.append(route_index)
+			route_index+=1
 	if f.contact=="landed": transition("rollout")
 	app.combat.engagement_enabled = phase=="combat"
 func label() -> String:
@@ -49,19 +57,10 @@ func controls() -> Vector3:
 	if phase=="approach":
 		f.afterburner = false
 		return app.approach_controls()
-	var desired := Vector3(0,240,-11000)
-	var speed := 130.0
-	if phase=="combat":
-		f.gear = false; f.flaps = 0
-		speed = 165
-		desired = Vector3(sin(-f.position.z*.00085)*150,210+sin(clock*.07)*25,f.position.z-1300)
-		var nearest := INF
-		for enemy: Dictionary in app.combat.enemies:
-			var delta: Vector3 = enemy.position-f.position
-			if delta.z < -150 and absf(enemy.position.x)<550 and enemy.position.y<420 and delta.length()<nearest:
-				nearest = delta.length(); desired = app.combat.lead_point(enemy)
-	else:
-		f.gear = false; f.flaps = 1
+	var desired: Vector3=Route.POINTS[mini(route_index,Route.POINTS.size()-1)]
+	var speed: float=145.0 if phase=="combat" else 110.0
+	f.gear=false
+	f.flaps=0 if phase=="combat" else 1
 	var terrain: float = app.world.ground_height(f.position.x,f.position.z)
 	for distance in [300.0,650.0,1100.0]:
 		var probe: Vector3 = f.position+f.forward()*distance

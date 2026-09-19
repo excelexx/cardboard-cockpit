@@ -2,7 +2,7 @@
 
 Version 0.8.2 is a relaxed native Mac arcade flight game: **one SPECTRE fighter, unlimited Gatling fire and guided missiles, and large Waterloo geese to clear from the valley**. The geese do not attack. There are no upgrades, reloads, heat limits or steady-lock requirements.
 
-Open **Launch Cardboard Cockpit.command** or **build/Cardboard Cockpit.app**. Choose **Play** (or Enter): flight assistance handles takeoff and the route so you can concentrate on shooting. Hold **Space + T**, or both mouse buttons, to fire both weapons together. **Watch demo** runs the entire takeoff → flock-clearing → landing sequence automatically in about 2 minutes 22 seconds.
+Open **Launch Cardboard Cockpit.command**. Previously packaged apps must be rebuilt to include this integration. Choose **Play** (or Enter): flight assistance handles takeoff and the route so you can concentrate on shooting. Hold **Space + T**, or both mouse buttons, to fire both weapons together. **Watch demo** runs the entire takeoff → flock-clearing → landing sequence automatically in about 2 minutes 45 seconds.
 
 ![SPECTRE in the valley](docs/screenshots/spectre-flight.png)
 
@@ -74,3 +74,7 @@ The project pins Godot 4.7.2. Mac exports include Apple Silicon and Intel binari
 Packaging creates `build/Cardboard Cockpit.app` and `build/Cardboard Cockpit Mac.zip`, including source and asset notices. The build is locally signed and is not Apple-notarized. See [verification](docs/verification.md), [demo runbook](docs/DEMO_RUNBOOK.md), and [asset credits](docs/demo-assets.md).
 
 This remains a compact, game-tuned flight project. It does not provide certified aerodynamics, global scenery, a clickable avionics simulation or commercial AAA production assets. Terrain and major buildings collide; trees and small scenery are forgiving. Historical licensed aircraft files remain as source provenance and are excluded from the playable export. Large geese, generous aim assistance and unlimited weapons are intentional arcade choices.
+
+## Coastal integration verification
+
+The combined guided sortie completes in 165 seconds, visits all eleven scenic waypoints, spends 31 seconds above the city and finishes with a full-stop landing. Legacy six-aircraft campaign scripts are retired; the single SPECTRE loadout, unlimited weapons and current radio/landing systems remain active.

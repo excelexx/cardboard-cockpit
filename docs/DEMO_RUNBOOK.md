@@ -3,7 +3,7 @@
 **Goal:** take off, enjoy clearing large flocks with unlimited weapons, then land. The geese never attack. No reload, heat, steady-lock or aircraft-upgrade systems interrupt play.
 
 - **Play / Enter:** assisted flight with player-controlled shooting. Hold Space + T, or both mouse buttons, to fire Gatling and missiles together. Aim generally toward a goose; missiles select targets immediately and Gatling assistance is generous.
-- **Watch demo:** the same complete flight with automatic shooting, useful for an uninterrupted judge demonstration. It takes approximately 2 minutes 22 seconds and ends stopped on North Field's runway.
+- **Watch demo:** the same complete flight with automatic shooting, useful for an uninterrupted judge demonstration. It takes approximately 2 minutes 45 seconds and ends stopped on Cape North's runway.
 - **Arrows:** optional manual steering. Hold for a smooth bank/pitch; release to level. H resumes route assistance.
 - **X / V:** missile inset / cockpit or chase view. Q performs a quick roll when altitude permits.
 - **Escape / R / F1:** pause / restart the current style of demo / controls. F10 changes quality.

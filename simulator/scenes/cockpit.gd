@@ -19,13 +19,37 @@ var black: StandardMaterial3D
 var rubber: StandardMaterial3D
 var lettering: Color = Color(0.7,0.77,0.78)
 var presentation_state: int = -1
+var _interior_cache: Dictionary={}
+var _screen_textures: Dictionary={}
+var _active_root: Node3D
 
 func build(aircraft: Dictionary) -> void:
+	var requested: String=str(aircraft.get("id","b737"))
+	if is_instance_valid(_active_root):
+		_interior_cache[airframe]={"root":_active_root,"displays":displays.duplicate(),"throttles":throttles.duplicate(),"pilot":pilot_control,"rest":control_rest,"stick":control_is_stick}
+		_active_root.visible=false
+		for viewport in _active_root.find_children("*","SubViewport",true,false): viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED
+	if _interior_cache.has(requested):
+		var cached: Dictionary=_interior_cache[requested]
+		_active_root=cached.root
+		_active_root.visible=true
+		displays.assign(cached.displays)
+		throttles.assign(cached.throttles)
+		pilot_control=cached.pilot
+		control_rest=cached.rest
+		control_is_stick=cached.stick
+		profile=aircraft
+		airframe=requested
+		trim=Vector3.ZERO
+		presentation_state=-1
+		return
 	presentation_state = -1
 	for child: Node in get_children():
+		if child.get_meta("cached_interior",false): continue
 		remove_child(child)
 		child.queue_free()
 	displays.clear()
+	_screen_textures.clear()
 	throttles.clear()
 	profile = aircraft
 	airframe = str(profile.get("id","b737"))
@@ -47,20 +71,65 @@ func build(aircraft: Dictionary) -> void:
 	_build_controls()
 	_build_console()
 	_build_lighting()
-	# The pilot eye sits behind the instrument faces: show the full displays at 16:10.
+	# Lower the dashboard, but keep the canopy/overhead above the pilot's sightline.
 	for child: Node in get_children():
-		if child is Node3D:
-			child.position += Vector3(0,0.08,-0.16)
+		if child is Node3D and not child.get_meta("cached_interior",false):
+			child.position += Vector3(0,0.15 if child.position.y>0.10 else 0.02,-0.48)
 	control_rest = pilot_control.position
+	_batch_fixed_panels()
+	_active_root=Node3D.new()
+	_active_root.name="Interior_"+airframe
+	_active_root.set_meta("cached_interior",true)
+	add_child(_active_root)
+	for child in get_children():
+		if child.get_meta("cached_interior",false): continue
+		child.reparent(_active_root,false)
+
+func _batch_fixed_panels() -> void:
+	# Only direct, stationary meshes. Yokes, sticks and throttle pivots keep
+	# their hierarchy and animation; instrument texture materials remain unique.
+	var groups: Dictionary={}
+	for child in get_children():
+		if not child is MeshInstance3D or child.get_child_count()>0: continue
+		var material: Material=child.material_override
+		if material==null: continue
+		if not groups.has(material):
+			var surface:=SurfaceTool.new()
+			surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+			surface.set_material(material)
+			groups[material]=surface
+		var surface: SurfaceTool=groups[material]
+		var arrays: Array=child.mesh.surface_get_arrays(0)
+		var vertices: PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array=arrays[Mesh.ARRAY_NORMAL]
+		var uv: PackedVector2Array=arrays[Mesh.ARRAY_TEX_UV]
+		var indices: PackedInt32Array=arrays[Mesh.ARRAY_INDEX]
+		for i in range(indices.size() if not indices.is_empty() else vertices.size()):
+			var index: int=indices[i] if not indices.is_empty() else i
+			surface.set_normal((child.basis*normals[index]).normalized())
+			surface.set_uv(uv[index] if uv.size()>index else Vector2.ZERO)
+			surface.add_vertex(child.transform*vertices[index])
+		remove_child(child)
+		child.free()
+	for material in groups:
+		var batch:=MeshInstance3D.new()
+		batch.name="FixedPanelBatch"
+		batch.mesh=groups[material].commit()
+		batch.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(batch)
+
+func _exit_tree() -> void:
+	_interior_cache.clear()
 
 func set_presentation_visible(value: bool) -> void:
 	visible = value
 	if presentation_state == int(value): return
 	presentation_state = int(value)
-	for geometry: Node in find_children("*","GeometryInstance3D",true,false):
+	if not is_instance_valid(_active_root): return
+	for geometry: Node in _active_root.find_children("*","GeometryInstance3D",true,false):
 		geometry.visible = value
-	for viewport: Node in find_children("*","SubViewport",true,false):
-		viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if value else SubViewport.UPDATE_DISABLED
+	for viewport: Node in _active_root.find_children("*","SubViewport",true,false):
+		viewport.render_target_update_mode = SubViewport.UPDATE_ONCE if value else SubViewport.UPDATE_DISABLED
 
 func update_instruments(flight: FlightDynamics, control: Vector3, delta: float) -> void:
 	for display: CockpitInstruments in displays:
@@ -135,6 +204,23 @@ func _label(parent: Node3D, value: String, at: Vector3, height: float = 0.012, c
 	return label
 
 func _build_shell() -> void:
+	if airframe == "f35":
+		# Compact single-seat tub: chamfered coaming, open forward glass,
+		# and low side consoles instead of an airliner-width rectangular slab.
+		_box(self,Vector3(1.62,0.43,0.15),Vector3(0,-0.61,-1.03),shell)
+		_box(self,Vector3(1.82,0.055,1.65),Vector3(0,-0.96,-0.36),black)
+		_box(self,Vector3(0.58,0.10,0.52),Vector3(0,-0.87,0.10),rubber)
+		_box(self,Vector3(1.70,0.045,0.25),Vector3(0,-0.365,-1.05),rubber,Vector3(-0.12,0,0))
+		for side: float in [-1.0,1.0]:
+			_box(self,Vector3(0.27,0.38,0.20),Vector3(side*0.89,-0.62,-1.00),shell,Vector3(0,side*0.24,0))
+			_box(self,Vector3(0.28,0.045,0.94),Vector3(side*0.88,-0.70,-0.61),black)
+			_box(self,Vector3(0.035,0.07,1.18),Vector3(side*1.04,-0.48,-0.48),rubber)
+			# The fighter's bubble canopy has no forward windscreen posts.
+			for i in range(8):
+				_cylinder(self,0.004,0.004,Vector3(side*1.02,-0.447,-0.93+i*0.12),metal)
+		for i in range(14):
+			_box(self,Vector3(0.039,0.004,0.042),Vector3(-0.72+i*0.11,-0.339,-1.08),black)
+		return
 	# A low, continuous coaming creates a convincing flight deck while leaving the horizon open.
 	_box(self,Vector3(2.72,0.53,0.27),Vector3(0,-0.60,-1.02),shell)
 	_box(self,Vector3(2.8,0.072,0.38),Vector3(0,-0.294,-1.09),rubber)
@@ -147,7 +233,7 @@ func _build_shell() -> void:
 		if airframe == "f35":
 			_beam(Vector3(side*1.17,-0.27,-1.10),Vector3(side*0.94,0.08,-0.89),0.032,0.038,black)
 		else:
-			_beam(Vector3(side*1.17,-0.27,-1.10),Vector3(side*0.90,0.76,-1.27),0.075,0.10,trim_material)
+			_beam(Vector3(side*1.17,-0.64,-1.10),Vector3(side*0.90,0.94,-1.27),0.075,0.10,trim_material)
 			_beam(Vector3(side*0.90,0.76,-1.27),Vector3(side*0.54,0.89,-0.25),0.07,0.09,black)
 		for row: int in 6:
 			_cylinder(self,0.009,0.005,Vector3(side*1.16,-0.37-float(row)*0.065,-0.865),metal,Vector3(PI/2,0,0))
@@ -159,7 +245,7 @@ func _build_shell() -> void:
 			_beam(Vector3(cos(a)*0.94,sin(a)*0.78+0.08,-0.89),Vector3(cos(b)*0.94,sin(b)*0.78+0.08,-0.89),0.032,0.037,black)
 	else:
 		var center_x: float = 0.67 if airframe != "b2" else 0.58
-		_beam(Vector3(center_x,-0.29,-1.20),Vector3(center_x+0.07 if airframe != "b2" else 0.28,0.87,-1.41),0.047 if airframe != "b2" else 0.073,0.072,trim_material)
+		_beam(Vector3(center_x,-0.65,-1.20),Vector3(center_x+0.07 if airframe != "b2" else 0.28,0.87,-1.41),0.047 if airframe != "b2" else 0.073,0.072,trim_material)
 		_box(self,Vector3(2.1,0.12,0.12),Vector3(0,0.79,-1.20),shell)
 		_build_overhead()
 	# Windshield demist vents and stitching on the glare shield.
@@ -210,7 +296,7 @@ func _transport_panels() -> void:
 	_label(self,"CC / FLIGHT DECK",Vector3(0.42,-0.815,-0.856),0.01,Color(0.4,0.52,0.57))
 
 func _fighter_panels() -> void:
-	_screen(Vector3(0,-0.56,-0.856),Vector2(1.29,0.43),"panorama")
+	_screen(Vector3(0,-0.56,-0.936),Vector2(1.29,0.36),"panorama")
 	_label(self,"PANORAMIC FLIGHT DISPLAY",Vector3(0,-0.81,-0.85),0.012)
 	for side: float in [-1,1]:
 		_box(self,Vector3(0.18,0.40,0.03),Vector3(side*0.78,-0.58,-0.846),black)
@@ -224,22 +310,12 @@ func _fighter_panels() -> void:
 func _screen(at: Vector3, dimensions: Vector2, mode: String) -> void:
 	_box(self,Vector3(dimensions.x+0.036,dimensions.y+0.037,0.035),at,black)
 	_box(self,Vector3(dimensions.x+0.046,dimensions.y+0.047,0.008),at-Vector3(0,0,0.020),metal)
-	var viewport := SubViewport.new()
-	viewport.size = Vector2i(1638,650) if mode == "panorama" else Vector2i(768,768)
-	if mode == "dual_flight": viewport.size = Vector2i(1536,768)
-	viewport.transparent_bg = false
-	viewport.disable_3d = true
-	viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
-	viewport.gui_disable_input = true
-	add_child(viewport)
-	var ui := Display.new()
-	ui.size = Vector2(viewport.size)
-	ui.display_mode = mode
-	ui.aircraft_name = str(profile.get("short","737"))
-	ui.engine_count = int(profile.get("engines",2))
-	ui.set_navigation(navigation_kind,navigation_checkpoint)
-	viewport.add_child(ui)
-	displays.append(ui)
+	var screen_texture: Texture2D
+	if _screen_textures.has(mode):
+		screen_texture=_screen_textures[mode]
+	else:
+		screen_texture=_instrument_texture(mode)
+		_screen_textures[mode]=screen_texture
 	var face := MeshInstance3D.new()
 	var mesh := QuadMesh.new()
 	mesh.size = dimensions
@@ -247,7 +323,7 @@ func _screen(at: Vector3, dimensions: Vector2, mode: String) -> void:
 	face.position = at+Vector3(0,0,0.019)
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_texture = viewport.get_texture()
+	material.albedo_texture = screen_texture
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 	face.material_override = material
 	add_child(face)
@@ -259,6 +335,25 @@ func _screen(at: Vector3, dimensions: Vector2, mode: String) -> void:
 		for side_y: float in [-1,1]:
 			_cylinder(self,0.0035,0.003,at+Vector3(side_x*(dimensions.x*0.5+0.012),side_y*(dimensions.y*0.5+0.012),0.020),metal,Vector3(PI/2,0,0))
 
+func _instrument_texture(mode: String) -> Texture2D:
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1638,650) if mode == "panorama" else Vector2i(768,768)
+	if mode == "dual_flight": viewport.size = Vector2i(1536,768)
+	viewport.transparent_bg = false
+	viewport.disable_3d = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	viewport.gui_disable_input = true
+	add_child(viewport)
+	var ui := Display.new()
+	ui.size = Vector2(viewport.size)
+	ui.display_mode = mode
+	ui.aircraft_name = str(profile.get("short","737"))
+	ui.engine_count = int(profile.get("engines",2))
+	ui.set_navigation(navigation_kind,navigation_checkpoint)
+	viewport.add_child(ui)
+	displays.append(ui)
+	return viewport.get_texture()
+
 func _knob(at: Vector3, radius: float) -> void:
 	_cylinder(self,radius,0.024,at,black,Vector3(PI/2,0,0))
 	_cylinder(self,radius*0.76,0.006,at+Vector3(0,0,0.015),trim_material,Vector3(PI/2,0,0))
@@ -268,7 +363,7 @@ func _build_controls() -> void:
 	pilot_control = Node3D.new()
 	add_child(pilot_control)
 	if control_is_stick:
-		pilot_control.position = Vector3(-0.81 if airframe == "a380" else 0.65,-0.64,-0.54)
+		pilot_control.position = Vector3(-0.68 if airframe == "a380" else 0.72,-0.61,-0.85)
 		_cylinder(pilot_control,0.053,0.07,Vector3.ZERO,rubber)
 		_cylinder(pilot_control,0.021,0.19,Vector3(0,0.105,0),black,Vector3(-0.18,0,0))
 		_box(pilot_control,Vector3(0.055,0.064,0.071),Vector3(0,0.218,-0.020),rubber,Vector3(-0.18,0,0))
@@ -289,7 +384,7 @@ func _build_controls() -> void:
 		_box(self,Vector3(0.24,0.15,0.54),Vector3(side*0.90,-1.14,0.04),rubber)
 
 func _build_console() -> void:
-	var x: float = -0.91 if airframe == "f35" else 0.67
+	var x: float = -0.72 if airframe == "f35" else 0.58
 	_box(self,Vector3(0.34,0.19,0.63),Vector3(x,-0.80,-0.57),shell)
 	_box(self,Vector3(0.31,0.026,0.54),Vector3(x,-0.691,-0.57),trim_material)
 	var count: int = int(profile.get("engines",2))
@@ -298,13 +393,18 @@ func _build_console() -> void:
 		var lx: float = (float(i)-float(count-1)*0.5)*lever_spacing
 		_box(self,Vector3(0.017,0.004,0.21),Vector3(x+lx,-0.674,-0.55),black)
 		var lever := Node3D.new()
-		lever.position = Vector3(x+lx,-0.68,-0.55)
+		lever.name = "ThrustLever_%d" % i
+		lever.position = Vector3(x+lx,-0.60,-0.82)
 		add_child(lever)
 		throttles.append(lever)
 		_cylinder(lever,0.009,0.16,Vector3(0,0.075,0),metal)
-		_box(lever,Vector3(0.039,0.034,0.063),Vector3(0,0.159,0),black)
+		_box(lever,Vector3(0.115 if airframe=="f35" else 0.039,0.055,0.080),Vector3(0,0.159,0),rubber,Vector3(-0.15,0,0))
+		for rib in range(5):
+			_box(lever,Vector3(0.095 if airframe=="f35" else 0.033,0.003,0.003),Vector3(0,0.185,-0.026+rib*0.013),trim_material)
+		_cylinder(lever,0.010,0.006,Vector3(-0.030,0.166,0.043),metal,Vector3(PI/2,0,0))
 		_label(lever,str(i+1),Vector3(0,0.163,0.033),0.011)
-	_label(self,"THRUST",Vector3(x,-0.679,-0.275),0.011)
+	_label(self,"THRUST  /  W · S",Vector3(x,-0.635,-0.78),0.013)
+	_label(self,"IDLE     MIL     AB",Vector3(x,-0.688,-0.92),0.009)
 	# Tactile checklist keyboard on the far end of the center pedestal.
 	for row: int in 4:
 		for col: int in 5:

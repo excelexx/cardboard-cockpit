@@ -10,6 +10,7 @@ func run():
 	app = load("res://scenes/main.tscn").instantiate(); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
 	app.start_flight("combat")
+	app.cockpit=false # Exterior muzzle effects are intentionally hidden in cockpit view.
 	check(is_instance_valid(app.fighter_fx.gun_rotor) and is_instance_valid(app.fighter_fx.gun_muzzle),"Imported rotary gun retains animated rotor and physical muzzle")
 	app.combat.fire_gun(); app.fighter_fx.update_gun(.05)
 	check(app.fighter_fx.rotor_speed>0 and app.fighter_fx.gun_flash.visible,"Gun fires immediately with rotating barrels and attached muzzle flash")
@@ -43,7 +44,7 @@ func run():
 	shot.age = 4.1; app.combat.update_shots(.01)
 	check(not shot.node.get_node("MotorFlame").visible,"Motor flame extinguishes after burnout")
 	app.start_flight("combat")
-	app.combat.spawn_shot(Vector3(0,5,-3500),Vector3(0,-600,-100),"cannon",-1,28)
+	app.combat.spawn_shot(Vector3(0,app.world.ground_height(0,-3500)+5,-3500),Vector3(0,-600,-100),"cannon",-1,28)
 	app.combat.update_shots(.03)
 	check(app.combat.shots.is_empty() and not app.combat.bursts.is_empty(),"Projectiles hit terrain and produce an impact")
 	app.start_flight("combat"); app.combat.spawn_contact()
@@ -71,8 +72,10 @@ func run():
 	var samples: Array[Vector2] = [Vector2(2400,-4800),Vector2(-4400,-8100),Vector2(960,-6500),Vector2(130,-13800)]
 	for at in samples:
 		var cached: float = app.world.ground_height(at.x,at.y)
-		var columns: int = app.world._height_columns; app.world._height_columns = 0
-		var direct: float = app.world.ground_height(at.x,at.y); app.world._height_columns = columns
+		var saved: Dictionary=app.world._height_grid.duplicate()
+		app.world._height_grid.clear()
+		var direct: float = app.world.ground_height(at.x,at.y)
+		app.world._height_grid=saved
 		check(absf(cached-direct)<.001,"Cached collision terrain matches the rendered heightfield")
 	for path in ["res://assets/environment/alpine-fir.png","res://assets/environment/alpine-fir-b.png","res://assets/environment/alpine-granite.png","res://assets/fighter/spectre-satin.png"]:
 		var texture: Texture2D = load(path)
