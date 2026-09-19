@@ -240,7 +240,7 @@ func draw_flight() -> void:
 		big(Vector2(0,250),"+%d" % c.last_reward,56,Color(GREEN.r,GREEN.g,GREEN.b,c.reward_flash),HORIZONTAL_ALIGNMENT_CENTER,1600,true)
 		if c.combo>=3: centered(282,"%d IN A ROW" % c.combo,20,Color(WHITE.r,WHITE.g,WHITE.b,c.reward_flash))
 	if c.hit_flash>0: draw_rect(Rect2(0,0,1600,1000),Color(RED.r,RED.g,RED.b,clampf(c.hit_flash*0.9,0,1)),false,14)
-	draw_scope(Vector2(1450,840),c)
+	if not app.cockpit: draw_scope(Vector2(1450,840),c)   # the cockpit's own display carries the radar
 	draw_weapons(c)
 	draw_boss(c)
 	draw_alerts(f,c)

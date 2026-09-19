@@ -306,6 +306,8 @@ func _process(dt: float) -> void:
 			world.update_local_shadows(flight.position,dt)
 		if cockpit:
 			cockpit_frame.update_instruments(flight,control,dt if active else 0)
+			if world.get("sun")!=null: cockpit_frame.set_sun(world.sun.global_basis.z,world.sun.light_energy/3.2)
+			cockpit_frame.set_tactical(tactical_state())
 			cockpit_frame.set_navigation("sf" if route_id=="sf" else "free",mission.route_index)
 	audio.gun_wanted = active and combat.active and combat.gun_firing_time>0
 	audio.beam_wanted=active and combat.beam_active
@@ -580,3 +582,21 @@ func select_route(value: String) -> void:
 func _exit_tree() -> void:
 	tutorial.stop()
 	badge.close()
+
+## What the cockpit's panoramic display shows beyond raw flight data.
+func tactical_state() -> Dictionary:
+	var contacts: Array[Vector3] = []
+	var boss := -1.0
+	for enemy: Dictionary in combat.enemies:
+		var delta: Vector3 = enemy.position-flight.position
+		var relative: Vector2 = Vector2(delta.x,delta.z).rotated(-flight.heading)
+		var important: bool = enemy.id==combat.boss_id or enemy.id==combat.target_id
+		contacts.append(Vector3(relative.x,relative.y,1.0 if important else 0.0))
+		if enemy.id==combat.boss_id and not combat.boss_defeated: boss = clampf(enemy.health/enemy.max_health,0,1)
+	var waypoint := Vector2.ZERO
+	if mission.active and mission.phase in ["opening","combat","return"]:
+		var target: Vector3 = mission.route_target()-flight.position
+		waypoint = Vector2(target.x,target.z).rotated(-flight.heading)
+	return {"gun":primary_latched or combat.beam_active,"missiles":salvo_latched,"tracking":combat.target_id>=0 and combat.assist,
+		"lock":combat.lock_progress,"contacts":contacts,"boss":boss,"waypoint":waypoint,"damaged":combat.hull<=65,
+		"objective":hud.mission_line(),"clock":hud.clock_text()}

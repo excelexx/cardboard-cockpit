@@ -26,6 +26,18 @@ var instrument_time: float = 0.0
 var navigation_kind: String = "valley"
 var navigation_checkpoint: int = 0
 var font: Font = ThemeDB.fallback_font
+# Panoramic display (fighter): fed by the cockpit each frame.
+var numerals: Font = load("res://assets/fonts/SairaCondensed-SemiBold.ttf")
+var heavy: Font = load("res://assets/fonts/SairaCondensed-Bold.ttf")
+var label_font: Font = load("res://assets/fonts/IBMPlexMono-Medium.ttf")
+var tactical: Dictionary = {}
+const P_GREEN := Color(0.553,1.0,0.690)
+const P_RED := Color(1.0,0.294,0.243)
+const P_AMBER := Color(1.0,0.710,0.278)
+const P_WHITE := Color(0.957,0.969,0.953)
+const P_SOFT := Color(0.42,0.50,0.45)
+const P_LINE := Color(0.169,0.227,0.192)
+const P_BACK := Color(0.016,0.024,0.022)
 const WHITE := Color(0.9, 0.96, 0.98)
 const MUTED := Color(0.39, 0.53, 0.62)
 const CYAN := Color(0.30, 0.87, 1.0)
@@ -90,21 +102,7 @@ func _draw() -> void:
 		_nav()
 		draw_set_transform(Vector2.ZERO)
 	elif display_mode == "panorama":
-		_panel_transform(Vector2(12,12), 0.78)
-		_pfd()
-		draw_set_transform(Vector2.ZERO)
-		# Large, readable essentials instead of three miniaturized avionics pages.
-		_text("SPEED / KNOTS",Vector2(680,78),32,CYAN)
-		_text("%03d" % int(speed),Vector2(675,215),124,WHITE)
-		_text("ALTITUDE / FEET",Vector2(1120,78),32,CYAN)
-		_text("%d" % int(altitude),Vector2(1110,215),112,WHITE)
-		_text("HEADING",Vector2(680,305),30,MUTED)
-		_text("%03d°" % int(heading),Vector2(675,405),82,WHITE)
-		_text("THRUST",Vector2(1120,305),30,MUTED)
-		_text("%d%%" % int(throttle*100),Vector2(1115,405),82,GREEN)
-		_text("GEAR "+("DOWN" if gear else "UP"),Vector2(680,540),34,AMBER if gear else MUTED)
-		_text("FLAPS %d" % flaps,Vector2(1120,540),34,MUTED)
-		_text("STALL — LOWER NOSE" if stall else "SPECTRE  /  FLIGHT SYSTEM",Vector2(680,615),30,AMBER if stall else CYAN)
+		_panorama()
 	else:
 		_panel_transform(Vector2.ZERO, size.x / 768.0)
 		match display_mode:
@@ -296,3 +294,98 @@ func _engines() -> void:
 	_text("FLAPS",Vector2(27,744),21,MUTED)
 	_text(["UP", "15°", "30°"][clampi(flaps,0,2)],Vector2(188,744),23,GREEN)
 	_text("NORMAL",Vector2(591,744),23,GREEN)
+
+
+# --- panoramic display ------------------------------------------------------
+func _p(face: Font,at: Vector2,value: String,size_px: int,color: Color,align: int=HORIZONTAL_ALIGNMENT_LEFT,width: float=-1) -> void:
+	draw_string(face,at,value,align,width,size_px,color)
+func _chip(at: Vector2,on: bool) -> void:
+	var rect := Rect2(at,Vector2(108 if on else 124,56))
+	if on:
+		draw_rect(rect,P_GREEN); _p(heavy,at+Vector2(20,44),"ON",46,P_BACK)
+	else:
+		draw_rect(rect,P_GREEN*Color(1,1,1,0.6),false,2); _p(heavy,at+Vector2(20,44),"OFF",46,P_SOFT)
+func _portal(rect: Rect2,title: String) -> void:
+	draw_rect(rect,P_LINE,false,2)
+	_p(label_font,rect.position+Vector2(16,32),title,22,P_GREEN)
+func _panorama() -> void:
+	draw_rect(Rect2(Vector2.ZERO,size),P_BACK)
+	# Top strip: aircraft, what to do, time.
+	_p(heavy,Vector2(24,44),"SPECTRE",38,P_WHITE)
+	_p(label_font,Vector2(0,40),str(tactical.get("objective","")).to_upper(),24,P_GREEN,HORIZONTAL_ALIGNMENT_CENTER,size.x)
+	_p(numerals,Vector2(size.x-324,46),str(tactical.get("clock","")),44,P_WHITE,HORIZONTAL_ALIGNMENT_RIGHT,300)
+	draw_line(Vector2(0,62),Vector2(size.x,62),P_LINE,2)
+	var top := 78.0; var tall: float = size.y-top-16
+	# Weapons and airframe.
+	var a := Rect2(16,top,380,tall); _portal(a,"WEAPONS")
+	_p(label_font,a.position+Vector2(16,104),"GUN",28,P_WHITE); _chip(a.position+Vector2(232,62),bool(tactical.get("gun",false)))
+	_p(label_font,a.position+Vector2(16,184),"MISSILES",28,P_WHITE); _chip(a.position+Vector2(232,142),bool(tactical.get("missiles",false)))
+	var lock: float = float(tactical.get("lock",0.0)); var tracking: bool = bool(tactical.get("tracking",false))
+	var lock_rect := Rect2(a.position+Vector2(16,226),Vector2(348,78))
+	if tracking and lock>=1.0:
+		draw_rect(lock_rect,P_RED); _p(heavy,lock_rect.position+Vector2(0,60),"LOCKED",60,P_BACK,HORIZONTAL_ALIGNMENT_CENTER,348)
+	elif tracking:
+		draw_rect(lock_rect,P_AMBER,false,3); draw_rect(Rect2(lock_rect.position,Vector2(348*lock,78)),P_AMBER*Color(1,1,1,0.35))
+		_p(heavy,lock_rect.position+Vector2(0,60),"LOCKING",60,P_AMBER,HORIZONTAL_ALIGNMENT_CENTER,348)
+	else:
+		draw_rect(lock_rect,P_LINE,false,2); _p(heavy,lock_rect.position+Vector2(0,60),"NO TARGET",60,P_SOFT,HORIZONTAL_ALIGNMENT_CENTER,348)
+	_p(label_font,a.position+Vector2(16,360),"GEAR",24,P_SOFT); _p(heavy,a.position+Vector2(16,410),"DOWN" if gear else "UP",48,P_AMBER if gear else P_WHITE)
+	_p(label_font,a.position+Vector2(200,360),"FLAPS",24,P_SOFT); _p(heavy,a.position+Vector2(200,410),str(flaps),48,P_AMBER if flaps>0 else P_WHITE)
+	if stall: _p(heavy,a.position+Vector2(16,480),"TOO SLOW",54,P_RED)
+	elif bool(tactical.get("damaged",false)): _p(heavy,a.position+Vector2(16,480),"DAMAGED",54,P_AMBER)
+	# Horizon.
+	var b := Rect2(412,top,440,tall); _attitude(b)
+	# Radar.
+	var c := Rect2(868,top,410,tall); _portal(c,"RADAR 3 KM")
+	var hub: Vector2 = c.position+Vector2(c.size.x/2,c.size.y/2+18); var reach: float = minf(c.size.x,c.size.y)/2-34
+	for fraction in [0.33,0.66,1.0]: draw_arc(hub,reach*fraction,0,TAU,72,P_GREEN*Color(1,1,1,0.35 if fraction<1 else 0.9),2,true)
+	draw_line(hub-Vector2(reach,0),hub+Vector2(reach,0),P_GREEN*Color(1,1,1,0.25),1); draw_line(hub-Vector2(0,reach),hub+Vector2(0,reach),P_GREEN*Color(1,1,1,0.25),1)
+	var waypoint: Vector2 = tactical.get("waypoint",Vector2.ZERO)
+	if waypoint!=Vector2.ZERO:
+		var w: Vector2 = hub+(waypoint/3000.0*reach).limit_length(reach)
+		draw_polyline(PackedVector2Array([w+Vector2(0,-10),w+Vector2(10,0),w+Vector2(0,10),w+Vector2(-10,0),w+Vector2(0,-10)]),P_GREEN,3,true)
+	for contact: Vector3 in tactical.get("contacts",[]):
+		var at: Vector2 = hub+(Vector2(contact.x,contact.y)/3000.0*reach).limit_length(reach)
+		if contact.z>0.5: draw_colored_polygon(PackedVector2Array([at+Vector2(0,-11),at+Vector2(11,0),at+Vector2(0,11),at+Vector2(-11,0)]),P_RED)
+		else: draw_circle(at,6,P_RED)
+	draw_colored_polygon(PackedVector2Array([hub+Vector2(0,-13),hub+Vector2(-10,11),hub+Vector2(10,11)]),P_GREEN)
+	var boss: float = float(tactical.get("boss",-1.0))
+	if boss>=0:
+		_p(label_font,c.position+Vector2(c.size.x-216,32),"BOSS",22,P_RED,HORIZONTAL_ALIGNMENT_RIGHT,200)
+		draw_rect(Rect2(c.position+Vector2(16,c.size.y-30),Vector2(c.size.x-32,12)),P_RED*Color(1,1,1,0.25))
+		draw_rect(Rect2(c.position+Vector2(16,c.size.y-30),Vector2((c.size.x-32)*clampf(boss,0,1),12)),P_RED)
+	# Flight numbers.
+	var d := Rect2(1294,top,size.x-1294-16,tall); _portal(d,"FLIGHT")
+	_p(label_font,d.position+Vector2(16,92),"SPEED · KNOTS",22,P_SOFT); _p(numerals,d.position+Vector2(12,186),"%d" % int(speed),104,P_WHITE)
+	_p(label_font,d.position+Vector2(16,240),"ALTITUDE · FEET",22,P_SOFT); _p(numerals,d.position+Vector2(12,334),_thousands(int(altitude)),104,P_WHITE)
+	_p(label_font,d.position+Vector2(16,388),"HEADING",22,P_SOFT); _p(numerals,d.position+Vector2(12,452),"%03d" % int(display_heading()),64,P_WHITE)
+	_p(label_font,d.position+Vector2(170,388),"POWER",22,P_SOFT); _p(numerals,d.position+Vector2(166,452),"%d%%" % int(throttle*100),64,P_GREEN)
+	draw_rect(Rect2(d.position+Vector2(16,tall-44),Vector2(d.size.x-32,14)),P_GREEN*Color(1,1,1,0.2)); draw_rect(Rect2(d.position+Vector2(16,tall-44),Vector2((d.size.x-32)*clampf(throttle,0,1),14)),P_GREEN)
+func _thousands(value: int) -> String:
+	var digits: String = str(absi(value)); var out := ""
+	for i in range(digits.length()):
+		if i>0 and (digits.length()-i)%3==0: out += ","
+		out += digits[i]
+	return out
+func _attitude(rect: Rect2) -> void:
+	var center: Vector2 = rect.get_center()
+	var scale_px := 9.0
+	var horizon: Vector2 = center+Vector2(sin(bank),cos(bank))*rad_to_deg(pitch)*scale_px
+	var right := Vector2(cos(bank),-sin(bank)); var down := Vector2(sin(bank),cos(bank))
+	var window := PackedVector2Array([rect.position,Vector2(rect.end.x,rect.position.y),rect.end,Vector2(rect.position.x,rect.end.y)])
+	var sky := PackedVector2Array([horizon-right*2000,horizon+right*2000,horizon+right*2000-down*2000,horizon-right*2000-down*2000])
+	var earth := PackedVector2Array([horizon-right*2000,horizon+right*2000,horizon+right*2000+down*2000,horizon-right*2000+down*2000])
+	for polygon: PackedVector2Array in Geometry2D.intersect_polygons(sky,window): draw_colored_polygon(polygon,Color(0.12,0.33,0.52))
+	for polygon: PackedVector2Array in Geometry2D.intersect_polygons(earth,window): draw_colored_polygon(polygon,Color(0.34,0.23,0.12))
+	for angle: int in range(-40,41,10):
+		var point: Vector2 = horizon-down*float(angle)*scale_px
+		var half: float = 600.0 if angle==0 else 70.0
+		for segment: PackedVector2Array in Geometry2D.intersect_polyline_with_polygon(PackedVector2Array([point-right*half,point+right*half]),window):
+			draw_polyline(segment,P_WHITE,4 if angle==0 else 2,true)
+		if angle!=0 and rect.grow(-40).has_point(point-right*96): _p(label_font,point-right*96+Vector2(-14,8),str(absi(angle)),20,P_WHITE)
+	# Fixed aircraft symbol and frame.
+	draw_polyline(PackedVector2Array([center+Vector2(-120,0),center+Vector2(-44,0),center+Vector2(0,30),center+Vector2(44,0),center+Vector2(120,0)]),P_AMBER,7,true)
+	draw_rect(rect,P_LINE,false,2)
+	draw_rect(Rect2(rect.position,Vector2(rect.size.x,44)),Color(P_BACK.r,P_BACK.g,P_BACK.b,0.55))
+	_p(label_font,rect.position+Vector2(16,32),"HORIZON",22,P_GREEN)
+	_p(label_font,rect.position+Vector2(rect.size.x-216,32),"CLIMB %+d" % (int(climb/100.0)*100),22,P_WHITE,HORIZONTAL_ALIGNMENT_RIGHT,200)

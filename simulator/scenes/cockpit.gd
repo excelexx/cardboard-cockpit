@@ -2,6 +2,8 @@ extends Node3D
 class_name DetailedCockpit
 
 const Display = preload("res://ui/cockpit_instruments.gd")
+const Canopy = preload("res://scenes/fighter_canopy.gd")
+var canopy: FighterCanopy
 var displays: Array[CockpitInstruments] = []
 var throttles: Array[Node3D] = []
 var pilot_control: Node3D
@@ -66,10 +68,7 @@ func build(aircraft: Dictionary) -> void:
 			for surface in range(geometry.mesh.get_surface_count()):
 				var original = geometry.mesh.surface_get_material(surface)
 				if original is StandardMaterial3D and original.albedo_texture==null:
-					var trim_material: StandardMaterial3D = original.duplicate()
-					trim_material.albedo_color = Color(.09,.11,.13)
-					trim_material.roughness = .65; trim_material.metallic = .12
-					geometry.set_surface_override_material(surface,trim_material)
+					geometry.set_surface_override_material(surface,_composite_material())
 				if original is StandardMaterial3D and original.albedo_texture!=null:
 					var display_material: StandardMaterial3D = original.duplicate()
 					display_material.albedo_texture = live_panel
@@ -77,6 +76,13 @@ func build(aircraft: Dictionary) -> void:
 					display_material.uv1_offset = Vector3(-.005975,-.016487,0)
 					display_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 					geometry.set_surface_override_material(surface,display_material)
+		canopy = Canopy.new(); canopy.name = "Canopy"; _active_root.add_child(canopy)
+		canopy.position = -_active_root.position   # canopy is authored around the eye point
+		canopy.build()
+		# The wide display is the brightest thing in a fighter cockpit: let it spill onto the coaming.
+		var spill := OmniLight3D.new(); spill.position = Vector3(0,-.20,-.42)
+		spill.light_color = Color(0.55,1.0,0.72); spill.light_energy = 0.22; spill.omni_range = 0.75; spill.shadow_enabled = false
+		_active_root.add_child(spill)
 		pilot_control = Node3D.new(); _active_root.add_child(pilot_control); control_rest = Vector3.ZERO
 		return
 	var boeing: bool = airframe in ["b737","b747"]
@@ -168,6 +174,25 @@ func update_instruments(flight: FlightDynamics, control: Vector3, delta: float) 
 			pilot_control.position.z = control_rest.z+trim.y*0.06
 	for lever: Node3D in throttles:
 		lever.rotation.x = lerpf(0.30,-0.38,flight.throttle)
+
+## Dark pebbled composite: fine normal and roughness breakup so the low sun
+## rakes across it instead of lighting one flat colour.
+func _composite_material() -> StandardMaterial3D:
+	var noise := FastNoiseLite.new(); noise.noise_type = FastNoiseLite.TYPE_CELLULAR; noise.frequency = 0.09
+	var bumps := NoiseTexture2D.new(); bumps.width = 256; bumps.height = 256; bumps.seamless = true
+	bumps.as_normal_map = true; bumps.bump_strength = 3.0; bumps.generate_mipmaps = true; bumps.noise = noise
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.032,0.034,0.038)
+	material.roughness = 0.82; material.metallic = 0.0; material.metallic_specular = 0.16
+	material.normal_enabled = true; material.normal_texture = bumps; material.normal_scale = 0.35
+	material.uv1_triplanar = true; material.uv1_scale = Vector3.ONE*14.0
+	return material
+## Combat and mission state for the panoramic display.
+func set_tactical(state: Dictionary) -> void:
+	for display: CockpitInstruments in displays: display.tactical = state
+## `direction` points from the scene toward the sun, in world space.
+func set_sun(direction: Vector3,energy: float) -> void:
+	if is_instance_valid(canopy): canopy.set_sun(global_basis.inverse()*direction,energy)
 
 func set_navigation(kind: String, checkpoint: int) -> void:
 	navigation_kind = kind
