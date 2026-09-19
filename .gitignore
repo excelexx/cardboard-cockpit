@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Godot imported data and local editor settings
+simulator/.godot/
+simulator/export_credentials.cfg
+
+# Build output and downloaded tools/assets awaiting review
+build/
+dist/
+.tools/
+.downloads/
+
+# Python environments and caches
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local settings, secrets and camera recordings
+.env
+.env.*
+!.env.example
+vision/calibration.local.json
+vision/recordings/
+*.log
