@@ -18,7 +18,7 @@ Use the existing `DICT_4X4_50` tracker. A face must remain stable for 90 ms to s
 | START | Start, replay, resume |
 | HOME | Pause / resume |
 | A | Gear |
-| B | Flap detent |
+| B | Deploy gear/flaps and start assisted SFO landing |
 | LEFT | Cockpit / chase view |
 | RIGHT | Missile camera inset |
 | UP | Route assistance |
