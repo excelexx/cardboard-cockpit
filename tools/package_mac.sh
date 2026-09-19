@@ -5,7 +5,8 @@ engine="$project_dir/.tools/Godot.app/Contents/MacOS/Godot"
 if [ ! -x "$engine" ] || [ ! -f "$project_dir/.tools/macos.zip" ]; then
   "$project_dir/tools/setup.sh" --export
 fi
-mkdir -p "$project_dir/build"
+output_dir="${COCKPIT_BUILD_OUTPUT:-$project_dir/build}"
+mkdir -p "$output_dir"
 # macOS file-provider folders can stamp FinderInfo while codesign reads a
 # bundle. Sign in the OS temporary directory, then archive without metadata.
 native_stage="$(mktemp -d /private/tmp/cardboard-cockpit-build.XXXXXX)"
@@ -23,8 +24,8 @@ codesign --verify --deep --strict "$app_bundle"
 # Include source and original licensed aircraft assets with the distributable.
 # Explicit paths exclude credentials, environments, downloads and local builds.
 tar -C "$project_dir" --exclude='simulator/.godot' --exclude='__pycache__' --exclude='vision/calibration.local.json' --exclude='vision/recordings' -cf - simulator vision tools docs shared README.md THIRD_PARTY_ASSETS.md | tar -C "$release_dir/Source" -xf -
-ditto --norsrc "$app_bundle" "$project_dir/build/Cardboard Cockpit.app"
-ditto -c -k --norsrc --keepParent "$release_dir" "$project_dir/build/Cardboard Cockpit Mac.zip"
-echo "Built: $project_dir/build/Cardboard Cockpit.app"
-echo "Archive with source: $project_dir/build/Cardboard Cockpit Mac.zip"
+ditto --norsrc "$app_bundle" "$output_dir/Cardboard Cockpit.app"
+ditto -c -k --norsrc --keepParent "$release_dir" "$output_dir/Cardboard Cockpit Mac.zip"
+echo "Built: $output_dir/Cardboard Cockpit.app"
+echo "Archive with source: $output_dir/Cardboard Cockpit Mac.zip"
 echo "The build is locally signed; it is not Apple-notarized for public distribution."
