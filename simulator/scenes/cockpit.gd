@@ -302,8 +302,8 @@ func _fighter_panels() -> void:
 		_box(self,Vector3(0.18,0.40,0.03),Vector3(side*0.78,-0.58,-0.846),black)
 		for i: int in 5:
 			_knob(Vector3(side*0.78,-0.4+i*-0.074,-0.822),0.018)
-	_label(self,"MASTER ARM\nSAFE",Vector3(-0.96,-0.52,-0.84),0.017,Color(0.5,0.86,0.58))
-	_label(self,"F-35\nLIGHTNING II",Vector3(0.99,-0.52,-0.84),0.02)
+	_label(self,"WEAPON\nCONTROL",Vector3(-0.96,-0.52,-0.84),0.017,Color(0.5,0.86,0.58))
+	_label(self,"SPECTRE\nX–26",Vector3(0.99,-0.52,-0.84),0.02)
 	_box(self,Vector3(0.41,0.038,0.11),Vector3(0,-0.316,-0.875),black)
 	_label(self,"HUD / FLIGHT REFERENCE",Vector3(0,-0.313,-0.811),0.009,Color(0.46,0.76,0.58))
 

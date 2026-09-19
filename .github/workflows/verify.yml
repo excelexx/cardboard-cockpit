@@ -30,5 +30,5 @@ jobs:
           key: godot-macos-universal-4.7.2
       - name: Prepare tracker dependencies
         run: ./tools/setup_vision.sh
-      - name: Verify all five aircraft and the tracker
+      - name: Verify SPECTRE flight, combat and tracker
         run: ./tools/verify.sh

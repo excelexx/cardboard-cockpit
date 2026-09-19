@@ -11,13 +11,12 @@ func run() -> void:
 	app.set_process_unhandled_key_input(false)
 	app.audio.muted=true
 	app.capture_file="profiling"
-	app.diagnostic_input_lock=true
 	app.vision.enabled=false
 	var start: int=Time.get_ticks_usec()
-	app.on_action("demo")
+	app.on_action("guided")
 	print("PREPARATION_MS ",(Time.get_ticks_usec()-start)/1000.0)
 	var samples: Array[float]=[]
-	var stage: int=app.combat.wave
+	var stage: String=app.mission.phase
 	var rendered: bool="--render" in OS.get_cmdline_user_args()
 	var render_samples: Array[float]=[]
 	var render_start: int=Time.get_ticks_usec()
@@ -27,8 +26,8 @@ func run() -> void:
 		if frame%6==0: app._process(1.0/60.0)
 		var ms: float=(Time.get_ticks_usec()-start)/1000.0
 		samples.append(ms)
-		if app.combat.wave!=stage:
-			stage=app.combat.wave
+		if app.mission.phase!=stage:
+			stage=app.mission.phase
 			print("UPGRADE_CPU_MS stage=",stage," ms=",ms)
 		if rendered and frame%6==0:
 			await process_frame

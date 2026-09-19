@@ -343,3 +343,8 @@ func _shore_details() -> void:
 	source.free()
 
 func cloud_immersion(_at: Vector3) -> float: return 0.0
+
+func apply_quality(high: bool) -> void:
+	if _environment==null: return
+	_environment.environment.ssao_enabled=high
+	_sun.directional_shadow_max_distance=3500 if high else 2000

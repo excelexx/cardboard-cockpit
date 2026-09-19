@@ -12,7 +12,7 @@ func run() -> void:
 	app.set_process(false)
 	app.set_physics_process(false)
 	app.audio.muted=true
-	app.on_action("demo")
+	app.on_action("guided")
 	app.capture_file="city-review"
 	var city: Node3D=app.world.metropolis
 	check(app.world.village_home_count==60,"Five countryside settlements contain sixty assembled homes")
@@ -68,16 +68,14 @@ func run() -> void:
 		]
 		for shot in shots:
 			if "--countryside" in OS.get_cmdline_user_args() and shot.name not in ["kominka-detail","coastal-village","country-panorama"]: continue
-			if shot.name=="city-cockpit": app.apply_campaign_aircraft(app.combat.plane_profile(1))
 			app.flight.position=shot.eye
 			app.flight.airborne=true
 			app.flight.speed=110
 			app.flight.heading=atan2(shot.target.x-shot.eye.x,shot.eye.z-shot.target.z)
 			app.flight.pitch=-0.04
-			app.combat.route_index=4
-			app.combat.wave=3
-			app.combat.phase="combat"
-			app.set_camera_view("cockpit" if shot.name=="city-cockpit" else "chase")
+			app.mission.route_index=4
+			app.mission.phase="combat"
+			app.cockpit=shot.name=="city-cockpit"
 			app._process(1.0/60.0)
 			if shot.name!="city-cockpit":
 				app.aircraft.visible=false
