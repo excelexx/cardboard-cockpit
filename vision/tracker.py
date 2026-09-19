@@ -157,7 +157,7 @@ class ArucoTracker:
             return found
         for marker_corners, marker_id in zip(corners, ids.flatten()):
             marker_id = int(marker_id)
-            if marker_id not in (self.yoke_id, self.throttle_id):
+            if marker_id not in (self.yoke_id, self.throttle_id) and marker_id not in WeaponSwitches.IDS:
                 continue
             # Duplicated IDs are ambiguous; reject that control instead of
             # choosing whichever marker happens to be enumerated last.
@@ -216,14 +216,11 @@ class ArucoTracker:
                 points = self._rescue(gray, marker_id, now)
                 if points is not None:
                     found[marker_id] = points
+        seen = set(found)  # includes duplicated IDs, which still block their opposite switch tag
         found = {marker_id: points.astype(np.float32) for marker_id, points in found.items() if points is not None}
         yoke = throttle = None
-<<<<<<< HEAD
         self.weapon_observations = {}
-        if ids is None:
-=======
         if not found:
->>>>>>> 8d00bab (Harden cardboard tracker for real desks: placement check, robust detection, next-pilot re-center)
             return yoke, throttle
         if draw:
             cv2.aruco.drawDetectedMarkers(frame, [points.reshape(1, 4, 2) for points in found.values()],
@@ -234,27 +231,17 @@ class ArucoTracker:
         matrix = np.array([[focal, 0, width / 2], [0, focal, height / 2], [0, 0, 1]], dtype=np.float64)
         distortion = np.zeros((5, 1), dtype=np.float64)
         object_points = np.array([[-.5, .5, 0], [.5, .5, 0], [.5, -.5, 0], [-.5, -.5, 0]], dtype=np.float32)
-<<<<<<< HEAD
-        # Duplicated IDs are ambiguous; reject that control instead of choosing
-        # whichever marker happens to be enumerated last.
-        counts = collections.Counter(int(marker_id) for marker_id in ids.flatten())
-        for marker_corners, marker_id in zip(corners, ids.flatten()):
-            key = int(marker_id)
-            if key in WeaponSwitches.IDS and counts[key] == 1:
-                role, value = WeaponSwitches.IDS[key]
-                other = 32 if key == 31 else 31 if key == 32 else 42 if key == 41 else 41
-                points = marker_corners.reshape(4, 2)
-                side = float(min(np.linalg.norm(points[(i+1)%4]-points[i]) for i in range(4)))
-                if other not in counts and side >= 24:
-                    self.weapon_observations[role] = (value, clamp(side/75,.3,1.0))
-        for marker_corners, marker_id in zip(corners, ids.flatten()):
-            marker_id = int(marker_id)
-            if counts[marker_id] != 1 or marker_id not in (self.yoke_id, self.throttle_id):
+        for key, points in found.items():
+            if key not in WeaponSwitches.IDS:
                 continue
-            points = marker_corners.reshape(4, 2)
-=======
+            role, value = WeaponSwitches.IDS[key]
+            other = 32 if key == 31 else 31 if key == 32 else 42 if key == 41 else 41
+            side = float(min(np.linalg.norm(points[(i + 1) % 4] - points[i]) for i in range(4)))
+            if other not in seen and side >= 24 * frame_scale:
+                self.weapon_observations[role] = (value, clamp(side / (75 * frame_scale), .3, 1.0))
         for marker_id, points in found.items():
->>>>>>> 8d00bab (Harden cardboard tracker for real desks: placement check, robust detection, next-pilot re-center)
+            if marker_id not in (self.yoke_id, self.throttle_id):
+                continue
             side = float(min(np.linalg.norm(points[(i + 1) % 4] - points[i]) for i in range(4)))
             # The throttle needs only a centre, so it may be smaller than the
             # yoke, whose corners must also carry an orientation estimate.
@@ -609,7 +596,7 @@ async def run(args):
             raise RuntimeError("Calibration needs its window. Remove --no-preview for the first run.")
         if args.calibrate:
             wizard = CalibrationWizard(args.camera, args.width, args.height)
-        else:
+        elif not args.paper_test:
             detector.set_pitch_range(calibration)
         source = CameraSource(args.camera, args.width, args.height, args.fps)
 
@@ -721,7 +708,7 @@ async def run(args):
                     elif not args.paper_test and key == ord("c"):
                         wizard = CalibrationWizard(args.camera, frame.shape[1], frame.shape[0])
                         detector.set_pitch_range(None)
-                    elif key == ord("n") and not wizard:
+                    elif key == ord("n") and not wizard and not args.paper_test:
                         wizard = CalibrationWizard(args.camera, frame.shape[1], frame.shape[0], base=controller.calibration)
                     elif key == 32 and wizard:
                         calibrated = wizard.capture()
@@ -752,11 +739,8 @@ def parser():
     mode.add_argument("--camera", type=int, metavar="INDEX", help="Explicitly open this webcam, usually 0")
     mode.add_argument("--markers", type=Path, metavar="DIRECTORY", help="Generate printable marker SVG/PNG files; no camera")
     result.add_argument("--calibrate", action="store_true", help="Run the seven-step calibration before camera control")
-<<<<<<< HEAD
     result.add_argument("--paper-test", action="store_true", help="Control with marker 7 only: auto-center, rotate to bank, tilt to pitch; no throttle marker")
-=======
     result.add_argument("--check", action="store_true", help="Measure camera placement and print PASS/WARN/FAIL advice; serves no controls")
->>>>>>> 8d00bab (Harden cardboard tracker for real desks: placement check, robust detection, next-pilot re-center)
     result.add_argument("--calibration", type=Path, default=DEFAULT_CALIBRATION)
     result.add_argument("--no-preview", action="store_true", help="Hide camera/debug window after calibration")
     result.add_argument("--print-json", action="store_true", help="Print every normalized packet for inspection")
@@ -782,13 +766,10 @@ def main():
         argument_parser.error("Camera index cannot be negative.")
     if args.calibrate and args.camera is None:
         argument_parser.error("--calibrate requires an explicit --camera INDEX.")
-<<<<<<< HEAD
     if args.paper_test and (args.camera is None or args.calibrate or args.no_preview):
         argument_parser.error("--paper-test needs --camera and its preview; omit --calibrate.")
-=======
     if args.check and (args.camera is None or args.calibrate):
         argument_parser.error("--check requires --camera INDEX and cannot be combined with --calibrate.")
->>>>>>> 8d00bab (Harden cardboard tracker for real desks: placement check, robust detection, next-pilot re-center)
     if args.loss_demo and not args.simulate:
         argument_parser.error("--loss-demo requires --simulate.")
     try:
