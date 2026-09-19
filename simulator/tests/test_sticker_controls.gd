@@ -18,6 +18,16 @@ func run() -> void:
 	assert(app.flight.throttle>.2,"Throttle marker changes engine power")
 	app.take_manual_control(true)
 	assert(not app.vision.enabled,"Keyboard override remains available")
+	app.vision.enabled=true; app.vision.tracking=false
+	app.vision.throttle_confidence=1; app.vision.throttle=.75
+	app.copilot=true; app.flight.throttle=.2
+	app.take_manual_control(true)
+	assert(app.vision.enabled,"Keyboard steering preserves throttle-only tracking")
+	app.copilot=true
+	app._physics_process(.1)
+	assert(not app.copilot and app.flight.throttle>.2,"Throttle alone takes power from automatic flight")
+	app.take_manual_control(false)
+	assert(not app.vision.enabled,"Power keys explicitly take over from camera throttle")
 	app.paper_test=true; app.vision.enabled=true
 	app.start_flight("paper")
 	app.vision.tracking=false
@@ -27,6 +37,13 @@ func run() -> void:
 	app.vision.tracking=true; app.vision.yoke=Vector2(.7,.4)
 	app._physics_process(.1)
 	assert(app.flight.position!=held_position and app.control.x>0,"Single-card steering resumes flight")
+	app.flight.throttle=.5; app.vision.throttle=0; app.vision.throttle_confidence=1
+	app._physics_process(.1)
+	assert(app.flight.throttle<.5,"Relative throttle overrides paper-test automatic speed")
+	var held_power: float=app.flight.throttle
+	app.vision.throttle_confidence=0
+	app._physics_process(.1)
+	assert(is_equal_approx(app.flight.throttle,held_power),"Lost throttle holds power instead of restoring automatic speed")
 	app.on_action("restart")
 	assert(app.vision.enabled and not app.copilot and app.flight.position.y>500,"Single-card restart preserves marker control and airborne test")
 	# The chase camera must rotate with climbs/dives, not merely look up or
@@ -48,5 +65,6 @@ func run() -> void:
 	var dive_angle: float = asin(-app.camera.basis.z.y)
 	assert(absf((dive_angle-level_angle)-deg_to_rad(-20))<deg_to_rad(1),"Camera follows nose-down pitch as well as climbs")
 	assert(app.camera.position.y>app.flight.position.y,"Diving chase offset stays behind the pitched aircraft")
+	assert(not app.paper_throttle_seen,"Restart clears paper throttle ownership")
 	print("STICKER INPUT: PASS")
 	app.queue_free(); await process_frame; quit()

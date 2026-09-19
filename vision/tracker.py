@@ -15,17 +15,22 @@ import sys
 import time
 
 if __package__:
+    from .camera_calibration import LensProfile, run_lens_calibration, write_checkerboard
+    from .pose_guard import PoseGuard
+    from .relative_throttle import RelativeThrottle, THROTTLE_IDLE_ID, THROTTLE_ID, THROTTLE_FULL_ID
     from .calibration import (AxisCalibration, Calibration, ControlFilter, ThrottleCalibration,
-                              ThrottleObservation, YokeObservation, clamp, simulated_calibration,
+                              YokeObservation, clamp, simulated_calibration,
                               simulated_observations, wrap_degrees)
 else:
+    from camera_calibration import LensProfile, run_lens_calibration, write_checkerboard
+    from pose_guard import PoseGuard
+    from relative_throttle import RelativeThrottle, THROTTLE_IDLE_ID, THROTTLE_ID, THROTTLE_FULL_ID
     from calibration import (AxisCalibration, Calibration, ControlFilter, ThrottleCalibration,
-                             ThrottleObservation, YokeObservation, clamp, simulated_calibration,
+                             YokeObservation, clamp, simulated_calibration,
                              simulated_observations, wrap_degrees)
 
-# Change these IDs and regenerate BOTH markers if another booth uses the same IDs.
+# Yoke stays separate from the relative throttle IDs 0, 1 and 2.
 YOKE_ID = 7
-THROTTLE_ID = 23
 if __package__:
     from .weapon_switches import WeaponSwitches
 else:
@@ -51,7 +56,9 @@ def generate_markers(directory: Path) -> None:
     cv2, np = load_cv()
     dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
     directory.mkdir(parents=True, exist_ok=True)
-    for marker_id, role, size_mm in ((YOKE_ID, "yoke", 70), (THROTTLE_ID, "throttle", 50), (31,"primary-on",35),(32,"primary-off",35),(41,"salvo-on",35),(42,"salvo-off",35)):
+    for marker_id, role, size_mm in ((YOKE_ID, "yoke", 70), (THROTTLE_IDLE_ID, "throttle-idle", 30),
+                                     (THROTTLE_ID, "throttle", 30), (THROTTLE_FULL_ID, "throttle-full", 30),
+                                     (31,"primary-on",35),(32,"primary-off",35),(41,"salvo-on",35),(42,"salvo-off",35)):
         # Six cells = four data cells + one-cell black border on each side.
         cells = cv2.aruco.generateImageMarker(dictionary, marker_id, 6)
         rects = ['<rect width="8" height="8" fill="white"/>']
@@ -71,15 +78,19 @@ def generate_markers(directory: Path) -> None:
 
 
 class ArucoTracker:
-    """Estimate yoke orientation and a throttle's normalized image position.
+    """Estimate yoke orientation and throttle position relative to live tags 0/2.
 
-    Approximate intrinsics are sufficient for relative arcade control. This is
-    not metric pose measurement. Calibration absorbs camera mounting offsets.
+    Supply a measured LensProfile to correct camera geometry. Without one,
+    the legacy approximate camera model remains available for quick testing.
     """
-    def __init__(self, yoke_id: int = YOKE_ID, throttle_id: int = THROTTLE_ID):
+    def __init__(self, yoke_id: int = YOKE_ID, lens=None):
         self.cv2, self.np = load_cv()
+        self.lens = lens
+        self.pose_guard = PoseGuard()
         self.yoke_id = yoke_id
-        self.throttle_id = throttle_id
+        if yoke_id in (THROTTLE_IDLE_ID, THROTTLE_ID, THROTTLE_FULL_ID):
+            raise ValueError("Yoke ID must differ from throttle IDs 0, 1 and 2.")
+        self.throttle = RelativeThrottle(self.cv2, self.np)
         dictionary = self.cv2.aruco.getPredefinedDictionary(self.cv2.aruco.DICT_4X4_50)
         parameters = self.cv2.aruco.DetectorParameters()
         parameters.cornerRefinementMethod = self.cv2.aruco.CORNER_REFINE_SUBPIX
@@ -93,7 +104,8 @@ class ArucoTracker:
         height, width = frame.shape[:2]
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         corners, ids, _ = self.detector.detectMarkers(gray)
-        yoke = throttle = None
+        yoke = None
+        throttle = self.throttle.observe(corners, ids, frame if draw else None)
         self.weapon_observations = {}
         if ids is None:
             return yoke, throttle
@@ -104,6 +116,9 @@ class ArucoTracker:
         focal = width * 0.72
         matrix = np.array([[focal, 0, width / 2], [0, focal, height / 2], [0, 0, 1]], dtype=np.float64)
         distortion = np.zeros((5, 1), dtype=np.float64)
+        if self.lens is not None:
+            matrix = self.lens.camera_matrix(width, height)
+            distortion = np.asarray(self.lens.distortion, dtype=np.float64)
         object_points = np.array([[-.5, .5, 0], [.5, .5, 0], [.5, -.5, 0], [-.5, -.5, 0]], dtype=np.float32)
         # Duplicated IDs are ambiguous; reject that control instead of choosing
         # whichever marker happens to be enumerated last.
@@ -119,19 +134,13 @@ class ArucoTracker:
                     self.weapon_observations[role] = (value, clamp(side/75,.3,1.0))
         for marker_corners, marker_id in zip(corners, ids.flatten()):
             marker_id = int(marker_id)
-            if counts[marker_id] != 1 or marker_id not in (self.yoke_id, self.throttle_id):
+            if counts[marker_id] != 1 or marker_id != self.yoke_id:
                 continue
             points = marker_corners.reshape(4, 2)
             side = float(min(np.linalg.norm(points[(i + 1) % 4] - points[i]) for i in range(4)))
             if side < 24:
                 continue
             confidence = clamp(side / 85, 0.25, 1.0)
-            center = points.mean(axis=0)
-            if marker_id == self.throttle_id:
-                throttle = ThrottleObservation((float(center[0] / width), float(center[1] / height)), confidence)
-                if draw:
-                    cv2.circle(frame, tuple(center.astype(int)), 5, (50, 210, 255), -1)
-                continue
             # IPPE provides both planar pose solutions; prioritize reprojection
             # error, with a small continuity preference near ambiguous head-on views.
             result = cv2.solvePnPGeneric(object_points, points, matrix, distortion, flags=cv2.SOLVEPNP_IPPE_SQUARE)
@@ -157,6 +166,8 @@ class ArucoTracker:
             _, error, roll, pitch, rvec, tvec = min(candidates, key=lambda value: value[0])
             if not math.isfinite(error) or error > 4.0:
                 continue
+            if not self.pose_guard.accept((roll, pitch), now):
+                continue
             confidence *= clamp(1 - error / 6, 0, 1)
             self.previous_pose = pitch
             self.previous_pose_time = now
@@ -172,12 +183,15 @@ class PaperController:
     The first stable second establishes neutral; space recenters. Rotation banks
     and forward/backward tilt pitches. Image translation is not an input.
     """
-    def __init__(self):
+    def __init__(self, lens=None):
+        self.lens = lens
+        self.pose_guard = PoseGuard()
         self.cv2, self.np = load_cv()
         parameters = self.cv2.aruco.DetectorParameters()
         parameters.cornerRefinementMethod = self.cv2.aruco.CORNER_REFINE_SUBPIX
         self.detector = self.cv2.aruco.ArucoDetector(
             self.cv2.aruco.getPredefinedDictionary(self.cv2.aruco.DICT_4X4_50), parameters)
+        self.throttle = RelativeThrottle(self.cv2, self.np)
         self.samples = collections.deque(maxlen=24)
         self.motion = collections.deque(maxlen=3)
         self.axis_active = [False, False]
@@ -185,6 +199,7 @@ class PaperController:
         self.message = "Show marker 7 and hold still for one second to center."
 
     def recenter(self):
+        self.pose_guard.reset()
         self.neutral = None
         self.samples.clear()
         self.motion.clear()
@@ -224,15 +239,25 @@ class PaperController:
         self.message = "LIVE: rotate to bank; tilt top toward you to climb. SPACE centers."
         return YokeObservation(bank, pitch, confidence)
 
-    def perspective_angles(self, points, width, height):
+    def perspective_angles(self, points, width, height, mirrored=False):
         cv, np = self.cv2, self.np
-        # Decompose the signed projective square, not its bounding-box aspect
-        # ratio. Intrinsics are approximate; this is a relative controller,
-        # not a calibrated metric pose measurement.
-        square = np.array([[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]], np.float32)
-        h = cv.getPerspectiveTransform(square, points.astype(np.float32))
+        # Lens correction precedes the rigid-plane decomposition. Translation
+        # in the image is never itself a pitch command.
         focal = width * .72
         k = np.array([[focal,0,width/2],[0,focal,height/2],[0,0,1]],float)
+        points = np.asarray(points, dtype=np.float64).copy()
+        if self.lens is not None:
+            k = self.lens.camera_matrix(width, height).copy()
+            if mirrored:
+                # Fallback detection happens on a flipped frame. Undistort in
+                # the original calibrated pixel coordinates before flipping back.
+                points[:, 0] = width - 1 - points[:, 0]
+            points = self.lens.undistort(points, width, height)
+            if mirrored:
+                points[:, 0] = width - 1 - points[:, 0]
+                k[0, 2] = width - 1 - k[0, 2]
+        square = np.array([[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]], np.float32)
+        h = cv.getPerspectiveTransform(square, points.astype(np.float32))
         basis = np.linalg.solve(k,h)
         scale = 2 / (np.linalg.norm(basis[:,0])+np.linalg.norm(basis[:,1]))
         if basis[2,2] < 0: scale = -scale
@@ -248,34 +273,41 @@ class PaperController:
     def detect(self, frame, now, draw=True):
         cv, np = self.cv2, self.np
         corners, ids, _ = self.detector.detectMarkers(frame)
+        throttle = self.throttle.observe(corners, ids)
         mirrored = False
         if ids is None or YOKE_ID not in ids:
             corners, ids, _ = self.detector.detectMarkers(cv.flip(frame, 1))
             mirrored = True
+            if throttle is None:
+                throttle = self.throttle.observe(corners, ids)
         if ids is None or list(ids.flatten()).count(YOKE_ID) != 1:
             self.samples.clear()
             self.motion.clear()
             self.axis_active = [False, False]
             self.message = "Marker 7 not visible - flight holds. Keep all four black corners clear."
-            return None, None
+            return None, throttle
         points = corners[list(ids.flatten()).index(YOKE_ID)].reshape(4, 2).copy()
         side = min(float(np.linalg.norm(points[(i + 1) % 4] - points[i])) for i in range(4))
         if side < 70:
             self.samples.clear()
             self.message = "Move marker 7 closer."
-            return None, None
+            return None, throttle
         try:
-            roll, tilt = self.perspective_angles(points,frame.shape[1],frame.shape[0])
+            roll, tilt = self.perspective_angles(points,frame.shape[1],frame.shape[0],mirrored)
         except (ValueError, np.linalg.LinAlgError, cv.error):
-            return None, None
+            return None, throttle
         if not math.isfinite(tilt) or abs(tilt)>65:
             self.message = "Face marker toward camera; avoid edge-on angles."
-            return None, None
+            return None, throttle
+        if not self.pose_guard.accept((roll, tilt), now):
+            self.samples.clear()
+            self.message = "Checking a sudden angle change; keep marker steady."
+            return None, throttle
         if mirrored:
             points[:, 0] = frame.shape[1] - 1 - points[:, 0]
         if draw:
             cv.polylines(frame, [points.astype(np.int32)], True, (60,240,90), 3)
-        return self.map_observation(roll, tilt, clamp(side / 120, .4, 1)), None
+        return self.map_observation(roll, tilt, clamp(side / 120, .4, 1)), throttle
 
 
 class CameraSource:
@@ -308,8 +340,6 @@ class CalibrationWizard:
         ("RIGHT", "Roll fully RIGHT. Hold still.", "yoke"),
         ("FORWARD", "Tilt yoke FORWARD for nose down. Hold still.", "yoke"),
         ("BACKWARD", "Tilt yoke BACK toward you for nose up. Hold still.", "yoke"),
-        ("IDLE", "Slide throttle to IDLE. Keep marker visible.", "throttle"),
-        ("FULL", "Slide throttle to FULL. Keep marker visible.", "throttle"),
     )
 
     def __init__(self, camera_index: int, width: int, height: int):
@@ -321,27 +351,20 @@ class CalibrationWizard:
         print("Calibration: " + self.STEPS[0][1], flush=True)
 
     def observe(self, yoke, throttle):
-        kind = self.STEPS[self.index][2]
-        observation = yoke if kind == "yoke" else throttle
-        if observation is None or observation.confidence < 0.4:
+        if yoke is None or yoke.confidence < 0.4:
             self.samples.clear()
-        elif kind == "yoke":
-            self.samples.append((yoke.roll, yoke.pitch))
         else:
-            self.samples.append(throttle.position)
+            self.samples.append((yoke.roll, yoke.pitch))
 
     def capture(self):
         if len(self.samples) < 18:
             self.message = "Keep the active marker visible and still for one second."
             return None
         rows = tuple(zip(*self.samples))
-        kind = self.STEPS[self.index][2]
         # Unwrap roll locally before taking a median near the +/-180 seam.
-        if kind == "yoke":
-            first = rows[0][0]
-            rows = (tuple(first + wrap_degrees(x - first) for x in rows[0]), rows[1])
-        threshold = 4.0 if kind == "yoke" else 0.015
-        if any(statistics.pstdev(axis) > threshold for axis in rows):
+        first = rows[0][0]
+        rows = (tuple(first + wrap_degrees(x - first) for x in rows[0]), rows[1])
+        if any(statistics.pstdev(axis) > 4.0 for axis in rows):
             self.message = "Too much movement. Hold still, then press SPACE again."
             return None
         key = self.STEPS[self.index][0]
@@ -356,7 +379,7 @@ class CalibrationWizard:
             result = Calibration(
                 AxisCalibration(self.values["LEFT"][0], self.values["NEUTRAL"][0], self.values["RIGHT"][0]),
                 AxisCalibration(self.values["FORWARD"][1], self.values["NEUTRAL"][1], self.values["BACKWARD"][1]),
-                ThrottleCalibration(self.values["IDLE"], self.values["FULL"]),
+                ThrottleCalibration((0.0, 0.0), (1.0, 0.0)),
                 self.camera_index, self.width, self.height,
             )
             result.validate()
@@ -369,18 +392,20 @@ class CalibrationWizard:
             return None
 
 
-def draw_preview(frame, packet, wizard, fps: float):
+def draw_preview(frame, packet, wizard, fps: float, throttle_status: str = "", lens_status: str = ""):
     cv2, _ = load_cv()
-    cv2.rectangle(frame, (0, 0), (frame.shape[1], 150 if wizard else 122), (26, 30, 32), -1)
+    cv2.rectangle(frame, (0, 0), (frame.shape[1], 150 if wizard or throttle_status else 122), (26, 30, 32), -1)
     if wizard:
         title, instruction, _ = wizard.STEPS[wizard.index]
-        lines = ["CALIBRATION %d/7 - %s" % (wizard.index + 1, title), instruction,
+        lines = ["CALIBRATION %d/%d - %s" % (wizard.index + 1, len(wizard.STEPS), title), instruction,
                  wizard.message, "SPACE: capture  |  Q / ESC: quit  |  %d/18 samples" % len(wizard.samples)]
     else:
         yoke, throttle = packet["yoke"], packet["throttle"]
-        lines = ["CARDBOARD COCKPIT  |  %.1f FPS  |  local camera only" % fps,
+        lines = ["CARDBOARD COCKPIT | %.1f FPS | %s" % (fps, lens_status or "local camera only"),
                  "YOKE %s  ROLL %+.2f  PITCH %+.2f" % ("TRACKED" if yoke["confidence"] else "LOST", yoke["roll"], yoke["pitch"]),
-                 "THROTTLE %3.0f%% %s  |  C: calibrate  Q: quit" % (throttle["value"] * 100, "TRACKED" if throttle["confidence"] else "HOLDING / LOST")]
+                 "THROTTLE %3.0f%% %s  |  tags 0/1/2  |  Q: quit" % (throttle["value"] * 100, "TRACKED" if throttle["confidence"] else "HOLDING / LOST")]
+    if throttle_status and not wizard:
+        lines.append(throttle_status)
     for index, line in enumerate(lines):
         cv2.putText(frame, line, (18, 28 + index * 32), cv2.FONT_HERSHEY_SIMPLEX, .62,
                     (115, 226, 247) if index == 0 else (235, 239, 240), 1, cv2.LINE_AA)
@@ -407,11 +432,17 @@ async def run(args):
 
     source = detector = wizard = None
     calibration = simulated_calibration()
+    lens = LensProfile.load(args.intrinsics) if args.intrinsics is not None else None
+    lens_status = "LENS CALIBRATED" if lens is not None else "LENS APPROXIMATE"
     if args.camera is not None:
-        detector = PaperController() if args.paper_test else ArucoTracker()
-        if args.paper_test:
+        if lens is not None and lens.camera_index != args.camera:
+            raise ValueError("Lens profile camera index differs; select its camera or recalibrate the lens.")
+        print(lens_status + ("; using " + str(args.intrinsics) if lens else "; use --calibrate-lens to measure this camera."), flush=True)
+        detector = PaperController(lens=lens) if args.paper_test else ArucoTracker(lens=lens)
+        if args.paper_test or args.throttle_only:
             args.calibrate = False
-            # Relative image-space units, not a fabricated saved physical calibration.
+            # Paper yoke returns normalized angle ranges. Live throttle fractions
+            # bypass the legacy stored image endpoints in ControlFilter.
             calibration = Calibration(AxisCalibration(-35,0,35), AxisCalibration(-25,0,25),
                                       ThrottleCalibration((.75,.8),(.75,.4)))
         elif args.calibration.exists() and not args.calibrate:
@@ -495,9 +526,11 @@ async def run(args):
                                         queue.get_nowait()
                                     queue.put_nowait(jpeg)
                             last_preview = frame_start
+                        if lens is not None:
+                            lens.check_source(args.camera, frame.shape[1], frame.shape[0])
                         if not checked_frame_size:
                             checked_frame_size = True
-                            if not args.paper_test and not wizard and (frame.shape[1], frame.shape[0]) != (calibration.width, calibration.height):
+                            if not (args.paper_test or args.throttle_only) and not wizard and (frame.shape[1], frame.shape[0]) != (calibration.width, calibration.height):
                                 if args.no_preview:
                                     raise RuntimeError("Camera resolution changed. Restart without --no-preview to recalibrate.")
                                 print("Camera resolution changed. Recalibration is required.", flush=True)
@@ -505,6 +538,8 @@ async def run(args):
                         if wizard:
                             wizard.width, wizard.height = frame.shape[1], frame.shape[0]
                         yoke, throttle = detector.detect(frame, frame_start, not args.no_preview)
+                        if args.throttle_only:
+                            yoke = None
                 if wizard:
                     wizard.observe(yoke, throttle)
                     yoke = throttle = None
@@ -527,11 +562,11 @@ async def run(args):
                 if frame is not None and not args.no_preview:
                     interval = max(frame_start - previous, 0.001)
                     fps_estimate += .08 * ((1.0 / interval) - fps_estimate)
-                    draw_preview(frame, packet, wizard, fps_estimate)
+                    draw_preview(frame, packet, wizard, fps_estimate, detector.throttle.message, lens_status)
                     if args.paper_test:
-                        detector.cv2.rectangle(frame, (0,0), (frame.shape[1],122), (26,30,32), -1)
-                        for row, line in enumerate(["YOKE CONTROLLER - ID 7 - KEEP OPEN WHILE PLAYING", detector.message,
-                                "BANK %+.2f  PITCH %+.2f   |   Q quits" % (packet["yoke"]["roll"], packet["yoke"]["pitch"]) ]):
+                        detector.cv2.rectangle(frame, (0,0), (frame.shape[1],150), (26,30,32), -1)
+                        for row, line in enumerate(["YOKE ID 7 | " + lens_status + " | KEEP OPEN", detector.message,
+                                "BANK %+.2f  PITCH %+.2f  POWER %3.0f%% %s | Q quits" % (packet["yoke"]["roll"], packet["yoke"]["pitch"], packet["throttle"]["value"] * 100, "LIVE" if packet["throttle"]["confidence"] > .4 else "HELD"), detector.throttle.message ]):
                             detector.cv2.putText(frame,line,(16,28+row*33),detector.cv2.FONT_HERSHEY_SIMPLEX,.55,(110,240,160),1,detector.cv2.LINE_AA)
                         detector.cv2.imshow(PREVIEW_TITLE,frame)
                     key = detector.cv2.waitKey(1) & 0xFF
@@ -547,7 +582,7 @@ async def run(args):
                         break
                     if args.paper_test and key in (32, ord("c")):
                         detector.recenter()
-                    elif not args.paper_test and key == ord("c"):
+                    elif not (args.paper_test or args.throttle_only) and key == ord("c"):
                         wizard = CalibrationWizard(args.camera, frame.shape[1], frame.shape[0])
                     elif key == 32 and wizard:
                         calibrated = wizard.capture()
@@ -574,8 +609,12 @@ def parser():
     mode.add_argument("--simulate", action="store_true", help="Serve deterministic controls without opening a camera")
     mode.add_argument("--camera", type=int, metavar="INDEX", help="Explicitly open this webcam, usually 0")
     mode.add_argument("--markers", type=Path, metavar="DIRECTORY", help="Generate printable marker SVG/PNG files; no camera")
-    result.add_argument("--calibrate", action="store_true", help="Run the seven-step calibration before camera control")
-    result.add_argument("--paper-test", action="store_true", help="Control with marker 7 only: auto-center, rotate to bank, tilt to pitch; no throttle marker")
+    mode.add_argument("--checkerboard", type=Path, metavar="SVG", help="Write the lens calibration print target; no camera")
+    result.add_argument("--calibrate-lens", action="store_true", help="Measure lens parameters using a printed checkerboard, then exit")
+    result.add_argument("--intrinsics", type=Path, metavar="JSON", help="Load measured lens profile, or save here with --calibrate-lens")
+    result.add_argument("--calibrate", action="store_true", help="Run the five-step yoke calibration; throttle endpoints are tracked live")
+    result.add_argument("--paper-test", action="store_true", help="Auto-center yoke 7, with optional relative throttle tags 0/1/2")
+    result.add_argument("--throttle-only", action="store_true", help="Track throttle 0/1/2 without yoke calibration; steer in game with keyboard")
     result.add_argument("--calibration", type=Path, default=DEFAULT_CALIBRATION)
     result.add_argument("--no-preview", action="store_true", help="Hide camera/debug window after calibration")
     result.add_argument("--print-json", action="store_true", help="Print every normalized packet for inspection")
@@ -611,10 +650,21 @@ def main():
         argument_parser.error("--calibrate requires an explicit --camera INDEX.")
     if args.paper_test and (args.camera is None or args.calibrate or args.no_preview):
         argument_parser.error("--paper-test needs --camera and its preview; omit --calibrate.")
+    if args.throttle_only and (args.camera is None or args.calibrate or args.paper_test):
+        argument_parser.error("--throttle-only needs --camera; omit --calibrate and --paper-test.")
+    if args.calibrate_lens and (args.camera is None or args.intrinsics is None or args.calibrate or args.paper_test or args.throttle_only or args.no_preview):
+        argument_parser.error("--calibrate-lens needs --camera INDEX --intrinsics FILE and its preview; omit other calibration/control modes.")
+    if args.intrinsics is not None and args.camera is None:
+        argument_parser.error("--intrinsics requires --camera INDEX.")
     if args.loss_demo and not args.simulate:
         argument_parser.error("--loss-demo requires --simulate.")
     try:
-        if args.markers is not None:
+        if args.checkerboard is not None:
+            write_checkerboard(args.checkerboard)
+            print("Print %s in landscape on flat paper; keep the white margin." % args.checkerboard)
+        elif args.calibrate_lens:
+            run_lens_calibration(args, CameraSource)
+        elif args.markers is not None:
             generate_markers(args.markers)
         else:
             asyncio.run(run(args))

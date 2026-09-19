@@ -27,7 +27,7 @@ Transport: one UTF-8 JSON object per WebSocket text message at approximately 24�
 | `version` | Protocol version; reject unsupported versions |
 | `sequence` | Monotonically increasing integer per tracker process; not necessarily zero when a client connects |
 | `timestamp` | Unix milliseconds; useful for logging, not the sole timeout source |
-| `tracking` | True only when both markers are usable; individual confidence still governs each control |
+| `tracking` | True only when both yoke and three-tag throttle are usable; individual confidence still governs each control |
 | `yoke.roll` | -1 left to +1 right |
 | `yoke.pitch` | -1 nose-down to +1 nose-up |
 | `yoke.confidence` | 0 lost to 1 confident; geometric quality heuristic, not a probability |
@@ -64,7 +64,7 @@ The receiver owns keyboard takeover and decides whether vision is selected. A us
 
 ## Calibration
 
-Calibration is a local seven-step screen in the tracker, launched with `--camera 0 --calibrate`. Its preview accepts **Space** to capture each endpoint, **C** to restart calibration, and **Q/Escape** to stop the tracker. No socket command is needed. Values are stored atomically in the ignored `vision/calibration.local.json` by default:
+Calibration is a local five-step yoke screen in the tracker, launched with `--camera 0 --calibrate`. Its preview accepts **Space** to capture each endpoint, **C** to restart calibration, and **Q/Escape** to stop the tracker. No socket command is needed. Values are stored atomically in the ignored `vision/calibration.local.json` by default:
 
 ```json
 {
@@ -78,6 +78,8 @@ Calibration is a local seven-step screen in the tracker, launched with `--camera
 }
 ```
 
-Roll and pitch endpoints are raw orientation angles in degrees. Each axis requires at least 8° of movement on **both** sides of neutral; the signs may reverse with mounting orientation. A calibrated endpoint always maps to the intended direction. Throttle endpoints are unmirrored image coordinates in `[0,1]`; projection along the calibrated two-dimensional line maps continuously to `[0,1]`, with a minimum 6% image displacement. These are relative controls, not metrically calibrated camera pose.
+Roll and pitch endpoints are raw orientation angles in degrees. Each axis requires at least 8° of movement on **both** sides of neutral; the signs may reverse with mounting orientation. A calibrated endpoint always maps to the intended direction. The saved throttle endpoints remain in the version-1 file for compatibility with simulations. Live throttle uses tags 0/1/2 and ignores these saved pixels: rectify the common marker plane, then project moving tag 1 along the current 0-to-2 axis. All three tags must be uniquely visible in the same frame; no stale endpoint caching is used. These are relative controls, not metrically calibrated camera pose.
 
 `--simulate --loss-demo` supplies a deterministic 20-second loop for integration testing: yoke is absent at 8–11 s; throttle is absent at 13–16 s. It never accesses a camera. See `docs/vision-setup.md` for setup and known limits.
+
+Keyboard steering while the yoke is absent preserves throttle tracking. W/S explicitly releases camera input. In paper-test flight, automatic speed stops after the first valid relative throttle observation and stays off through marker loss until a flight restart.

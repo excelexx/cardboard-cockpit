@@ -7,7 +7,7 @@ import json
 import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 
 def clamp(value: float, low: float, high: float) -> float:
@@ -131,6 +131,13 @@ class ThrottleObservation:
     confidence: float
 
 
+@dataclass(frozen=True)
+class RelativeThrottleObservation:
+    """Already normalized against the live endpoint markers, not saved pixels."""
+    value: float
+    confidence: float
+
+
 def dead_zone(value: float, radius: float) -> float:
     if abs(value) <= radius:
         return 0.0
@@ -164,7 +171,7 @@ class ControlFilter:
         return current + clamp(step, -rate * delta, rate * delta)
 
     def step(self, now: float, timestamp_ms: int, yoke: Optional[YokeObservation],
-             throttle: Optional[ThrottleObservation]) -> Dict[str, object]:
+             throttle: Optional[Union[ThrottleObservation, RelativeThrottleObservation]]) -> Dict[str, object]:
         if not finite_number(now) or type(timestamp_ms) is not int:
             raise ValueError("Invalid clocks.")
         delta = 1 / 30 if self.last_time is None else clamp(now - self.last_time, 0, 0.10)
@@ -179,8 +186,13 @@ class ControlFilter:
             self.roll_target = self.pitch_target = 0.0
         self.roll = self._smooth(self.roll, self.roll_target, delta, 3.5)
         self.pitch = self._smooth(self.pitch, self.pitch_target, delta, 3.5)
-        if throttle is not None and len(throttle.position) == 2 and all(finite_number(v) for v in (*throttle.position, throttle.confidence)) and throttle.confidence >= 0.25:
+        target = None
+        if isinstance(throttle, RelativeThrottleObservation):
+            if all(finite_number(v) for v in (throttle.value, throttle.confidence)) and throttle.confidence >= 0.25:
+                target = clamp(throttle.value, 0, 1)
+        elif throttle is not None and len(throttle.position) == 2 and all(finite_number(v) for v in (*throttle.position, throttle.confidence)) and throttle.confidence >= 0.25:
             target = self.calibration.throttle.normalize(throttle.position)
+        if target is not None:
             self.throttle = self._smooth(self.throttle, target, delta, 1.5)
             throttle_confidence = clamp(throttle.confidence, 0, 1)
         packet = {

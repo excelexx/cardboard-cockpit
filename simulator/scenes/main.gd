@@ -46,6 +46,7 @@ var hud: CockpitHUD
 var cockpit := true
 var copilot := false
 var paper_test := false
+var paper_throttle_seen := false
 var used_copilot := false
 var demo_auto_fire := true
 var help_visible := false
@@ -136,6 +137,7 @@ func _ready() -> void:
 		world.visible = false; aircraft.visible = false; fighter_fx.visible = false
 
 func start_flight(kind: String = "demo") -> void:
+	paper_throttle_seen = false
 	flight_kind = kind
 	mode = "flight"; resume_mode = "flight"
 	help_visible = false; calibration_visible = false; credits_visible = false
@@ -237,6 +239,10 @@ func _input(event: InputEvent) -> void:
 func take_manual_control(steering: bool) -> void:
 	copilot = false
 	if steering: mouse_yoke = false
+	# Keyboard steering can accompany a throttle-only camera setup. Power keys
+	# still explicitly release all camera controls, as does overriding a live yoke.
+	if steering and vision.enabled and not vision.tracking and not paper_test:
+		return
 	vision.enabled = false; vision.status = "KEYBOARD / MOUSE"
 func on_action(action: String) -> void:
 	match action:
@@ -369,12 +375,14 @@ func _physics_process(dt: float) -> void:
 	input.x *= Tune.KEYBOARD_SCALE; input.y *= Tune.KEYBOARD_SCALE
 	var power: float = float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
 	if test_mode: input = Vector3.ZERO; power = 0
-	if input.length()>0 or power!=0: take_manual_control(input.length()>0)
+	if input.length()>0 or power!=0: take_manual_control(input.length()>0 and power==0)
 	if vision.enabled and vision.tracking:
 		if flight.airborne and vision.yoke.distance_to(assisted_yoke_reference)>.10:copilot=false
 		# Tracker packets already include the user's sensitivity setting.
 		input.x = vision.yoke.x; input.y = vision.yoke.y
 		# Physical yoke weapon toggles own firing; tracking alone never shoots.
+	if vision.enabled and vision.throttle_confidence>0.4:
+		copilot = false
 	flight.power_input = 0
 	if copilot:
 		input = mission.controls() if mission.active else combat.pilot_controls() if combat.active else approach_controls()
@@ -392,7 +400,8 @@ func _physics_process(dt: float) -> void:
 			flight.throttle=move_toward(flight.throttle,vision.throttle,dt*Tune.THROTTLE_RATE)
 			flight.power_input=clampf((vision.throttle-.5)*2,-1,1)
 			flight.afterburner=vision.throttle>.94 and flight.airborne
-		if paper_test and vision.enabled:
+			paper_throttle_seen = true
+		if paper_test and vision.enabled and not paper_throttle_seen:
 			flight.throttle = clampf(.45+(135-flight.speed)*.035,0,1)
 		flight.throttle = clampf(flight.throttle+power*dt*Tune.THROTTLE_RATE,0,1)
 		input=combat.intent.steering_assist(input,combat)

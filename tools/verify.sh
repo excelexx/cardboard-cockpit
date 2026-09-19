@@ -30,4 +30,5 @@ if [ ! -x .venv/bin/python ]; then ./tools/setup_vision.sh; fi
 "$engine" --headless --path simulator --fixed-fps 60 -- --approach --autotest --route=alpine
 .venv/bin/python -m unittest discover -s vision/tests -v
 "$engine" --headless --path simulator --script ../tools/test_vision_client.gd
+"$engine" --headless --path simulator --script ../tools/test_relative_throttle_game.gd
 printf '%s\n' 'PASS: SPECTRE flight, combat, camera, landing, audio and cardboard integration.'

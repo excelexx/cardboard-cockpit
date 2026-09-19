@@ -22,5 +22,6 @@ __pycache__/
 .env.*
 !.env.example
 vision/calibration.local.json
+vision/*.lens.local.json
 vision/recordings/
 *.log

@@ -9,6 +9,7 @@ except ImportError:
     cv2 = np = None
 
 from vision.tracker import ArucoTracker
+from vision.tests.throttle_fixture import throttle_frame
 
 
 @unittest.skipIf(cv2 is None, "Optional OpenCV/NumPy packages not installed")
@@ -18,15 +19,12 @@ class ArucoTests(unittest.TestCase):
         self.dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
 
     def test_two_markers_and_independent_loss(self):
-        frame = np.full((720, 1280, 3), 255, dtype=np.uint8)
-        for marker_id, x in ((7, 220), (23, 880)):
-            marker = cv2.aruco.generateImageMarker(self.dictionary, marker_id, 160)
-            frame[280:440, x:x + 160] = cv2.cvtColor(marker, cv2.COLOR_GRAY2BGR)
+        frame = throttle_frame(.5, yoke=True)
         yoke, throttle = self.tracker.detect(frame, 0, False)
         self.assertIsNotNone(yoke)
         self.assertIsNotNone(throttle)
         self.assertAlmostEqual(yoke.roll, 0, delta=.2)
-        self.assertAlmostEqual(throttle.position[0], 959.5 / 1280, places=3)
+        self.assertAlmostEqual(throttle.value, .5, places=3)
         frame[280:440, 220:380] = 255
         yoke, throttle = self.tracker.detect(frame, 1, False)
         self.assertIsNone(yoke)

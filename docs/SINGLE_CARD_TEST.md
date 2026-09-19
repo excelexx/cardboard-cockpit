@@ -5,7 +5,13 @@ The camera controller turns marker rotation and perspective tilt into flight
 inputs. Leave that window open, then play in the separate simulator window.
 It estimates relative orientation using approximate camera intrinsics; it is
 not a calibrated depth sensor. Lifting the marker is no longer a pitch command.
-No throttle card or stored multi-step calibration is required.
+
+For measured focal lengths and lens-distortion correction, follow
+[camera lens calibration](camera-calibration.md), then add
+`--intrinsics vision/iphone.lens.local.json` to the tracker command. Without
+that option the preview is labelled LENS APPROXIMATE. Sudden angle jumps now
+require three agreeing observations; the usual median filtering remains.
+No throttle card or stored multi-step calibration is required. Optional throttle tags 0 (idle), 1 (moving) and 2 (full) now supply relative power; see [setup](vision-setup.md).
 
 From the project folder, use two terminals:
 
@@ -32,7 +38,7 @@ From the project folder, use two terminals:
 4. Hide the card to hold flight still. Show it again to resume.
 
 The aircraft starts airborne in chase view with automatic speed so you can
-see steering immediately. This is a diagnostic flight, not the takeoff mission.
+see steering immediately. Once the three-tag throttle is visible, it replaces automatic speed and holds its last power if hidden. This is a diagnostic flight, not the takeoff mission.
 The chase camera follows the aircraft's nose up and down with a short, smooth
 response, keeping its position behind the aircraft through climbs and dives.
 Restart preserves this mode. Keyboard override leaves marker control.

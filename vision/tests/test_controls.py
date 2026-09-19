@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 from vision.calibration import (AxisCalibration, Calibration, ControlFilter,
-    ThrottleCalibration, ThrottleObservation, YokeObservation, dead_zone,
+    ThrottleCalibration, ThrottleObservation, YokeObservation, RelativeThrottleObservation, dead_zone,
     simulated_calibration, simulated_observations)
 from vision.tracker import CalibrationWizard, parser
 
@@ -69,9 +69,9 @@ class CalibrationTests(unittest.TestCase):
         wizard = CalibrationWizard(0, 1280, 720)
         captures = [YokeObservation(4, 5, 1), YokeObservation(35, 5, 1),
                     YokeObservation(-40, 5, 1), YokeObservation(4, -20, 1),
-                    YokeObservation(4, 28, 1), None, None]
+                    YokeObservation(4, 28, 1)]
         result = None
-        for index in range(7):
+        for index in range(5):
             throttle = ThrottleObservation((.75, .8 if index == 5 else .4), 1)
             for _ in range(20):
                 wizard.observe(captures[index], throttle)
@@ -163,6 +163,16 @@ class FilterTests(unittest.TestCase):
         packet = controller.step(1 / 30, 1033, YokeObservation(35, 25, 1), ThrottleObservation((.75, .4), 1))
         self.assertLessEqual(packet["yoke"]["roll"], 3.5 / 30 + .00001)
         self.assertLessEqual(packet["throttle"]["value"], 1.5 / 30 + .00001)
+
+    def test_relative_throttle_ignores_saved_pixels_and_holds_on_loss(self):
+        controller = self.make()
+        initial = self.warm(controller, throttle=RelativeThrottleObservation(.75, 1))
+        self.assertAlmostEqual(initial["throttle"]["value"], .75, places=4)
+        for observation in (None, RelativeThrottleObservation(math.nan, 1),
+                            RelativeThrottleObservation(.2, .1)):
+            packet = controller.step(4, 5000, None, observation)
+            self.assertEqual(packet["throttle"]["value"], initial["throttle"]["value"])
+            self.assertEqual(packet["throttle"]["confidence"], 0)
 
     def test_simulated_stream_deterministic_and_loss(self):
         a, b = self.make(), self.make()

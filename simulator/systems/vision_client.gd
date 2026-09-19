@@ -78,6 +78,8 @@ func poll(dt: float) -> void:
 		throttle_confidence = 0.0
 	if connected:
 		status = "YOKE TRACKED" if tracking else "YOKE LOST · KEYBOARD READY"
+		if throttle_confidence>0.4:
+			status = "YOKE + THROTTLE TRACKED" if tracking else "THROTTLE TRACKED · KEYBOARD STEERING"
 
 func _is_number(value: Variant) -> bool:
 	return (value is float or value is int) and is_finite(float(value))

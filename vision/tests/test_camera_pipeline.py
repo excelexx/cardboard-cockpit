@@ -13,15 +13,12 @@ from websockets.asyncio.client import connect
 
 from vision.calibration import simulated_calibration
 from vision import tracker
+from vision.tests.throttle_fixture import throttle_frame
 
 
 class SyntheticCamera:
     def __init__(self):
-        dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
-        self.frame = np.full((720, 1280, 3), 255, dtype=np.uint8)
-        for marker_id, x in ((7, 220), (23, 880)):
-            marker = cv2.aruco.generateImageMarker(dictionary, marker_id, 160)
-            self.frame[280:440, x:x + 160] = cv2.cvtColor(marker, cv2.COLOR_GRAY2BGR)
+        self.frame = throttle_frame(.75, yoke=True)
         self.hide_yoke = False
         self.hide_throttle = False
         self.closed = False
@@ -33,7 +30,7 @@ class SyntheticCamera:
         if self.hide_yoke:
             frame[280:440, 220:380] = 255
         if self.hide_throttle:
-            frame[280:440, 880:1040] = 255
+            frame[450:650, 500:1200] = 255
         return frame
 
     def close(self):
@@ -119,7 +116,7 @@ class CameraPipelineTests(unittest.IsolatedAsyncioTestCase):
             packet["throttle"]["value"] = .4
             return packet
 
-        def readout(frame, packet, wizard, fps):
+        def readout(frame, packet, wizard, fps, *status):
             shown[packet["sequence"]] = json.loads(json.dumps(packet))
 
         with patch.object(tracker, "CameraSource", return_value=self.camera), \
@@ -150,6 +147,16 @@ class CameraPipelineTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(asyncio.CancelledError):
                     await service
             self.assertTrue(self.camera.closed)
+    async def test_throttle_only_starts_without_saved_yoke_calibration(self):
+        self.args.throttle_only = True
+        self.calibration_path.unlink()
+        self.args.duration = .15
+        self.camera.hide_yoke = True
+        with patch.object(tracker, "CameraSource", return_value=self.camera), \
+                patch.object(tracker, "CalibrationWizard", side_effect=AssertionError("No yoke calibration")):
+            await tracker.run(self.args)
+        self.assertGreater(self.camera.reads, 0)
+        self.assertTrue(self.camera.closed)
 
     async def test_resolution_change_requires_recalibration_and_releases_camera(self):
         self.camera.frame = self.camera.frame[:480, :640]

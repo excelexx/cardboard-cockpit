@@ -367,7 +367,7 @@ func draw_camera_setup() -> void:
 	zones.clear(); dim(); panel(Rect2(370,175,860,650),.97)
 	text(Vector2(421,236),"CARDBOARD / LOCAL INPUT",13,CYAN,true)
 	text(Vector2(419,291),"Your cockpit. Your aircraft.",32,WHITE)
-	var lines: Array[String] = ["1. Start tools/tracker.sh --camera 0 --calibrate.","2. Capture the seven poses in the tracker preview.","3. Enable tracking below, then centre the yoke.","Yoke switches: primary 31/32, salvo 41/42. Flip ON or OFF.","Badge: A gear / B flaps / arrows views, assist, text."]
+	var lines: Array[String] = ["1. Start tools/tracker.sh --camera 0 --paper-test.","2. Hold yoke 7 steady; throttle tags: 0 idle, 1 slider, 2 full.","3. Enable tracking below, then centre the yoke.","Throttle alone: use --throttle-only; arrows steer, W/S takes over.","Keep all three throttle tags flat and visible to the camera."]
 	for i in range(lines.size()): text(Vector2(423,345+i*42),lines[i],17,MUTED if i>2 else WHITE)
 	text(Vector2(423,586),app.vision.status,13,CYAN if app.vision.tracking else AMBER,true)
 	text(Vector2(423,626),"ROLL %+.2f / PITCH %+.2f / POWER %03d%%" % [app.vision.yoke.x,app.vision.yoke.y,int(app.vision.throttle*100)],15,WHITE,true)
