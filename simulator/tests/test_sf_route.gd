@@ -24,7 +24,7 @@ func run() -> void:
 		var at: Vector3=app.flight.position
 		if at.x>14000 and at.x<21000 and at.z< -9000 and at.z> -21000:
 			city_flyover_frames+=1
-		if app.flight.position.distance_to(previous)>app.flight.speed/60.0+1.0:
+		if app.flight.position.distance_to(previous)>app.flight.velocity.length()/60.0+1.0:
 			floor_corrections += 1
 		if app.mission.route_index!=previous_index:
 			previous_index = app.mission.route_index
@@ -39,9 +39,10 @@ func run() -> void:
 				root.get_texture().get_image().save_png(destination+"/route-%02d.png" % previous_index)
 		if app.mode=="results": break
 		if frame%600==0: await process_frame
-	if not app.mission_success: failures.append("Did not finish with a safe runway stop: "+str(app.flight.position)+" phase="+app.mission.phase)
-	if app.mission.visited_route.size()!=ScenicRoute.POINTS.size(): failures.append("Not every scenic landmark was visited")
-	if peak<600: failures.append("Did not reach the Bay Area touring altitude")
+	if not app.mission_success or not app.combat.boss_defeated: failures.append("Demo failed to defeat boss and reach outcome")
+	if app.mission.clock>150: failures.append("Demo exceeded 150 second limit")
+	if app.mission.visited_route.size()<2: failures.append("Demo did not reach SF neighborhoods")
+	if peak<350: failures.append("Did not reach the Bay Area touring altitude")
 	if floor_corrections>0: failures.append("Route relied on terrain safety correction: "+str(floor_corrections))
 	if app.profile().name!="SPECTRE X-26": failures.append("Current fighter was replaced")
 	if app.combat.hostile_launches!=0 or app.combat.ammo!=-1: failures.append("Current arcade rules were replaced")

@@ -16,7 +16,16 @@ const Vision = preload("res://systems/vision_client.gd")
 const Hud = preload("res://ui/hud.gd")
 const Manual = preload("res://systems/arcade_controls.gd")
 const Mission = preload("res://systems/demo_mission.gd")
+const Badge = preload("res://systems/badge_link.gd")
 const Approach = preload("res://systems/approach_guidance.gd")
+var badge: BadgeLink=Badge.new()
+var cv_weapon_revision:=-1
+var primary_latched:=false
+var salvo_latched:=false
+var text_hud:=true
+var gear_override:=-1
+var flaps_override:=-1
+var assisted_yoke_reference:=Vector2.ZERO
 var mode := "title"
 var resume_mode := "flight"
 var flight_kind := "demo"
@@ -62,11 +71,14 @@ var test_finished := false
 var pending_capture := false
 var toast := ""
 var toast_time := 0.0
+var near_obstacle_cooldown:=0.0
 func profile() -> Dictionary: return Catalog.PROFILE
 func _ready() -> void:
 	get_window().title = "Goose Protocol — SPECTRE X-26"
 	mission.app = self
+	if DisplayServer.get_name()!="headless":badge.open_inputs()
 	load_settings()
+	if DisplayServer.get_name()!="headless":route_id="sf"
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--route="): route_id = argument.trim_prefix("--route=")
 	route_id = str(get_meta("route_override",route_id))
@@ -117,6 +129,7 @@ func start_flight(kind: String = "demo") -> void:
 	copilot = false; used_copilot = false; mission_success = false; result_reason = ""
 	pilot_ejected = false; record_broken = false; eject_hold = 0; crash_clock = 0; fire_guard = 0.3
 	control = Vector3.ZERO; look = Vector2.ZERO
+	primary_latched=false;salvo_latched=false;cv_weapon_revision=-1;gear_override=-1;flaps_override=-1;assisted_yoke_reference=vision.yoke
 	flight.reset(profile())
 	if route_id=="sf": flight.position.y += world.ground_height(flight.position.x,flight.position.z)
 	if kind=="approach":
@@ -172,21 +185,27 @@ func _input(event: InputEvent) -> void:
 			KEY_B:
 				if mode=="flight": mouse_yoke = not mouse_yoke
 			KEY_G:
-				if mode=="flight": flight.gear = not flight.gear
+				if mode=="flight": flight.gear = not flight.gear;gear_override=int(flight.gear)
 			KEY_F:
-				if mode=="flight": flight.flaps = (flight.flaps+1)%3
+				if mode=="flight": flight.flaps = (flight.flaps+1)%3;flaps_override=flight.flaps
 			KEY_Q:
-				if mode=="flight": flight.start_barrel_roll(-1 if control.x<0 else 1)
+				if mode=="flight":
+					if flight.start_barrel_roll(-1 if control.x<0 else 1):combat.event("roll",flight.position,1);audio.play_effect("sonic",-23,1.5);camera_rig.impulse(.10)
 			KEY_T:
-				if mode=="flight" and fire_guard<=0: combat.fire_missile()
+				if mode=="flight" and fire_guard<=0:
+					salvo_latched=not salvo_latched
+					if salvo_latched:combat.fire_missile()
 			KEY_Z:
 				if mode=="flight": combat.deploy_flares()
 			KEY_J:
 				if mode=="flight": combat.assist = not combat.assist
 			KEY_F9: developer_mode = not developer_mode
 			KEY_F10: set_quality(not high_quality)
+			KEY_F8: text_hud=not text_hud
 			KEY_SPACE:
-				if mode=="flight" and flight.airborne and fire_guard<=0: combat.fire_gun()
+				if mode=="flight" and flight.airborne and fire_guard<=0:
+					primary_latched=not primary_latched
+					if primary_latched:combat.fire_gun()
 		if mode=="flight":
 			var physical: int = event.physical_keycode if event.physical_keycode else event.keycode
 			if physical in [KEY_LEFT,KEY_RIGHT,KEY_UP,KEY_DOWN,KEY_A,KEY_D,KEY_W,KEY_S]: take_manual_control(physical not in [KEY_W,KEY_S])
@@ -195,8 +214,8 @@ func _input(event: InputEvent) -> void:
 		look.x = clampf(look.x-event.relative.x*0.003,-1.4,1.4)
 		look.y = clampf(look.y-event.relative.y*0.003,-0.6,0.6)
 	if event is InputEventMouseButton and event.pressed and fire_guard<=0:
-		if event.button_index==MOUSE_BUTTON_RIGHT: combat.fire_missile()
-		elif event.button_index==MOUSE_BUTTON_LEFT: combat.fire_gun()
+		if event.button_index==MOUSE_BUTTON_RIGHT:salvo_latched=not salvo_latched
+		elif event.button_index==MOUSE_BUTTON_LEFT:primary_latched=not primary_latched
 
 func take_manual_control(steering: bool) -> void:
 	copilot = false
@@ -204,7 +223,7 @@ func take_manual_control(steering: bool) -> void:
 	vision.enabled = false; vision.status = "KEYBOARD / MOUSE"
 func on_action(action: String) -> void:
 	match action:
-		"route": select_route("coast" if route_id=="sf" else "alpine" if route_id=="coast" else "sf")
+		"route": pass
 		"fly": start_flight(); copilot = true; used_copilot = true; demo_auto_fire = false
 		"restart": start_flight(); copilot = true; used_copilot = true
 		"approach": start_flight("approach")
@@ -225,6 +244,8 @@ func on_action(action: String) -> void:
 func _process(dt: float) -> void:
 	runtime += dt; toast_time = maxf(0,toast_time-dt)
 	vision.poll(dt)
+	if vision.weapons_available and cv_weapon_revision!=vision.weapons_revision:
+		cv_weapon_revision=vision.weapons_revision;primary_latched=vision.primary_switch;salvo_latched=vision.salvo_switch
 	var paused: bool = mode=="paused" or overlay_visible()
 	var active: bool = mode in ["flight","rollout"] and not paused
 	if mode not in ["title"]:
@@ -242,6 +263,9 @@ func _process(dt: float) -> void:
 			cockpit_frame.update_instruments(flight,control,dt if active else 0)
 			cockpit_frame.set_navigation("sf" if route_id=="sf" else "free",mission.route_index)
 	audio.gun_wanted = active and combat.active and combat.gun_firing_time>0
+	audio.beam_wanted=active and combat.beam_active
+	audio.flow_intensity=combat.intent.intensity
+	audio.acquisition=combat.lock_progress if combat.target_id>=0 and combat.lock_progress<1 else 0
 	audio.burner_wanted = flight.afterburner and active
 	audio.set_context(mode,cockpit,flight.contact,paused)
 	audio.observe_flight(flight)
@@ -258,6 +282,20 @@ func capture_frame() -> void:
 	if not test_mode: get_tree().call_deferred("quit")
 
 func _physics_process(dt: float) -> void:
+	badge.poll();badge.tick(self,dt)
+	near_obstacle_cooldown=maxf(0,near_obstacle_cooldown-dt)
+	if badge.tapped(8):
+		if mode in ["title","results"]:on_action("fly")
+		elif mode=="paused":mode=resume_mode
+	if badge.tapped(2) and mode in ["flight","paused"]:
+		if mode=="paused":mode=resume_mode
+		else:resume_mode=mode;mode="paused"
+	if badge.tapped(0) and mode=="flight":flight.gear=not flight.gear;gear_override=int(flight.gear)
+	if badge.tapped(1) and mode=="flight":flight.flaps=(flight.flaps+1)%3;flaps_override=flight.flaps
+	if badge.tapped(4) and mode=="flight":cockpit=not cockpit;camera_rig.reset()
+	if badge.tapped(5) and mode=="flight":camera_rig.missile_requested=not camera_rig.missile_requested
+	if badge.tapped(6) and mode=="flight":copilot=not copilot;assisted_yoke_reference=vision.yoke
+	if badge.tapped(3):text_hud=not text_hud
 	if overlay_visible() or mode=="paused": return
 	if mode=="ejected":
 		fighter_fx.tick_ejection(dt)
@@ -294,16 +332,17 @@ func _physics_process(dt: float) -> void:
 	if combat.active:
 		combat.tick(dt)
 		if mode!="flight": return
-		if not test_mode and fire_guard<=0 and (Input.is_physical_key_pressed(KEY_SPACE) or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)): combat.fire_gun()
-		if not test_mode and fire_guard<=0 and (Input.is_physical_key_pressed(KEY_T) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)): combat.fire_missile()
+		if not test_mode and fire_guard<=0 and (primary_latched or Input.is_physical_key_pressed(KEY_SPACE) or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)): combat.fire_gun()
+		if not test_mode and fire_guard<=0 and (salvo_latched or Input.is_physical_key_pressed(KEY_T) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)): combat.fire_missile()
 	var input := Vector3(float(Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_UP))-float(Input.is_physical_key_pressed(KEY_DOWN)),float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)))
 	input.x *= Tune.KEYBOARD_SCALE; input.y *= Tune.KEYBOARD_SCALE
 	var power: float = float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
 	if test_mode: input = Vector3.ZERO; power = 0
 	if input.length()>0 or power!=0: take_manual_control(input.length()>0)
 	if vision.enabled and vision.tracking:
-		copilot = false; input.x = vision.yoke.x; input.y = vision.yoke.y
-		if combat.lock_progress>=1 and combat.assist: combat.fire_gun()
+		if flight.airborne and vision.yoke.distance_to(assisted_yoke_reference)>.10:copilot=false
+		input.x = vision.yoke.x; input.y = vision.yoke.y
+		# Physical yoke weapon toggles own firing; tracking alone never shoots.
 	flight.power_input = 0
 	if copilot:
 		input = mission.controls() if mission.active else combat.pilot_controls() if combat.active else approach_controls()
@@ -317,10 +356,15 @@ func _physics_process(dt: float) -> void:
 		if mouse_yoke and not Input.is_key_pressed(KEY_ALT):
 			var mouse: Vector2 = (get_viewport().get_mouse_position()-Vector2(800,470))/Tune.MOUSE_RANGE
 			input.x = clampf(mouse.x,-1,1); input.y = clampf(-mouse.y,-1,1)
-		if vision.enabled and vision.throttle_confidence>0.4: flight.throttle = move_toward(flight.throttle,vision.throttle,dt*0.8)
+		if vision.enabled and vision.throttle_confidence>0.4:
+			flight.throttle=move_toward(flight.throttle,vision.throttle,dt*Tune.THROTTLE_RATE)
+			flight.power_input=clampf((vision.throttle-.5)*2,-1,1)
+			flight.afterburner=vision.throttle>.94 and flight.airborne
 		flight.throttle = clampf(flight.throttle+power*dt*Tune.THROTTLE_RATE,0,1)
-		flight.power_input = power
-		flight.afterburner = Input.is_physical_key_pressed(KEY_SHIFT) and flight.airborne
+		input=combat.intent.steering_assist(input,combat)
+		if not (vision.enabled and vision.throttle_confidence>0.4) or power!=0:
+			flight.power_input = power
+			flight.afterburner = Input.is_physical_key_pressed(KEY_SHIFT) and flight.airborne
 		var landing_assist: bool = flight.gear and (flight_kind=="approach" or (mission.active and mission.phase=="approach"))
 		var clearance: float = flight.position.y-world.ground_height(flight.position.x,flight.position.z)
 		if not landing_assist:
@@ -328,11 +372,21 @@ func _physics_process(dt: float) -> void:
 				var ahead: Vector3 = flight.position+flight.forward()*flight.speed*seconds
 				clearance = minf(clearance,flight.position.y-world.ground_height(ahead.x,ahead.z))
 		input = Manual.command(flight,input,clearance,landing_assist)
+		if not landing_assist and world.has_method("obstacle_proximity"):
+			var near: Dictionary=world.obstacle_proximity(flight.position)
+			if near.distance<65 and near_obstacle_cooldown<=0:
+				combat.intent.event("near_miss");combat.event("near_miss",near.point,1);near_obstacle_cooldown=2.5
+			var ahead: Dictionary=world.obstacle_proximity(flight.position+flight.velocity*.9)
+			if ahead.distance<100:
+				# Add bounded elevator demand. Aircraft position remains physical.
+				input.y=maxf(input.y,.55*(1-clampf(ahead.distance/100,0,1)))
 		if landing_assist and power==0 and not vision.enabled: flight.throttle = clampf(.22+(Tune.APPROACH_SPEED-flight.speed)*.055,0,1)
 	control = control.lerp(input,1-exp(-dt*Tune.INPUT_RESPONSE))
 	var agl: float = flight.position.y-world.ground_height(flight.position.x,flight.position.z)
 	flight.wind = Vector3(3.5+sin(flight.elapsed*.23)*1.7,0,sin(flight.elapsed*.17)*2.0)*clampf((agl-20)/90,0,1)
 	var was_airborne: bool = flight.airborne
+	if gear_override>=0:flight.gear=gear_override==1
+	if flaps_override>=0:flight.flaps=flaps_override
 	flight.step(dt,control,not mission.active and Input.is_physical_key_pressed(KEY_SPACE),world.ground_height(flight.position.x,flight.position.z),is_on_runway(flight.position),false)
 	flight.resolve_contact(world.ground_height(flight.position.x,flight.position.z),is_on_runway(flight.position))
 	if flight.airborne and not was_airborne: audio.radio.say("cleared")
@@ -416,3 +470,6 @@ func select_route(value: String) -> void:
 	add_child(world); world.set_conditions("golden"); world.apply_quality(high_quality)
 	world.visible = mode!="title"
 	save_settings()
+
+func _exit_tree() -> void:
+	badge.close()

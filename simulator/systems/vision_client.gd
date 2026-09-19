@@ -16,6 +16,10 @@ var throttle_confidence: float = 0.0
 var last_received: int = -1
 var retry_at: int = 0
 var sequence: int = -1
+var primary_switch:=false
+var salvo_switch:=false
+var weapons_revision:=0
+var weapons_available:=false
 var status := "KEYBOARD / MOUSE"
 var enabled := false:
 	set(value):
@@ -30,6 +34,8 @@ var enabled := false:
 			yoke = Vector2.ZERO
 			yoke_confidence = 0.0
 			throttle_confidence = 0.0
+			if primary_switch or salvo_switch:weapons_revision+=1
+			primary_switch=false;salvo_switch=false
 			last_received = -1
 			sequence = -1
 			status = "KEYBOARD / MOUSE"
@@ -63,6 +69,8 @@ func poll(dt: float) -> void:
 				_accept_packet(packet, now)
 	var fresh: bool = connected and last_received >= 0 and now - last_received < STALE_AFTER_MS
 	tracking = fresh and yoke_confidence > 0.4
+	if not fresh and weapons_available and (primary_switch or salvo_switch):
+		primary_switch=false;salvo_switch=false;weapons_revision+=1
 	if not fresh:
 		yoke = yoke.move_toward(Vector2.ZERO, maxf(dt, 0.0) * 1.5)
 		yoke_confidence = 0.0
@@ -106,6 +114,19 @@ func _accept_packet(packet: PackedByteArray, now: int) -> bool:
 		var minimum: float = -1.0 if index < 2 else 0.0
 		if float(value) < minimum or float(value) > 1.0:
 			return false
+	if data.has("weapons"):
+		if not data.weapons is Dictionary:return false
+		var weapons: Dictionary=data.weapons
+		for key in ["primary","salvo"]:
+			if not weapons.get(key) is bool:return false
+			var confidence=weapons.get(key+"_confidence")
+			if not _is_number(confidence) or confidence<0 or confidence>1:return false
+		var new_primary: bool=weapons.primary and float(weapons.primary_confidence)>.35
+		var new_salvo: bool=weapons.salvo and float(weapons.salvo_confidence)>.35
+		if not weapons_available or new_primary!=primary_switch or new_salvo!=salvo_switch:weapons_revision+=1
+		weapons_available=true;primary_switch=new_primary;salvo_switch=new_salvo
+	elif weapons_available and (primary_switch or salvo_switch):
+		primary_switch=false;salvo_switch=false;weapons_revision+=1
 	sequence = seq
 	last_received = now
 	yoke = Vector2(float(y.roll), float(y.pitch))

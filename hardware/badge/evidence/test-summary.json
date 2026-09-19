@@ -1,0 +1,12 @@
+{
+  "recorded_at_utc": "2026-09-19T07:40:14.323423+00:00",
+  "python_tests": {
+    "count": 27,
+    "status": "passed",
+    "hardware_required": false
+  },
+  "firmware_build": "passed; not flashed",
+  "interrupt_recovery": "passed on physical device",
+  "game_integration": "none",
+  "filesystem_read_only": "passed"
+}

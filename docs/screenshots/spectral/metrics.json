@@ -1,0 +1,90 @@
+[
+	{
+		"fps": 0.0229974932732332,
+		"lights": 1,
+		"nodes": 990,
+		"scenario": "blue-sky",
+		"shots": 2,
+		"sprites": 1
+	},
+	{
+		"fps": 33.1306017925736,
+		"lights": 0,
+		"nodes": 1128,
+		"scenario": "cloud",
+		"shots": 22,
+		"sprites": 28
+	},
+	{
+		"fps": 43.1814573741864,
+		"lights": 0,
+		"nodes": 1293,
+		"scenario": "dark-ground",
+		"shots": 58,
+		"sprites": 38
+	},
+	{
+		"fps": 43.4294871794872,
+		"lights": 0,
+		"nodes": 1332,
+		"scenario": "city",
+		"shots": 22,
+		"sprites": 40
+	},
+	{
+		"fps": 42.9069031032299,
+		"lights": 0,
+		"nodes": 1412,
+		"scenario": "sun",
+		"shots": 66,
+		"sprites": 27
+	},
+	{
+		"fps": 44.8327014999176,
+		"lights": 0,
+		"nodes": 1476,
+		"scenario": "far-target",
+		"shots": 43,
+		"sprites": 28
+	},
+	{
+		"fps": 44.8031625761818,
+		"lights": 0,
+		"nodes": 1541,
+		"scenario": "close-target",
+		"shots": 56,
+		"sprites": 16
+	},
+	{
+		"fps": 42.2740524781341,
+		"lights": 0,
+		"nodes": 1596,
+		"scenario": "crossing",
+		"shots": 57,
+		"sprites": 28
+	},
+	{
+		"fps": 53.2331809274984,
+		"lights": 0,
+		"nodes": 1623,
+		"scenario": "roll",
+		"shots": 20,
+		"sprites": 37
+	},
+	{
+		"fps": 53.9568345323741,
+		"lights": 4,
+		"nodes": 1680,
+		"scenario": "boost",
+		"shots": 19,
+		"sprites": 63
+	},
+	{
+		"fps": 45.876117919841,
+		"lights": 0,
+		"nodes": 1743,
+		"scenario": "boss-stress",
+		"shots": 25,
+		"sprites": 37
+	}
+]

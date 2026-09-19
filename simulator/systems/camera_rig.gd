@@ -71,7 +71,7 @@ func update(dt: float) -> void:
 		if not initialized:
 			yaw = f.heading; bank = 0; initialized = true
 		yaw = lerp_angle(yaw,f.heading,1-exp(-dt*8))
-		bank = lerpf(bank,clampf(-f.roll*0.10,-0.12,0.12),1-exp(-dt*4))
+		bank = lerpf(bank,(-f.roll*.82 if f.barrel_remaining>0 else clampf(-f.roll*.10,-.12,.12)),1-exp(-dt*4))
 		var desired := Vector3(-app.control.x*0.8,6.1+speed_fraction*1.1,22.0+speed_fraction*4+clampf(acceleration*0.035,-0.4,0.8))
 		offset = offset.lerp(desired,1-exp(-dt*6))
 		var orbit: Vector3 = Basis(Vector3.UP,app.look.x)*offset

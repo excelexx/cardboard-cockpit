@@ -13,6 +13,6 @@ void fragment() {
 	float soft_edge = pow(abs(dot(normalize(NORMAL),normalize(VIEW))),1.5);
 	vec3 gas = mix(vec3(.28,.48,.95),vec3(1.0,.44,.12),smoothstep(.12,.90,axial));
 	ALBEDO = mix(gas,vec3(1.0,.86,.58),core);
-	EMISSION = ALBEDO*(.5+diamonds*.6);
-	ALPHA = (.26+core*.20)*turbulence*soft_edge*pow(1.0-axial,.7);
+	EMISSION = ALBEDO*(4.0+core*5.0+diamonds*2.0);
+	ALPHA = (.36+core*.30)*turbulence*soft_edge*pow(1.0-axial,.7);
 }

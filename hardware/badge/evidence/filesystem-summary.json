@@ -1,0 +1,17 @@
+{
+  "disk_version": "2.1",
+  "block_size": 4096,
+  "block_count": 320,
+  "volume_bytes": 1310720,
+  "volume_sha256": "05c67a9100d5559715097e56734a811cb7f67491bfbef6946da784aa2268bbbc",
+  "file_count": 12,
+  "total_file_bytes": 9395,
+  "extensions": {
+    ".json": 1,
+    ".txt": 1,
+    ".cfg": 10
+  },
+  "installed_app_lua_sources": 0,
+  "source_buffer_unchanged": true,
+  "flash_offset": "0x2b0000"
+}
