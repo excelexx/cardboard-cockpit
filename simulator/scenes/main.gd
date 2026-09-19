@@ -17,6 +17,13 @@ const Hud = preload("res://ui/hud.gd")
 const Manual = preload("res://systems/arcade_controls.gd")
 const Mission = preload("res://systems/demo_mission.gd")
 const Badge = preload("res://systems/badge_link.gd")
+const Tutorial = preload("res://systems/tutorial.gd")
+const Results = preload("res://systems/sortie_result.gd")
+var tutorial: FlightTutorial=Tutorial.new()
+var result_headline:=""
+var result_advice:=""
+var result_code:=""
+var landed_early:=false
 const Approach = preload("res://systems/approach_guidance.gd")
 var badge: BadgeLink=Badge.new()
 var cv_weapon_revision:=-1
@@ -104,6 +111,7 @@ func _ready() -> void:
 	fighter_fx = Effects.new(); fighter_fx.app = self; add_child(fighter_fx); fighter_fx.build()
 	var layer := CanvasLayer.new(); add_child(layer)
 	hud = Hud.new(); hud.app = self; layer.add_child(hud); hud.action.connect(on_action)
+	tutorial.configure(self)
 	set_quality(high_quality)
 	get_viewport().size_changed.connect(_apply_render_scale)
 	var start := false
@@ -138,6 +146,7 @@ func _ready() -> void:
 		world.visible = false; aircraft.visible = false; fighter_fx.visible = false
 
 func start_flight(kind: String = "demo") -> void:
+	tutorial.stop();result_headline="";result_advice="";result_code="";landed_early=false
 	flight_kind = kind
 	mode = "flight"; resume_mode = "flight"
 	help_visible = false; calibration_visible = false; credits_visible = false
@@ -188,12 +197,15 @@ func _input(event: InputEvent) -> void:
 		if event.keycode==KEY_C: calibration_visible = not calibration_visible; help_visible = false; credits_visible = false; return
 		if event.keycode==KEY_M: audio.muted = not audio.muted; save_settings(); return
 		if overlay_visible(): return
+		if tutorial.active and event.keycode==KEY_ENTER:tutorial.advance();return
+		if tutorial.active and not tutorial.practice_active() and event.keycode in [KEY_SPACE,KEY_T,KEY_Q]:return
 		match event.keycode:
 			KEY_ENTER:
 				if mode in ["title","results"]: on_action("fly")
 			KEY_R:
 				if mode in ["flight","rollout","paused","results"]:
-					if paper_test: on_action("restart")
+					if tutorial.active:on_action("tutorial")
+					elif paper_test: on_action("restart")
 					elif flight_kind=="demo": on_action("guided" if demo_auto_fire else "fly")
 					else: start_flight(flight_kind)
 			KEY_V:
@@ -235,7 +247,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and (Input.is_key_pressed(KEY_ALT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)):
 		look.x = clampf(look.x-event.relative.x*0.003,-1.4,1.4)
 		look.y = clampf(look.y-event.relative.y*0.003,-0.6,0.6)
-	if event is InputEventMouseButton and event.pressed and fire_guard<=0:
+	if event is InputEventMouseButton and event.pressed and fire_guard<=0 and not tutorial.active:
 		if event.button_index==MOUSE_BUTTON_RIGHT:salvo_latched=not salvo_latched
 		elif event.button_index==MOUSE_BUTTON_LEFT:primary_latched=not primary_latched
 
@@ -245,10 +257,17 @@ func take_manual_control(steering: bool) -> void:
 	vision.enabled = false; vision.status = "KEYBOARD / MOUSE"
 func on_action(action: String) -> void:
 	match action:
+		"tutorial":
+			start_flight("combat");combat.managed_mission=true;demo_auto_fire=false;copilot=true;used_copilot=true;tutorial.start()
+		"tutorial_next": tutorial.advance()
+		"tutorial_repeat": tutorial.speak()
+		"tutorial_land": begin_landing()
+		"tutorial_exit": tutorial.stop();on_action("title")
 		"route": pass
 		"fly": start_flight(); copilot = not vision.enabled; used_copilot = copilot; demo_auto_fire = false
 		"restart":
-			if paper_test:
+			if tutorial.active:on_action("tutorial")
+			elif paper_test:
 				vision.enabled=true
 				start_flight("paper")
 				copilot=false
@@ -270,16 +289,17 @@ func on_action(action: String) -> void:
 		"mute": audio.muted = not audio.muted; save_settings()
 		"quality": set_quality(not high_quality)
 		"title":
+			tutorial.stop()
 			mode = "title"; combat.active = false; mission.active = false; help_visible = false; calibration_visible = false; credits_visible = false
 			world.visible = false; aircraft.visible = false; fighter_fx.visible = false; cockpit_frame.set_presentation_visible(false)
 			audio.radio.reset(); camera_rig.reset()
 
 func _process(dt: float) -> void:
 	runtime += dt; toast_time = maxf(0,toast_time-dt)
-	vision.poll(dt)
+	vision.poll(dt);tutorial.tick()
 	if vision.weapons_available and cv_weapon_revision!=vision.weapons_revision:
 		cv_weapon_revision=vision.weapons_revision;primary_latched=vision.primary_switch;salvo_latched=vision.salvo_switch
-	var paused: bool = mode=="paused" or overlay_visible()
+	var paused: bool = mode=="paused" or overlay_visible() or (tutorial.active and not tutorial.practice_active())
 	var active: bool = mode in ["flight","rollout"] and not paused
 	if mode not in ["title"]:
 		if not Input.is_key_pressed(KEY_ALT) and not Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE): look = look.lerp(Vector2.ZERO,1-exp(-dt*3))
@@ -297,6 +317,7 @@ func _process(dt: float) -> void:
 			cockpit_frame.set_navigation("sf" if route_id=="sf" else "free",mission.route_index)
 	audio.gun_wanted = active and combat.active and combat.gun_firing_time>0
 	audio.beam_wanted=active and combat.beam_active
+	audio.instructor_speaking=tutorial.speaking()
 	audio.flow_intensity=combat.intent.intensity
 	audio.acquisition=combat.lock_progress if combat.target_id>=0 and combat.lock_progress<1 else 0
 	audio.burner_wanted = flight.afterburner and active
@@ -318,14 +339,15 @@ func _physics_process(dt: float) -> void:
 	badge.poll();badge.tick(self,dt)
 	near_obstacle_cooldown=maxf(0,near_obstacle_cooldown-dt)
 	if badge.tapped(8):
-		if mode in ["title","results"]:on_action("fly")
+		if tutorial.active and mode=="flight":tutorial.advance()
+		elif mode in ["title","results"]:on_action("fly")
 		elif mode=="paused":mode=resume_mode
 	if badge.tapped(2) and mode in ["flight","paused"]:
 		if mode=="paused":mode=resume_mode
 		else:resume_mode=mode;mode="paused"
 	if badge.tapped(0) and mode=="flight":flight.gear=not flight.gear;gear_override=int(flight.gear)
 	if badge.tapped(1) and mode=="flight":
-		if mission.cinematic:begin_landing()
+		if mission.cinematic or tutorial.active:begin_landing()
 		else:flight.flaps=(flight.flaps+1)%3;flaps_override=flight.flaps
 	if badge.tapped(4) and mode=="flight":cockpit=not cockpit;camera_rig.reset()
 	if badge.tapped(5) and mode=="flight":camera_rig.missile_requested=not camera_rig.missile_requested
@@ -336,6 +358,7 @@ func _physics_process(dt: float) -> void:
 		control = Vector3.ZERO
 		return
 	if overlay_visible() or mode=="paused": return
+	if tutorial.active and not tutorial.practice_active():return
 	if mode=="ejected":
 		fighter_fx.tick_ejection(dt)
 		flight.position += flight.velocity*dt
@@ -441,7 +464,7 @@ func _physics_process(dt: float) -> void:
 		audio.play_effect("touchdown_tires",-17); audio.play_effect("touchdown_thump",-16); audio.radio.say("touchdown")
 	elif flight.contact!="": begin_crash()
 	if (absf(flight.position.x)>60000 or absf(flight.position.z)>60000) if route_id=="sf" else (absf(flight.position.x)>14500 or flight.position.z < -24500 or flight.position.z>8500):
-		finish_sortie(false,"Operational sector exited. Turn back earlier.")
+		finish_sortie(false,"Operational sector exited. Turn back earlier.","sector")
 	if flight.airborne and not flight.gear and flight.position.y-world.ground_height(flight.position.x,flight.position.z)<50: audio.radio.say("warning")
 	if flight.stall_time>1: audio.radio.say("warning")
 	apply_aircraft_pose()
@@ -452,20 +475,26 @@ func begin_crash() -> void:
 	mode = "crashed"; crash_clock = 0; combat.active = false; copilot = false
 	fighter_fx.debris(flight.position); combat.burst(flight.position,Color(1,0.5,0.15),14)
 	audio.play_effect("explosion",-10); camera_rig.impulse(0.8)
-func finish_sortie(success: bool, reason: String) -> void:
+func finish_sortie(success: bool, reason: String, cause: String="") -> void:
 	if mode=="results": return
-	if mission.active and success: mission.transition("secured")
-	mission_success = success; result_reason = reason; mode = "results"; combat.active = false
-	if success and not demo_auto_fire and combat.score>best_score:
-		best_score = combat.score; record_broken = true; save_settings()
-	audio.radio.say("landed" if flight.contact=="landed" else "success" if success else "failure")
+	var result: Dictionary=Results.assess({"contact":flight.contact,"stopped":flight.speed<=.1,"boss":combat.boss_defeated,"cinematic":mission.cinematic,"tutorial":tutorial.active,"training_ready":tutorial.training_ready(),"ejected":pilot_ejected,"landing":landing_started or flight_kind=="approach","cause":cause,"early_landing":landed_early},success,reason)
+	mission_success=result.success;result_headline=result.headline;result_reason=result.summary;result_advice=result.advice;result_code=result.code
+	var training: bool=tutorial.active;tutorial.stop()
+	if mission.active and mission_success:mission.transition("secured")
+	mode="results";combat.active=false
+	if mission_success and not training and not demo_auto_fire and combat.score>best_score:
+		best_score=combat.score;record_broken=true;save_settings()
+	audio.radio.reset();audio.radio.say(result.radio,3)
 	if test_mode and not test_finished:
-		test_finished = true
-		print("SORTIE RESULT: ","PASS" if success else "FAIL"," time=",flight.elapsed," contacts=",combat.kills," hull=",combat.hull," position=",flight.position," contact=",flight.contact)
-		get_tree().quit(0 if success else 1)
+		test_finished=true
+		print("SORTIE RESULT: ","PASS" if mission_success else "FAIL"," time=",flight.elapsed," contacts=",combat.kills," hull=",combat.hull," position=",flight.position," contact=",flight.contact)
+		get_tree().quit(0 if mission_success else 1)
 func begin_landing() -> void:
 	if mode!="flight" or not flight.airborne or landing_started or route_id!="sf":return
+	if tutorial.active and tutorial.index!=7:return
+	landed_early=mission.cinematic and mission.clock<107 and not combat.boss_defeated
 	landing_started=true;landing_transition=1.2
+	tutorial.landing_begun()
 	primary_latched=false;salvo_latched=false;combat.active=false;combat.engagement_enabled=false
 	combat.beam_active=false;combat.gun_firing_time=0;combat.visuals.reset()
 	vision.enabled=false;copilot=true;used_copilot=true;control=Vector3.ZERO
@@ -533,4 +562,5 @@ func select_route(value: String) -> void:
 	save_settings()
 
 func _exit_tree() -> void:
+	tutorial.stop()
 	badge.close()
