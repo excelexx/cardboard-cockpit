@@ -122,11 +122,13 @@ func run_test() -> void:
 	for detent in [1, 2, 0]:
 		tap(KEY_F)
 		check(app.flight.flaps == detent, "F cycles flap detent to " + str(detent))
-	var first_view: bool = app.cockpit
+	app.set_camera_view("cockpit")
 	tap(KEY_V)
-	check(app.cockpit != first_view, "V switches cockpit/chase view")
-	tap(KEY_V)
-	check(app.cockpit == first_view, "V switches back")
+	check(app.camera_view == "chase" and not app.cockpit, "V advances from cockpit to chase view")
+	for expected: String in ["tail", "top", "left", "right", "front", "cockpit"]:
+		tap(KEY_V)
+		check(app.camera_view == expected, "V cycles through camera view: " + expected)
+	check(app.cockpit, "The complete view cycle restores cockpit instruments")
 	var first_spectator: bool = app.spectator
 	tap(KEY_TAB)
 	check(app.spectator != first_spectator, "Tab toggles spectator HUD")

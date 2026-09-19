@@ -2,6 +2,14 @@
 
 Tested on Apple M4, 16 GiB RAM, macOS 27.0, Godot 4.7.2. This records actual checks rather than declaring untested hardware complete.
 
+## Version 0.3 camera checks
+
+- **1,081 camera checks passed** across all five aircraft, seven views and three aircraft attitudes. The tests check finite transforms, camera direction, imported aircraft bounds fitting neutral exterior views, look-around behavior, direct keys, cycling, picker routing and preservation of the complete flight state.
+- **Four startup-option checks passed** for the new `--view=top` option and existing `--chase` alias.
+- **79 keyboard/UI checks passed**, including the complete seven-view cycle and a manual 737 mission through five checkpoints, touchdown and a full stop on North Field. Copilot remained disabled. Tests restore the user's saved settings.
+
+- Rendered and inspected all seven A380 views, top/tail views of the B-2, side views of the 737, the camera picker and the updated controls panel. The top-down camera centers the aircraft above the instruction panel. These are staged camera-framing captures, not additional completed flight missions.
+
 ## Version 0.2 checks
 
 - **Weather and scenery: 94/94 checks passed** using `simulator/tests/test_weather.gd`. Coverage includes selecting a preset before world construction, preset fallback, metadata isolation, distinct fog/exposure/sun angles, shadow restoration, and switching without adding scene geometry or changing sampled terrain elevations.
