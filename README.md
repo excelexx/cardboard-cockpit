@@ -1,8 +1,8 @@
 # Goose Protocol · Cardboard Cockpit
 
-**Version 0.4 — a three-minute, cardboard-controlled arcade demo.** Waterloo geese have taken over the skies. Start with a tiny trainer and a worn gatling, upgrade through six aircraft and six single-weapon loadouts, and finish in a Millennium Falcon-style freighter firing twin plasma cannons.
+**Version 0.5 — a three-minute, cardboard-controlled arcade demo.** Waterloo geese have taken over the skies. Start with a tiny trainer and a worn gatling, upgrade through six aircraft and six single-weapon loadouts, and finish in a Millennium Falcon-style freighter firing continuous twin plasma beams.
 
-Double-click **Launch Cardboard Cockpit.command**, then press **Enter** or **Start the 3-minute demo**. Each stage lasts 30 seconds. Aim assistance fires the current weapon when a goose is locked; **Space / left click** fires manually. **H** hands the guided demonstration over to the pilot. Tracked cardboard controls take control automatically. **C** opens camera setup before launch.
+Double-click **Launch Cardboard Cockpit.command**, then press **Enter** or **Start the 3-minute demo**. Each stage lasts 30 seconds. Low-strength aim assistance gives a small directional nudge and fires when a target is locked; poor aim can still miss. J toggles assistance; **Space / left click** fires manually. **H** hands the guided demonstration over to the pilot. Tracked cardboard controls take control automatically. **C** opens camera setup before launch.
 
 **Developer mode:** press **F9**, then **1–6** to jump to any stage or **N** for the next stage. F9 disables the shortcuts again. The HUD clearly marks developer mode and the showcase's training shield. The guided showcase advances on time; it does not claim to be an unassisted campaign victory.
 

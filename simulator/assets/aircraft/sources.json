@@ -563,6 +563,36 @@
         "url": "https://raw.githubusercontent.com/HerbyW/AN-225-Mrija/8aa5d855c7675259dfaf6e83c677ccfd432e10ed/Sounds/wind.wav",
         "sha256": "d9f76844664c453669929b8666c8af2405154ff5d0e34374377312bbb19ed118",
         "bytes": 67488
+      },
+      {
+        "path": "Sounds/gear.wav",
+        "url": "https://raw.githubusercontent.com/HerbyW/AN-225-Mrija/8aa5d855c7675259dfaf6e83c677ccfd432e10ed/Sounds/gear.wav",
+        "sha256": "9a25812ac681640b6941162179f74730d5f47edfa0ce8c064bfff687e2b051de",
+        "bytes": 404466
+      },
+      {
+        "path": "Sounds/flaps.wav",
+        "url": "https://raw.githubusercontent.com/HerbyW/AN-225-Mrija/8aa5d855c7675259dfaf6e83c677ccfd432e10ed/Sounds/flaps.wav",
+        "sha256": "6ef019934e794c17e2f4ce1c5be56fcb4571c3e99ddc42acae8ff3f2312f9cae",
+        "bytes": 108546
+      },
+      {
+        "path": "Sounds/squeal.wav",
+        "url": "https://raw.githubusercontent.com/HerbyW/AN-225-Mrija/8aa5d855c7675259dfaf6e83c677ccfd432e10ed/Sounds/squeal.wav",
+        "sha256": "d52ce1e619a2a097763b533ed1797bdb7a4d589dafd319c62d92b6b40d92004c",
+        "bytes": 18446
+      },
+      {
+        "path": "Sounds/24roll.wav",
+        "url": "https://raw.githubusercontent.com/HerbyW/AN-225-Mrija/8aa5d855c7675259dfaf6e83c677ccfd432e10ed/Sounds/24roll.wav",
+        "sha256": "069d3b156817098a6b5270bceb7f30fa595e9ccf6e357ed6625292d0636aee1a",
+        "bytes": 199478
+      },
+      {
+        "path": "Sounds/rumble.wav",
+        "url": "https://raw.githubusercontent.com/HerbyW/AN-225-Mrija/8aa5d855c7675259dfaf6e83c677ccfd432e10ed/Sounds/rumble.wav",
+        "sha256": "f9bf554a29566e03c90c8b63f0080d04f36a557c6273997a3117bf6708709589",
+        "bytes": 29374
       }
     ]
   }

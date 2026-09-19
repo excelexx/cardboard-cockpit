@@ -125,8 +125,8 @@ func resolve_contact(ground: float, runway: bool) -> void:
 		if runway and gear and speed < 105.0 and vertical_speed > -10.0 and absf(roll) < 0.40:
 			airborne = false
 			position.y = ground + float(profile.clearance)
-			pitch = 0.0
-			roll = 0.0
+			# Contact stops vertical penetration, not angular motion. Let the
+			# nose and wings settle during rollout instead of snapping the view.
 			vertical_speed = 0.0
 			contact = "landed"
 		else:
@@ -162,6 +162,8 @@ func rollout_step(dt: float, brakes: bool, steering: float, on_runway: bool) -> 
 		return
 	elapsed += dt
 	rollout_elapsed += dt
+	pitch = move_toward(pitch,0.0,dt*0.10)
+	roll = move_toward(roll,0.0,dt*0.18)
 	throttle = 0.0
 	engine = move_toward(engine,0.0,dt*0.5)
 	speed = maxf(0.0,speed-(1.4 + (4.8 if brakes else 0.0))*dt)
