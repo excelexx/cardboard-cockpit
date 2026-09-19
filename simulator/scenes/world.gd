@@ -422,12 +422,6 @@ func _build_airport(z_center: float, airport_name: String, north_number: String,
 	var markings: StandardMaterial3D = _mat("markings", Color(0.89, 0.90, 0.85))
 	var metal: StandardMaterial3D = _mat("airport_metal", Color(0.31, 0.36, 0.37), 0.63, 0.15)
 	var glass: StandardMaterial3D = _mat("airport_glass", Color(0.11, 0.25, 0.29), 0.16, 0.38)
-	var field_green: StandardMaterial3D = _mat("mown_grass", Color(0.28, 0.34, 0.20))
-	for surface_material in [field_green]:
-		surface_material.albedo_texture=load("res://assets/environment/aerial_grass_rock_diff_1k.jpg" if surface_material==field_green else "res://assets/environment/aerial_asphalt_01_diff_2k.jpg")
-		surface_material.uv1_triplanar=true
-		surface_material.uv1_world_triplanar=true
-		surface_material.uv1_scale=Vector3.ONE/(36.0 if surface_material==field_green else 12.0)
 	_box(airport, "Runway", Vector3(0.0, -0.13, 0.0), Vector3(100.0, 0.26, 3200.0), asphalt)
 	_box(airport, "RunwayShoulderWest", Vector3(-56.0, -0.13, 0.0), Vector3(12.0, 0.20, 3220.0), concrete)
 	_box(airport, "RunwayShoulderEast", Vector3(56.0, -0.13, 0.0), Vector3(12.0, 0.20, 3220.0), concrete)
@@ -436,7 +430,7 @@ func _build_airport(z_center: float, airport_name: String, north_number: String,
 	_box(airport, "TerminalApron", Vector3(438.0, -0.085, 470.0), Vector3(370.0, 0.17, 950.0), concrete)
 	for side in [-1.0, 1.0]:
 		_box(airport, "EdgeStripe", Vector3(side * 45.0, 0.025, 0.0), Vector3(1.6, 0.015, 3150.0), markings)
-		_box(airport, "MownVerge", Vector3(side * 95.0, -0.115, 0.0), Vector3(50.0, 0.06, 3350.0), field_green)
+		# The continuous terrain supplies the verge, avoiding long rectangular overlays.
 	for stripe in range(-14, 15):
 		_box(airport, "Centerline", Vector3(0.0, 0.030, stripe * 92.0), Vector3(1.8, 0.018, 40.0), markings)
 	for threshold in [-1.0, 1.0]:
@@ -461,6 +455,7 @@ func _build_airport(z_center: float, airport_name: String, north_number: String,
 		_box(airport, "StandStopBar", Vector3(520.0, 0.033, stand_z), Vector3(0.55, 0.015, 20.0), yellow)
 		_box(airport, "StandFootprint", Vector3(432.0, 0.03, stand_z + 63.0), Vector3(238.0, 0.012, 0.3), markings)
 	_build_terminal(airport, airport_name, concrete, metal, glass)
+	_airport_service_detail(airport,metal,glass)
 	for hangar in range(4):
 		_build_hangar(airport, Vector3(470.0, 0.0, -330.0 - hangar * 215.0), 145.0, 130.0)
 	for light_index in range(6):
@@ -479,6 +474,35 @@ func _build_airport(z_center: float, airport_name: String, north_number: String,
 
 	_batch_static_geometry(airport)
 
+
+func _airport_service_detail(airport: Node3D, metal: Material, glass: Material) -> void:
+	var white:=_mat("service_ivory",Color(0.69,0.72,0.69),0.65,0.12)
+	var tire:=_mat("service_tire",Color(0.025,0.03,0.033))
+	var roof:=_mat("roof_equipment",Color(0.22,0.27,0.28),0.5,0.4)
+	for stand in range(6):
+		var at:=Vector3(535,0,115+stand*145)
+		_box(airport,"ServiceTruckBody",at+Vector3(0,1.8,0),Vector3(3.5,2.5,6.8),white)
+		_box(airport,"ServiceTruckCab",at+Vector3(0,1.8,-4.2),Vector3(3.4,2.6,2.3),white)
+		_box(airport,"TruckWindshield",at+Vector3(0,2.3,-5.37),Vector3(2.9,1.1,0.07),glass)
+		for side in [-1.0,1.0]:
+			for axle in [-3.8,2.3]:
+				var wheel:=_cylinder(airport,"ServiceWheel",at+Vector3(side*1.7,0.65,axle),0.65,0.32,tire)
+				wheel.rotation.z=PI/2
+		for cart in range(3):
+			_box(airport,"BaggageCart",at+Vector3(10,0.8,cart*4),Vector3(2.3,1.1,3.1),metal)
+			_box(airport,"TowLink",at+Vector3(10,0.45,cart*4+1.9),Vector3(0.12,0.15,1),metal)
+		# Roof plant has a visible raised curb, vents and louvered faces.
+		var plant:=Vector3(682,18.3,310+stand*88)
+		_box(airport,"HVACCurb",plant,Vector3(10,0.6,15),metal)
+		_box(airport,"HVACUnit",plant+Vector3(0,1.7,0),Vector3(8,3,12),roof)
+		for vent in range(7):
+			_box(airport,"HVACLouver",plant+Vector3(-4.03,1.1+vent*0.3,0),Vector3(0.08,0.10,10),metal)
+	# A service-side perimeter follows the airport edge, clear of flight paths.
+	for index in range(110):
+		var z: float=-1400+index*24
+		_box(airport,"PerimeterPost",Vector3(1000,1.6,z),Vector3(0.13,3.2,0.13),metal)
+		for rail in [0.65,1.6,2.6]:
+			_box(airport,"PerimeterRail",Vector3(1000,rail,z+12),Vector3(0.07,0.07,24),metal)
 
 func _add_runway_lights(airport: Node3D) -> void:
 	var lights_material: StandardMaterial3D = _mat("runway_lights", Color(0.96, 0.94, 0.79))
@@ -555,11 +579,25 @@ func _build_terminal(airport: Node3D, airport_name: String, concrete: Material, 
 
 
 func _build_hangar(airport: Node3D, at: Vector3, width: float, depth: float) -> void:
-	var wall: StandardMaterial3D = _mat("hangar_wall", Color(0.42, 0.46, 0.44), 0.69, 0.12)
+	var wall:=ShaderMaterial.new()
+	wall.shader=load("res://assets/environment/cladding.gdshader")
 	var roof: StandardMaterial3D = _mat("hangar_roof", Color(0.28, 0.33, 0.32), 0.78, 0.18)
 	var door: StandardMaterial3D = _mat("hangar_door", Color(0.32, 0.38, 0.39), 0.73, 0.12)
 	_box(airport, "MaintenanceHangar", at + Vector3(0.0, 17.0, 0.0), Vector3(width, 34.0, depth), wall)
-	_box(airport, "HangarRoof", at + Vector3(0.0, 35.0, 0.0), Vector3(width + 5.0, 2.0, depth + 5.0), roof)
+	# Low pitched roof, fascia, skylights and roof ventilation give the silhouette depth.
+	for side in [-1.0,1.0]:
+		var slope:=_box(airport,"HangarRoof",at+Vector3(0,37,side*depth*0.25),Vector3(width+5,1.2,depth*0.515+3),roof)
+		slope.rotation.x=side*0.12
+		_box(airport,"RoofGutter",at+Vector3(0,33.3,side*(depth*0.5+2)),Vector3(width+5,0.7,0.7),roof)
+		for bay in range(6):
+			var skylight:=_box(airport,"RoofSkylight",at+Vector3(-width*0.38+bay*width*0.15,38,side*depth*0.22),Vector3(12,0.5,18),_mat("hangar_skylight",Color(0.12,0.22,0.25),0.2,0.45))
+			skylight.rotation.x=side*0.12
+	for vent in range(4):
+		_box(airport,"RoofVent",at+Vector3(-width*0.32+vent*width*0.21,42,0),Vector3(8,2,5),roof)
+	for side in [-1.0,1.0]:
+		_box(airport,"HangarPlinth",at+Vector3(0,1,side*depth*0.5),Vector3(width,2,0.6),_mat("hangar_plinth",Color(0.22,0.23,0.21)))
+		for bay in range(9):
+			_box(airport,"ClerestoryWindow",at+Vector3(-width*0.43+bay*width*0.105,27,side*(depth*0.5+0.1)),Vector3(width*0.085,4,0.2),_mat("hangar_skylight",Color(0.12,0.22,0.25),0.2,0.45))
 	_box(airport, "HangarDoor", at + Vector3(-width * 0.5 - 0.1, 14.0, 0.0), Vector3(0.3, 27.0, depth * 0.86), door)
 	for rib in range(19):
 		_box(airport, "HangarCladdingRib", at + Vector3(0.0, 18.0, -depth * 0.5 - 0.2) + Vector3(-width * 0.46 + rib * width / 20.0, 0.0, 0.0), Vector3(0.6, 32.0, 0.55), roof)

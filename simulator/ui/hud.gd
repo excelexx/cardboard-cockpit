@@ -36,6 +36,9 @@ func _process(_dt: float) -> void:
 	queue_redraw()
 
 func text(at: Vector2, value: String, size: int = 20, color: Color = WHITE, technical: bool = false) -> void:
+	# A thin glyph shadow keeps the transparent HUD legible over clouds and snow.
+	if is_instance_valid(app) and app.mode not in ["title","hangar","briefing"]:
+		draw_string(mono if technical else font,at+Vector2(0,1),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,Color(0.015,0.025,0.035,0.75))
 	draw_string(mono if technical else font, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
 
 func paragraph(at: Vector2, value: String, width: float, size: int, color: Color) -> void:
@@ -220,20 +223,13 @@ func draw_flight() -> void:
 	var campaign: bool = app.flight_kind=="campaign"
 	var fighting: bool = campaign and app.combat.phase=="combat"
 	var landing: bool = app.ring_index>=5
-	var ink := Color(0.025,0.055,0.065,0.70)
 	var phosphor := Color(0.65,1.0,0.79,0.92)
-	# A narrow status rail leaves the outside view and physical cockpit exposed.
-	panel(Rect2(28,24,1544,62),ink)
-	text(Vector2(48,49),"C / C   FLIGHT DECK",12,phosphor,true)
-	text(Vector2(48,72),str(app.profile().short),15,WHITE)
-	var stages: Array[String] = ["01  TAKEOFF","02  INTERCEPT" if campaign else "02  EXPLORE","03  LAND"]
-	var active_stage: int = 2 if landing else 1 if f.airborne else 0
-	for i in range(3):
-		text(Vector2(570+i*170,61),stages[i],13,phosphor if i==active_stage else MUTED,true)
-	text(Vector2(1140,49),"COPILOT ON" if app.copilot else "YOU HAVE CONTROL",12,AMBER if app.copilot else phosphor,true)
-	text(Vector2(1140,72),"H to take control" if app.copilot else "H for guided flight",12,WHITE)
-	zones["views_header"] = Rect2(1380,32,175,44)
-	text(Vector2(1393,60),app.camera_view_label().to_upper()+"  V",12,phosphor,true)
+	# Borderless flight overlay. Instruments live in the physical cockpit.
+	text(Vector2(48,55),str(app.profile().short),15,WHITE,true)
+	text(Vector2(48,79),"LANDING" if landing else "INTERCEPT" if fighting else "DEPARTURE",11,GREEN,true)
+	text(Vector2(1215,55),"GUIDED FLIGHT" if app.copilot else "MANUAL FLIGHT",12,WHITE,true)
+	zones["views_header"] = Rect2(1390,32,165,48)
+	text(Vector2(1400,55),"VIEW  /  V",12,WHITE,true)
 	# Heading ribbon, pitch ladder, and velocity reference follow actual attitude.
 	for i in range(-3,4):
 		var x: float = 800+i*65
@@ -256,12 +252,10 @@ func draw_flight() -> void:
 	flight_tape(Vector2(510,center.y),f.speed*1.94384,10,"SPEED","KNOTS",phosphor)
 	flight_tape(Vector2(1090,center.y),f.position.y*3.28084,100,"ALTITUDE","FEET",phosphor)
 	text(Vector2(1108,548),"%+d FT/MIN" % int(f.vertical_speed*196.85),11,phosphor,true)
-	panel(Rect2(35,133,252,122),ink)
-	text(Vector2(53,159),"ENGINE POWER",11,MUTED,true)
-	text(Vector2(52,193),"%d%%" % int(f.throttle*100),26,phosphor,true)
-	line(Vector2(54,207),Vector2(264,207),MUTED,3)
-	line(Vector2(54,207),Vector2(54+210*f.throttle,207),phosphor,3)
-	text(Vector2(53,237),"W increase / S decrease",12,WHITE)
+	text(Vector2(48,143),"THRUST",10,WHITE,true)
+	text(Vector2(48,172),"%d%%" % int(f.throttle*100),23,WHITE,true)
+	line(Vector2(48,188),Vector2(168,188),Color(1,1,1,0.22),2)
+	line(Vector2(48,188),Vector2(48+120*f.throttle,188),phosphor,2)
 	var instruction := "Follow the amber checkpoints"
 	var detail := "Arrow keys steer   ·   Keep movements gentle"
 	if not f.airborne and not f.ever_airborne:
@@ -275,9 +269,7 @@ func draw_flight() -> void:
 		detail = c.Route.HINTS[mini(c.route_index,c.Route.HINTS.size()-1)]
 		var route_delta: Vector3 = c.route_target()-f.position
 		text(Vector2(54,350),"NEXT VIEW  %.1f KM" % (route_delta.length()/1000),12,phosphor,true)
-		text(Vector2(54,372),"SPACE fire · H guided flight",12,WHITE)
 		if c.developer: text(Vector2(54,395),"DEVELOPER LOADOUT",11,AMBER,true)
-		elif c.showcase: text(Vector2(54,395),"TRAINING SHIELD",11,MUTED,true)
 		# One navigation diamond remains distinct from square enemy brackets.
 		var bearing: float = wrapf(atan2(route_delta.x,-route_delta.z)-f.heading,-PI,PI)
 		var route_screen: Vector2 = app.camera.unproject_position(c.route_target())
@@ -316,26 +308,27 @@ func draw_flight() -> void:
 	if f.stall_time>0.8:
 		instruction = "Low speed — add power"
 		detail = "Hold W and gently lower the nose with ↓"
-	panel(Rect2(360,680,880,77),ink)
-	text(Vector2(384,710),instruction,22,WHITE)
-	text(Vector2(384,740),detail,14,phosphor)
-	text(Vector2(36,983),"ARROWS steer   W/S power   H copilot   V view   R restart   F1 help",12,WHITE,true)
+	# Guidance sits above the instrument coaming, never on a filled card.
+	var title_width: float = font.get_string_size(instruction,HORIZONTAL_ALIGNMENT_LEFT,-1,20).x
+	text(Vector2(800-title_width*0.5,595),instruction,20,WHITE)
+	if not f.airborne or landing or f.stall_time>0.8:
+		var detail_width: float = font.get_string_size(detail,HORIZONTAL_ALIGNMENT_LEFT,-1,13).x
+		text(Vector2(800-detail_width*0.5,620),detail,13,WHITE)
+	text(Vector2(36,983),"ARROWS steer   W/S thrust   H guide   F1 help",12,WHITE,true)
 	text(Vector2(1280,983),"GEAR "+("DOWN" if f.gear else "UP"),12,phosphor,true)
 	if app.spectator:
-		panel(Rect2(1280,140,285,96),ink)
 		text(Vector2(1295,170),"CARDBOARD CONTROLS",12,phosphor,true)
 		text(Vector2(1295,199),app.vision.status,11,WHITE,true)
 		text(Vector2(1295,221),"Webcam → yoke + throttle",12,MUTED)
 
 func flight_tape(at: Vector2, value: float, interval: float, label: String, unit: String, color: Color) -> void:
 	text(at+Vector2(-31,-160),label,12,color,true)
-	for i in range(-3,4):
+	for i in range(-2,3):
 		var tick: float = floor(value/interval)*interval+i*interval
 		if tick<0: continue
 		var y: float = -(tick-value)/interval*33
 		line(at+Vector2(-25,y),at+Vector2(-12,y),color)
 		if absf(y)>24: text(at+Vector2(0,y+4),"%d" % int(tick),11,color,true)
-	panel(Rect2(at+Vector2(-32,-21),Vector2(108,42)),Color(0.02,0.05,0.065,0.80))
 	text(at+Vector2(-21,8),"%03d" % int(value),24,color,true)
 	text(at+Vector2(-22,149),unit,11,color,true)
 
@@ -536,7 +529,6 @@ func draw_calibration() -> void:
 func draw_combat() -> void:
 	var c: CombatDirector = app.combat
 	var f: FlightDynamics = app.flight
-	panel(Rect2(28,24,1544,78),Color(0.025,0.045,0.06,0.9))
 	text(Vector2(48,57),"SKY SHIELD",24,AMBER,true)
 	text(Vector2(49,82),"F-35 / DRONE INTERCEPTION",11,MUTED,true)
 	text(Vector2(423,59),"WAVE %d / 3" % c.wave,22,WHITE,true)
@@ -564,7 +556,6 @@ func draw_combat() -> void:
 		text(point+Vector2(30,0),"DRONE %02d" % (enemy.id+1),11,color,true)
 		text(point+Vector2(30,18),"%.1f KM" % (pos.distance_to(f.position)/1000),11,color,true)
 		line(point+Vector2(-23,31),point+Vector2(-23+46*enemy.health/100,31),color,3)
-	panel(Rect2(1295,130,270,270),Color(0.025,0.05,0.07,0.87))
 	text(Vector2(1315,157),"TACTICAL / 4 KM",12,MUTED,true)
 	var radar := Vector2(1430,275)
 	draw_arc(radar,98,0,TAU,64,Color(0.4,0.7,0.65,0.4),1,true)
@@ -576,7 +567,6 @@ func draw_combat() -> void:
 		var flat := Vector2(offset.x,offset.z).rotated(f.heading)*0.024
 		flat = flat.limit_length(95)
 		draw_circle(radar+flat,4,GREEN if enemy.id==c.target_id else Color(1,0.4,0.25))
-	panel(Rect2(28,810,1544,164),Color(0.025,0.045,0.06,0.95))
 	var names: Array[String] = ["CANNON", "MISSILES", "FLARES", "SPEED / KT", "ALT / FT", "ASSIST"]
 	var values: Array[String] = [str(c.ammo),str(c.missiles),str(c.flares),str(int(f.speed*1.94384)),str(int(f.position.y*3.28084)),"ON" if c.assist else "OFF"]
 	for i: int in names.size():
@@ -588,17 +578,14 @@ func draw_combat() -> void:
 	line(Vector2(54,906),Vector2(249,906),MUTED,3)
 	line(Vector2(54,906),Vector2(54+195*c.gun_heat,906),Color(1,0.35,0.15),4)
 	if c.message_time>0:
-		panel(Rect2(350,163,820,59))
 		text(Vector2(376,202),c.message,18,GREEN)
 	if app.vision.enabled:
-		panel(Rect2(28,130,515,100))
 		text(Vector2(47,161),"CARDBOARD ASSIST  /  " + ("ON" if c.assist else "OFF"),13,GREEN,true)
 		text(Vector2(47,187),"Aim to fire · Pull back for a locked missile",16)
 		text(Vector2(47,213),"Full bank for a roll · Re-center to re-arm",16,MUTED)
 	if c.eject_hold>0:
 		text(Vector2(630,680),"HOLD E TO EJECT  %d%%" % int(c.eject_hold*100),20,AMBER,true)
 	if app.mode=="ejected":
-		panel(Rect2(490,640,620,74))
 		text(Vector2(519,687),"PILOT SAFE · PARACHUTE DEPLOYED",23,GREEN,true)
 	if c.hit_flash>0:
 		draw_rect(Rect2(0,0,1600,1000),Color(1,0.12,0.02,c.hit_flash*0.25))

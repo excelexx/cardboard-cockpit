@@ -23,18 +23,20 @@ vec3 triplanar(sampler2D source, vec3 point, vec3 weights) {
 void fragment() {
 	vec3 weights = pow(abs(world_normal), vec3(4.0));
 	weights /= max(dot(weights, vec3(1.0)), 0.0001);
-	vec3 grass_detail = texture(grass_texture, world_position.xz / 84.0).rgb;
+	vec3 grass_detail = texture(grass_texture, world_position.xz / 12.0).rgb;
 	vec3 grass_macro = texture(grass_texture, world_position.xz / 1100.0 + vec2(0.4)).rgb;
-	vec3 grass = mix(grass_detail, grass_macro, 0.50) * vec3(0.39, 0.59, 0.36);
-	float forest_zone=smoothstep(25.0,100.0,world_position.y)*(1.0-smoothstep(1100.0,1650.0,world_position.y));
+	float patches=noise2(world_position.xz/170.0)*0.65+noise2(world_position.xz/41.0)*0.35;
+	vec3 grass = mix(vec3(0.075,0.115,0.035),vec3(0.19,0.235,0.095),patches)*(0.65+grass_detail*0.85+grass_macro*0.3);
+	float forest_zone=smoothstep(6.0,12.0,world_position.y)*(1.0-smoothstep(1500.0,1900.0,world_position.y));
 	float canopy=noise2(world_position.xz/23.0)*0.5+noise2(world_position.xz/71.0)*0.3+noise2(world_position.xz/420.0)*0.2;
-	vec3 forest=mix(vec3(0.022,0.053,0.030),vec3(0.10,0.155,0.067),canopy);
-	grass=mix(grass,forest,forest_zone*0.88);
+	vec3 forest=mix(vec3(0.030,0.063,0.037),vec3(0.075,0.13,0.060),canopy);
+	forest*=0.65+grass_detail*0.65+grass_macro*0.30;
+	grass=mix(grass,forest,forest_zone*0.80);
 	vec3 rock = triplanar(rock_texture, world_position / 180.0, weights);
 	vec3 rock_macro = triplanar(rock_texture, world_position / 920.0 + vec3(0.3), weights);
 	rock = mix(rock, rock_macro, 0.3) * vec3(0.9, 0.92, 0.90);
 	float slope = 1.0 - world_normal.y;
-	float rocky = max(smoothstep(720.0, 1600.0, world_position.y), smoothstep(0.13, 0.45, slope));
+	float rocky = max(smoothstep(1650.0, 2450.0, world_position.y), smoothstep(0.22, 0.58, slope));
 	vec3 terrain = mix(grass, rock, rocky);
 	float shore=(1.0-smoothstep(-2.0,12.0,world_position.y))*(1.0-smoothstep(0.10,0.55,slope));
 	float airport_z=min(abs(world_position.z),abs(world_position.z+15000.0));

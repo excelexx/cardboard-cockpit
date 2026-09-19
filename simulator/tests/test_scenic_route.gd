@@ -16,9 +16,13 @@ func run() -> void:
 	var previous_index := -1
 	var peak := 0.0
 	var floor_corrections := 0
+	var city_flyover_frames:=0
 	for frame in range(36000):
 		app._physics_process(1.0/60.0)
 		peak = maxf(peak,app.flight.position.y)
+		var at: Vector3=app.flight.position
+		if at.x>1200 and at.x<3200 and at.z< -3500 and at.z> -7500:
+			city_flyover_frames+=1
 		if app.combat.phase=="combat" and absf(app.flight.position.y-app.world.ground_height(app.flight.position.x,app.flight.position.z)-100)<0.01:
 			floor_corrections += 1
 		if app.combat.route_index!=previous_index:
@@ -38,6 +42,8 @@ func run() -> void:
 	if peak<1000: failures.append("Did not reach the Pacific panorama altitude")
 	if floor_corrections>0: failures.append("Route relied on terrain safety correction: "+str(floor_corrections))
 	if app.camera_view!="cockpit": failures.append("View left cockpit")
+	if city_flyover_frames<600: failures.append("Route did not spend at least ten simulated seconds above the city")
+	print("CITY FLYOVER SECONDS: ",city_flyover_frames/60.0)
 	print("SCENIC RESULT: ","PASS" if failures.is_empty() else "FAIL"," seconds=",app.flight.elapsed," peak=",peak," landmarks=",app.combat.visited_route.size()," corrections=",floor_corrections)
 	for failure in failures: printerr(failure)
 	app.queue_free()
