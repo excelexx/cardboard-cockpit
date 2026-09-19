@@ -10,6 +10,7 @@ func run():
 	app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
 	app.start_flight("combat")
+	app.cockpit = false # This assertion tests exterior muzzle effects, hidden in cockpit view.
 	check(is_instance_valid(app.fighter_fx.gun_rotor) and is_instance_valid(app.fighter_fx.gun_muzzle),"Imported rotary gun retains animated rotor and physical muzzle")
 	app.combat.fire_gun(); app.fighter_fx.update_gun(.05)
 	check(app.fighter_fx.rotor_speed>0 and app.fighter_fx.gun_flash.visible,"Gun fires immediately with rotating barrels and attached muzzle flash")
