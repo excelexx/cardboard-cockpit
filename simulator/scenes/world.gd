@@ -11,6 +11,11 @@ const TERRAIN_Z_MIN: float = -25500.0
 const TERRAIN_Z_MAX: float = 9500.0
 const TERRAIN_STEP: float = 110.0
 const RIVER_Y: float = -8.5
+const CONDITIONS: Dictionary = {
+	"golden": {"id": "golden", "name": "Golden hour", "time_of_day": "17:40", "cloud_cover": 0.30, "visibility_km": 30.0, "description": "Warm evening light · scattered high cloud", "visual_only": true},
+	"clear": {"id": "clear", "name": "Clear midday", "time_of_day": "12:15", "cloud_cover": 0.17, "visibility_km": 45.0, "description": "Bright midday · excellent valley visibility", "visual_only": true},
+	"overcast": {"id": "overcast", "name": "High overcast", "time_of_day": "10:30", "cloud_cover": 0.92, "visibility_km": 18.0, "description": "High cloud ceiling · soft light and valley haze", "visual_only": true}
+}
 
 var _built: bool = false
 var _noise: FastNoiseLite = FastNoiseLite.new()
@@ -18,6 +23,10 @@ var _detail_noise: FastNoiseLite = FastNoiseLite.new()
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _materials: Dictionary = {}
 var _environment: WorldEnvironment
+var _sun: DirectionalLight3D
+var _condition_id: String = "golden"
+var _condition_skies: Dictionary = {}
+var _airport_obstacles: Array[AABB] = []
 
 
 func _init() -> void:
@@ -98,6 +107,9 @@ func _box(parent: Node3D, title: String, position_value: Vector3, size_value: Ve
 	object.position = position_value
 	object.material_override = material
 	parent.add_child(object)
+	if title in ["MaintenanceHangar", "HangarRoof", "TerminalGroundFloor", "TerminalRoof", "ControlTowerBase", "JetBridge", "GateCabin"]:
+		# Airport parents only translate. Capture the authored bounds before batching.
+		_airport_obstacles.append(AABB(parent.position + position_value - size_value * 0.5, size_value))
 	return object
 
 
@@ -113,6 +125,10 @@ func _cylinder(parent: Node3D, title: String, position_value: Vector3, radius: f
 	object.position = position_value
 	object.material_override = material
 	parent.add_child(object)
+	if title in ["ControlTowerShaft", "ControlTowerCab", "ControlTowerRoof"]:
+		var collision_radius: float = maxf(radius, top_radius)
+		var bounds: Vector3 = Vector3(collision_radius * 2.0, height, collision_radius * 2.0)
+		_airport_obstacles.append(AABB(parent.position + position_value - bounds * 0.5, bounds))
 	return object
 
 
@@ -123,6 +139,9 @@ func _build_atmosphere() -> void:
 	var sky: Sky = Sky.new()
 	sky.sky_material = sky_material
 	sky.radiance_size = Sky.RADIANCE_SIZE_256
+	_condition_skies["golden"] = sky
+	_condition_skies["clear"] = _make_weather_sky(false)
+	_condition_skies["overcast"] = _make_weather_sky(true)
 	var environment: Environment = Environment.new()
 	environment.background_mode = Environment.BG_SKY
 	environment.sky = sky
@@ -140,17 +159,94 @@ func _build_atmosphere() -> void:
 	_environment.name = "MountainAtmosphere"
 	_environment.environment = environment
 	add_child(_environment)
-	var sun: DirectionalLight3D = DirectionalLight3D.new()
-	sun.name = "LateAfternoonSun"
-	sun.rotation_degrees = Vector3(-31.0, -38.0, 0.0)
-	sun.light_color = Color(1.0, 0.93, 0.81)
-	sun.light_energy = 1.25
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 2400.0
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	sun.shadow_bias = 0.04
-	sun.shadow_normal_bias = 1.2
-	add_child(sun)
+	_sun = DirectionalLight3D.new()
+	_sun.name = "ValleySun"
+	_sun.directional_shadow_max_distance = 2400.0
+	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	_sun.shadow_bias = 0.04
+	_sun.shadow_normal_bias = 1.2
+	add_child(_sun)
+	set_conditions(_condition_id)
+
+
+func _make_weather_sky(overcast: bool) -> Sky:
+	# Sky clouds add no scene geometry, transparency overdraw, or draw calls.
+	# A static sky also avoids rebuilding the environment's reflection map every frame.
+	var material: ShaderMaterial = ShaderMaterial.new()
+	material.shader = load("res://assets/environment/weather_sky.gdshader") as Shader
+	material.set_shader_parameter("cloud_cover", 0.92 if overcast else 0.17)
+	material.set_shader_parameter("overcast", 1.0 if overcast else 0.0)
+	material.set_shader_parameter("sun_direction", Vector3(-0.41, 0.82, 0.40) if overcast else Vector3(-0.32, 0.92, 0.22))
+	var sky: Sky = Sky.new()
+	sky.sky_material = material
+	sky.radiance_size = Sky.RADIANCE_SIZE_256
+	sky.process_mode = Sky.PROCESS_MODE_QUALITY
+	return sky
+
+
+func set_conditions(preset: String) -> void:
+	## Changes lighting and atmospheric visibility only; flight dynamics are unaffected.
+	## Safe before build(), after build(), and when called repeatedly from the hangar.
+	_condition_id = preset if CONDITIONS.has(preset) else "golden"
+	if _environment == null or _sun == null:
+		return
+	var environment: Environment = _environment.environment
+	environment.sky = _condition_skies[_condition_id] as Sky
+	_sun.shadow_enabled = _condition_id != "overcast"
+	match _condition_id:
+		"clear":
+			_sun.rotation_degrees = Vector3(-67.0, -55.0, 0.0)
+			_sun.light_color = Color(1.0, 0.98, 0.94)
+			_sun.light_energy = 1.55
+			environment.ambient_light_energy = 0.58
+			environment.tonemap_exposure = 0.96
+			environment.fog_light_color = Color(0.67, 0.79, 0.90)
+			environment.fog_light_energy = 0.95
+			environment.fog_density = 0.000014
+			environment.fog_aerial_perspective = 0.62
+			environment.fog_sky_affect = 0.08
+		"overcast":
+			_sun.rotation_degrees = Vector3(-54.0, -46.0, 0.0)
+			_sun.light_color = Color(0.87, 0.92, 1.0)
+			_sun.light_energy = 0.72
+			environment.ambient_light_energy = 0.85
+			environment.tonemap_exposure = 1.02
+			environment.fog_light_color = Color(0.69, 0.74, 0.78)
+			environment.fog_light_energy = 0.88
+			environment.fog_density = 0.000052
+			environment.fog_aerial_perspective = 0.86
+			environment.fog_sky_affect = 0.22
+		_:
+			_sun.rotation_degrees = Vector3(-31.0, -38.0, 0.0)
+			_sun.light_color = Color(1.0, 0.93, 0.81)
+			_sun.light_energy = 1.25
+			environment.ambient_light_energy = 0.32
+			environment.tonemap_exposure = 0.85
+			environment.fog_light_color = Color(0.62, 0.73, 0.80)
+			environment.fog_light_energy = 0.85
+			environment.fog_density = 0.000026
+			environment.fog_aerial_perspective = 0.78
+			environment.fog_sky_affect = 0.12
+
+
+func get_condition_name() -> String:
+	return str(CONDITIONS[_condition_id]["name"])
+
+
+func get_conditions() -> Dictionary:
+	# A copy keeps HUD formatting from modifying the canonical preset definitions.
+	return (CONDITIONS[_condition_id] as Dictionary).duplicate(true)
+
+
+func obstacle_collision(position_value: Vector3, radius: float = 2.0) -> bool:
+	## Major airport buildings use their visible authored bounds, retained after batching.
+	## Tiny furniture and trees remain forgiving; this is not aircraft-wing collision.
+	var safe_radius: float = maxf(radius, 0.0)
+	for bounds in _airport_obstacles:
+		var nearest: Vector3 = position_value.clamp(bounds.position, bounds.end)
+		if nearest.distance_squared_to(position_value) <= safe_radius * safe_radius:
+			return true
+	return false
 
 
 func _terrain_color(x: float, z: float, h: float, normal: Vector3) -> Color:

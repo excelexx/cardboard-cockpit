@@ -7,10 +7,19 @@ const Hangar = preload("res://scenes/hangar.gd")
 const World = preload("res://scenes/world.gd")
 const Audio = preload("res://systems/engine_audio.gd")
 const Vision = preload("res://systems/vision_client.gd")
+const Cockpit = preload("res://scenes/cockpit.gd")
+const Visuals = preload("res://systems/aircraft_visuals.gd")
+const Approach = preload("res://systems/approach_guidance.gd")
 const CHECKPOINTS: Array[Vector3] = [Vector3(0,180,-2000),Vector3(-450,420,-4200),Vector3(450,650,-6500),Vector3(150,420,-9000),Vector3(0,200,-11800)]
 const RING_RADIUS: float = 280.0
 
 var mode := "hangar"
+var resume_mode := "flight"
+var flight_kind := "valley"
+var conditions := "golden"
+var expanded_hud := false
+var aircraft_visuals: Node3D
+var touchdown_valid := false
 var selected: int = 0
 var flight: FlightDynamics = Dynamics.new()
 var vision: VisionClient = Vision.new()
@@ -58,6 +67,7 @@ func _ready() -> void:
 	load_settings()
 	world = World.new()
 	add_child(world)
+	world.set_conditions(conditions)
 	hangar = Hangar.new()
 	hangar.position = Vector3(50000,0,0)
 	add_child(hangar)
@@ -101,6 +111,13 @@ func _ready() -> void:
 			capture_at = maxf(1.0,arg.trim_prefix("--capture-at=").to_float())
 		if arg.begins_with("--plane="):
 			select_plane(clampi(arg.trim_prefix("--plane=").to_int(),0,4))
+		if arg.begins_with("--conditions="):
+			conditions = arg.trim_prefix("--conditions=")
+			world.set_conditions(conditions)
+		if arg.begins_with("--kind="):
+			flight_kind = arg.trim_prefix("--kind=")
+		if arg == "--briefing":
+			mode = "briefing"
 		if arg == "--flight":
 			start_flight()
 		if arg == "--copilot":
@@ -187,7 +204,7 @@ func build_rings() -> void:
 
 func update_rings() -> void:
 	for i: int in ring_nodes.size():
-		ring_nodes[i].visible = mode != "hangar" and mode != "briefing" and i >= ring_index
+		ring_nodes[i].visible = mode != "hangar" and mode != "briefing" and i >= ring_index and flight_kind == "valley"
 		var mesh: MeshInstance3D = ring_nodes[i].get_child(0)
 		var mat: StandardMaterial3D = mesh.material_override
 		mat.albedo_color = Color(1,0.68,0.30) if i == ring_index else Color(0.5,0.7,0.75)
@@ -199,7 +216,12 @@ func start_flight() -> void:
 	credits_visible = false
 	for child: Node in aircraft.get_children():
 		child.queue_free()
-	aircraft.add_child(load_plane())
+	var model: Node3D = load_plane()
+	aircraft.add_child(model)
+	aircraft_visuals = Visuals.new()
+	aircraft.add_child(aircraft_visuals)
+	aircraft_visuals.initialize(model,profile())
+	cockpit_frame.build(profile())
 	var tune: Dictionary = profile().duplicate()
 	tune.clearance = 3.0
 	flight.reset(tune)
@@ -211,6 +233,18 @@ func start_flight() -> void:
 	look = Vector2.ZERO
 	toast_time = 0
 	control = Vector3.ZERO
+	touchdown_valid = false
+	if flight_kind == "approach":
+		ring_index = 5
+		flight.position = Vector3(0,155,-11200)
+		flight.speed = float(profile().rotation_speed)*1.25
+		flight.throttle = 0.32
+		flight.engine = 0.32
+		flight.airborne = true
+		flight.ever_airborne = true
+		flight.airborne_time = 30.0
+		flight.pitch = -atan(Approach.GLIDESLOPE)
+		flight.flaps = 2
 	update_rings()
 	update_camera(1.0)
 
@@ -237,6 +271,11 @@ func _input(event: InputEvent) -> void:
 				take_manual_control(false)
 		match event.keycode:
 			KEY_F1: on_action("help")
+			KEY_F2: expanded_hud = not expanded_hud
+			KEY_F:
+				if mode == "flight":
+					flight.flaps = (flight.flaps+1)%3
+					show_toast("Flaps " + ["UP","15°","30°"][flight.flaps])
 			KEY_M: on_action("mute")
 			KEY_ENTER:
 				if mode == "hangar": on_action("brief")
@@ -246,8 +285,10 @@ func _input(event: InputEvent) -> void:
 				if credits_visible: credits_visible = false
 				elif help_visible: help_visible = false
 				elif calibration_visible: calibration_visible = false
-				elif mode == "flight": mode = "paused"
-				elif mode == "paused": mode = "flight"
+				elif mode in ["flight","rollout"]:
+					resume_mode = mode
+					mode = "paused"
+				elif mode == "paused": mode = resume_mode
 				elif mode == "briefing": mode = "hangar"
 			KEY_V: cockpit = not cockpit
 			KEY_TAB: spectator = not spectator
@@ -261,7 +302,7 @@ func _input(event: InputEvent) -> void:
 					flight.gear = not flight.gear
 					show_toast("Landing gear DOWN" if flight.gear else "Landing gear UP")
 			KEY_R:
-				if mode in ["flight","paused","results"]: start_flight()
+				if mode in ["flight","paused","results","rollout"]: start_flight()
 			KEY_H:
 				if mode == "flight":
 					copilot = not copilot
@@ -274,7 +315,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		if mode == "hangar" and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and event.position.y<735:
 			hangar_angle += event.relative.x*0.006
-		if mode == "flight" and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		if mode in ["flight","rollout"] and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 			look.x = clampf(look.x-event.relative.x*0.003,-1.5,1.5)
 			look.y = clampf(look.y-event.relative.y*0.003,-0.8,0.8)
 	if event is InputEventMouseButton and mode == "hangar":
@@ -282,6 +323,14 @@ func _input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN: hangar_zoom = minf(1.45,hangar_zoom+0.06)
 
 func on_action(action: String) -> void:
+	if action.begins_with("weather_"):
+		conditions = action.trim_prefix("weather_")
+		world.set_conditions(conditions)
+		save_settings()
+		return
+	if action.begins_with("kind_"):
+		flight_kind = action.trim_prefix("kind_")
+		return
 	match action:
 		"brief": mode = "briefing"
 		"fly", "restart": start_flight()
@@ -291,7 +340,7 @@ func on_action(action: String) -> void:
 			calibration_visible = false
 			credits_visible = false
 			update_rings()
-		"resume": mode = "flight"
+		"resume": mode = resume_mode
 		"help":
 			help_visible = not help_visible
 			calibration_visible = false
@@ -315,7 +364,13 @@ func _process(dt: float) -> void:
 	if mode == "hangar":
 		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT): hangar_angle += dt*0.025
 	update_camera(dt)
-	audio.update(flight.engine,flight.speed,mode == "flight" and not overlay_visible())
+	var active: bool = mode in ["flight","rollout"] and not overlay_visible()
+	if is_instance_valid(aircraft_visuals):
+		aircraft_visuals.update_visuals(dt if active else 0.0,flight,control)
+	if cockpit and mode not in ["hangar","briefing"]:
+		cockpit_frame.set_navigation(flight_kind,ring_index)
+		cockpit_frame.update_instruments(flight,control,dt if active else 0.0)
+	audio.update(flight.engine,flight.speed,active)
 	if capture_at>0 and runtime>=capture_at:
 		capture_at = -1
 		await RenderingServer.frame_post_draw
@@ -328,7 +383,20 @@ func _process(dt: float) -> void:
 		get_tree().quit(2)
 
 func _physics_process(dt: float) -> void:
-	if mode != "flight" or overlay_visible():
+	if overlay_visible():
+		return
+	if mode == "rollout":
+		var steering: float = float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
+		var brakes: bool = copilot or Input.is_physical_key_pressed(KEY_SPACE)
+		flight.rollout_step(dt,brakes,steering,is_on_runway(flight.position))
+		if not is_on_runway(flight.position): flight.contact = "overrun"
+		aircraft.position = flight.position
+		aircraft.rotation = Vector3(0,-flight.heading,0)
+		if flight.contact=="overrun" or flight.speed<=0.1:
+			if flight.speed<=0.1: flight.speed = 0.0
+			finish_mission()
+		return
+	if mode != "flight":
 		return
 	var keyboard := Vector3(float(Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_UP))-float(Input.is_physical_key_pressed(KEY_DOWN)),float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)))
 	var throttle_delta: float = float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
@@ -360,9 +428,17 @@ func _physics_process(dt: float) -> void:
 	if flight.airborne and not was_airborne:
 		show_toast("Positive climb. Welcome to the sky.")
 		audio.ping()
-	if flight.contact != "":
+	if flight.airborne and world.obstacle_collision(flight.position,2.5):
+		flight.contact = "obstacle"
+	if flight.contact == "landed":
+		touchdown_valid = (flight_kind=="free" or ring_index==5) and (flight_kind=="free" or absf(flight.position.z+15000)<1600)
+		mode = "rollout"
+		flight.throttle = 0.0
+		show_toast("Touchdown. Hold SPACE to brake to a stop.")
+		audio.ping()
+	elif flight.contact != "":
 		finish_mission()
-	if ring_index<CHECKPOINTS.size() and flight.airborne:
+	if ring_index<CHECKPOINTS.size() and flight.airborne and flight_kind == "valley":
 		var target: Vector3 = CHECKPOINTS[ring_index]
 		if not is_equal_approx(prior.z, flight.position.z) and (prior.z-target.z)*(flight.position.z-target.z) <= 0.0:
 			var fraction: float = inverse_lerp(prior.z,flight.position.z,target.z)
@@ -378,9 +454,6 @@ func _physics_process(dt: float) -> void:
 		finish_mission()
 	aircraft.position = flight.position
 	aircraft.rotation = Vector3(flight.pitch,-flight.heading,-flight.roll)
-	if aircraft.get_child_count()>0:
-		var gear_node: Node3D = aircraft.get_child(aircraft.get_child_count()-1).get_node_or_null("Airframe/LandingGear")
-		if gear_node: gear_node.visible = flight.gear
 
 func take_manual_control(steering: bool) -> void:
 	if copilot:
@@ -396,16 +469,13 @@ func pilot_controls() -> Vector3:
 	var desired_speed: float = 115.0
 	if not flight.airborne:
 		flight.throttle = 1.0
-		return Vector3(0,0.7 if flight.speed>float(profile().rotation_speed) else 0,0)
-	if ring_index>=5:
-		# Broad, forgiving glideslope to the destination runway.
-		var remaining: float = -14250.0-flight.position.z
-		target = Vector3(0,maxf(3.0,(-remaining)*0.055),flight.position.z-650)
-		desired_speed = maxf(float(profile().rotation_speed)*1.06,70.0)
+		return Vector3(0,0.7 if flight.speed>flight.effective_rotation_speed() else 0,0)
+	if ring_index>=5 or flight_kind == "free":
+		var guidance: Dictionary = Approach.solution(flight.position)
+		target = Vector3(0,float(guidance.ideal_height),flight.position.z-800)
+		desired_speed = maxf(float(profile().rotation_speed)*1.14,65.0)
 		flight.gear = true
-		if flight.position.z < -13850:
-			target.y = 2.4
-			desired_speed = float(profile().rotation_speed)*1.03
+		flight.flaps = 2
 	else:
 		flight.gear = flight.airborne_time<10
 	var delta: Vector3 = target-flight.position
@@ -413,43 +483,54 @@ func pilot_controls() -> Vector3:
 	var heading_error: float = wrapf(desired_heading-flight.heading,-PI,PI)
 	var desired_roll: float = clampf(heading_error*2.0,-0.55,0.55)
 	var desired_pitch: float = clampf(atan2(delta.y,maxf(Vector2(delta.x,delta.z).length(),300)),-0.15,0.23)
-	if ring_index>=5 and flight.position.z < -13850:
-		desired_pitch = -0.035 if flight.position.y>5 else -0.012
+	if ring_index>=5 or flight_kind == "free":
+		var approach: Dictionary = Approach.solution(flight.position)
+		desired_pitch = clampf(-atan(Approach.GLIDESLOPE)+(float(approach.ideal_height)-flight.position.y)*0.002,-0.15,0.05)
+		if flight.position.y<14.0:
+			desired_pitch = -0.025 if flight.position.y>5.0 else -0.015
 	var pitch_input: float = clampf((desired_pitch-flight.pitch)*5.5,-1,1)
 	var roll_input: float = clampf((desired_roll-flight.roll)*4.0,-1,1)
 	flight.throttle = clampf(0.20+(desired_speed-flight.speed)*0.045,0,1)
 	return Vector3(roll_input,pitch_input,0)
 
 func target_position() -> Vector3:
-	return CHECKPOINTS[ring_index] if ring_index<5 else Vector3(0,3,-14300)
+	return CHECKPOINTS[ring_index] if ring_index<5 and flight_kind=="valley" else Vector3(0,3,Approach.AIM_Z)
 
 func phase_label() -> String:
 	if mode == "hangar": return "HANGAR"
+	if mode=="rollout" or (mode=="paused" and resume_mode=="rollout"): return "ROLLOUT · BRAKE TO A STOP"
+	if flight_kind=="free" and flight.airborne: return "FREE FLIGHT · EXPLORE THE VALLEY"
 	if not flight.ever_airborne: return "RUNWAY 36 · CLEARED FOR DEPARTURE"
-	if ring_index>=5: return "FINAL APPROACH · NORTH FIELD"
+	if ring_index>=5 or flight_kind == "free": return "FINAL APPROACH · NORTH FIELD"
 	return "AIRBORNE · VALLEY CHECKPOINTS"
 
 func flight_prompt() -> String:
+	if mode=="rollout": return "Power idle  ·  Hold SPACE to brake  ·  A / D to stay centered"
 	if flight.contact!="": return "Flight complete"
 	if flight.stall_time>0.8: return "LOW AIRSPEED  ·  Add power and lower the nose gently"
 	if not flight.airborne:
-		if flight.speed<float(profile().rotation_speed): return "Hold W for power  ·  Rotate at %d knots" % int(float(profile().rotation_speed)*1.94384)
+		if flight.speed<flight.effective_rotation_speed(): return "Hold W for power  ·  Rotate at %d knots" % int(flight.effective_rotation_speed()*1.94384)
 		return "ROTATE  ·  Hold ↑ gently to take off"
+	if flight_kind == "free": return "Explore the valley  ·  Land at either airport whenever you are ready"
 	if ring_index>=5:
 		if not flight.gear: return "FINAL APPROACH  ·  Press G to lower landing gear"
-		return "Reduce power  ·  Line up with runway 36  ·  Land below 200 knots"
+		return "Follow the approach diamonds  ·  F for flaps  ·  Aim for %d knots" % int(maxf(float(profile().rotation_speed)*1.14,65.0)*1.94384)
 	if flight.position.z < CHECKPOINTS[ring_index].z-500: return "Checkpoint behind you  ·  Turn back, or press R to restart"
 	if flight.position.y-world.ground_height(flight.position.x,flight.position.z)<45: return "LOW ALTITUDE  ·  Gently raise the nose"
 	return "Follow the amber rings  ·  Checkpoint %d of 5" % (ring_index+1)
 
 func finish_mission() -> void:
-	mission_success = flight.contact=="landed" and ring_index==5 and absf(flight.position.z+15000)<1600
+	mission_success = flight.contact=="landed" and touchdown_valid and flight.speed<=0.1 and is_on_runway(flight.position)
 	if mission_success:
-		result_reason = "Smooth landing. All five checkpoints collected." if flight.touchdown_sink > -4 else "Safe arrival. All five checkpoints collected."
-	elif flight.contact=="landed": result_reason = "Safe touchdown. Collect all five checkpoints and land at North Field to complete the route."
-	elif flight.contact=="excursion": result_reason = "Runway excursion. Keep centered with A / D and rotate at the indicated speed."
+		result_reason = "Landing complete. Aircraft stopped safely."
+		if flight_kind=="valley": result_reason += " Five checkpoints cleared."
+		elif flight_kind=="free": result_reason = "Scenic flight complete. Parked safely after landing."
+	elif flight.contact=="overrun": result_reason = "Runway overrun. Touch down earlier and hold SPACE to brake."
+	elif flight.contact=="obstacle": result_reason = "Aircraft contacted an airport building. Keep clear of structures."
+	elif flight.contact=="landed": result_reason = "Safe touchdown. Complete all checkpoints and land at North Field."
+	elif flight.contact=="excursion": result_reason = "Runway excursion. Use A / D to stay centered during takeoff."
 	elif flight.contact=="boundary": result_reason = "You left the flight area. Restart and follow the amber valley route."
-	else: result_reason = "Landing was too hard or outside a runway. Try less speed, level wings, and gear down."
+	else: result_reason = "Unsafe landing. Approach gently with level wings and gear down."
 	mode = "results"
 	audio.ping()
 	if test_mode and not test_finished:
@@ -464,6 +545,7 @@ func show_toast(message: String) -> void:
 func update_camera(dt: float) -> void:
 	if mode in ["hangar","briefing"]:
 		camera.environment = hangar_environment
+		camera.near = 0.5
 		aircraft.visible = false
 		hangar.visible = true
 		cockpit_frame.visible = false
@@ -480,10 +562,13 @@ func update_camera(dt: float) -> void:
 		var plane_basis := Basis.from_euler(Vector3(flight.pitch,-flight.heading,-flight.roll))
 		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT): look = look.lerp(Vector2.ZERO,1-exp(-dt*2.0))
 		if cockpit:
+			camera.near = 0.05
 			camera.position = flight.position+plane_basis*Vector3(0,3.0,-float(profile().length)*0.29)
 			camera.basis = plane_basis * Basis.from_euler(Vector3(look.y,look.x,0))
+			cockpit_frame.basis = Basis.from_euler(Vector3(look.y,look.x,0)).inverse()
 			camera.fov = 77
 		else:
+			camera.near = 0.5
 			var length: float = maxf(float(profile().length),30.0)
 			var offset := Vector3(sin(look.x)*length*1.15,length*0.22+6.0+look.y*15.0,cos(look.x)*length*1.05)
 			var wanted: Vector3 = flight.position+Basis(Vector3.UP,-flight.heading)*offset
@@ -492,21 +577,18 @@ func update_camera(dt: float) -> void:
 			camera.fov = 65
 
 func create_cockpit() -> void:
-	cockpit_frame = Node3D.new()
+	cockpit_frame = Cockpit.new()
 	camera.add_child(cockpit_frame)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.025,0.038,0.046)
-	mat.roughness = 0.65
-	# A custom instrument hood and windshield pillars; model-specific study-level interiors are out of scope.
-	for spec: Array in [[Vector3(0,-1.0,-1.7),Vector3(4.2,0.35,1.7)],[Vector3(-1.9,0,-1.9),Vector3(0.09,2.3,0.12)],[Vector3(1.9,0,-1.9),Vector3(0.09,2.3,0.12)],[Vector3(0,1.05,-1.9),Vector3(4.1,0.08,0.12)]]:
-		var instance := MeshInstance3D.new()
-		var mesh := BoxMesh.new()
-		mesh.size = spec[1]
-		instance.mesh = mesh
-		instance.position = spec[0]
-		instance.material_override = mat
-		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		cockpit_frame.add_child(instance)
+	cockpit_frame.build(profile())
+
+func is_on_runway(at: Vector3) -> bool:
+	return absf(at.x)<50.0 and (absf(at.z)<1600.0 or absf(at.z+15000.0)<1600.0)
+
+func approach_data() -> Dictionary:
+	return Approach.solution(flight.position)
+
+func flight_kind_label() -> String:
+	return {"valley":"VALLEY MISSION","approach":"LANDING PRACTICE","free":"FREE FLIGHT"}.get(flight_kind,"VALLEY MISSION")
 
 func set_quality(high: bool) -> void:
 	high_quality = high
@@ -519,10 +601,12 @@ func load_settings() -> void:
 	if settings.load("user://settings.cfg") == OK:
 		selected = clampi(int(settings.get_value("flight","aircraft",0)),0,4)
 		high_quality = bool(settings.get_value("video","high_quality",false))
+		conditions = str(settings.get_value("world","conditions","golden"))
 
 func save_settings() -> void:
 	var settings := ConfigFile.new()
 	settings.set_value("flight","aircraft",selected)
 	settings.set_value("video","high_quality",high_quality)
+	settings.set_value("world","conditions",conditions)
 	if is_instance_valid(audio): settings.set_value("audio","muted",audio.muted)
 	settings.save("user://settings.cfg")
