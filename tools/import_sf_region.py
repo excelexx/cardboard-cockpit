@@ -58,7 +58,7 @@ class GLTF:
   if key not in self.m:
    mat={'name':Path(tex).stem if tex else 'source_material','doubleSided':True,'pbrMetallicRoughness':{'baseColorFactor':list(rgb)+[1],'roughnessFactor':.3 if water else .9,'metallicFactor':.05 if water else 0}}
    if tex:
-    ti=len(self.g['textures']);self.g['images'].append({'uri':tex});self.g['textures'].append({'source':ti,'sampler':0});mat['pbrMetallicRoughness']['baseColorTexture']={'index':ti}
+    ti=len(self.g['textures']);self.g['images'].append({'uri':tex,'mimeType':'image/jpeg' if tex.endswith('.jpg') else 'image/png'});self.g['textures'].append({'source':ti,'sampler':0});mat['pbrMetallicRoughness']['baseColorTexture']={'index':ti}
    if tex:
     if tex not in alpha_cache:
      from PIL import Image

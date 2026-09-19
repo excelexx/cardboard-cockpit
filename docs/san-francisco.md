@@ -1,6 +1,6 @@
 # San Francisco regional scenery
 
-Version 0.10 uses an existing regional FlightGear/OSM2City dataset for its default world. It preserves the downloaded terrain triangles, building meshes, roads, geographic placements and source textures. The converter changes file formats, coordinate systems, triangulation and material handling; it does not invent a new city or individually model landmarks.
+Version 0.10.1 uses an existing regional FlightGear/OSM2City dataset for its default world. It preserves the downloaded terrain triangles, building meshes, roads, geographic placements and source textures. The converter changes file formats, coordinate systems, triangulation and material handling; it does not invent a new city or individually model landmarks.
 
 ## Coverage and flight
 
@@ -19,6 +19,7 @@ The map is anchored at the midpoint of SFO runway 28R: **37.62114, -122.375285**
 | Regional roads and 2,007,435 tree locations | [OSM2City](https://terrasync.eti.pg.gda.pl/o2c/) Roads and Trees archives for the same tile | Same source-data attribution |
 | Building and tree templates | [SimGear SGBuildingBin](https://github.com/FlightGear/simgear/blob/next/simgear/scene/tgdb/SGBuildingBin.cxx), TreeBin and FGData shaders | GPL-2.0-or-later; Stuart Buchanan and FlightGear contributors. Source template coordinates and shader calculations are converted, not replaced with invented buildings |
 | Building, road, terrain, water-normal and tree textures | [FlightGear FGData](https://gitlab.com/flightgear/fgdata) | Original FlightGear asset terms; downloaded inputs retained |
+| Actual aerial ground photography | [USGS/USDA National Map imagery](https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer) and NAIP Plus | Public domain, 23 original georeferenced 4000 × 2000 JPEGs. Extents, source requests and SHA-256 hashes are retained beside the photographs |
 | Photographic sky | [Qwantani Sunset (Pure Sky)](https://polyhaven.com/a/qwantani_sunset_puresky) | CC0. Photography Greg Zaal; processing Jarod Guest. Original 4K EXR |
 | Fighter exterior and cockpit; missile | [FGMEMBERS F-35B](https://github.com/FGMEMBERS/F-35B) | GPL-3.0; original aircraft author credits in `THIRD_PARTY_ASSETS.md`. Original livery and Cockpit/AIM-120 geometry; live 2D instruments mapped onto the source panel |
 | Cannon mesh and muzzle/smoke artwork | [FGMEMBERS A-10](https://github.com/FGMEMBERS/A-10) | GPL-2.0; source model, textures and COPYING retained. Cannon geometry is extracted from the existing aircraft mesh |
@@ -42,3 +43,11 @@ No AI image generation or new Blender modeling was used for this version. HUD dr
 The scene streams nearby city/road chunks and tree batches. Terrain remains available for long views; individual mesh bounds allow normal frustum culling. Masked transparency, mipmaps, anisotropic filtering, MSAA and a larger camera near plane reduce shimmering. Alternate bridge LOD shells and light sprites are excluded so they are not rendered on top of one another.
 
 To rebuild, unpack the source archives into `.downloads/sf-region/{terrain,objects,textures,buildings,roads,trees}` and copy the supplied atlases there. Install NumPy, Pillow, pyproj and mapbox-earcut in the project virtual environment. Run the converters, material preparation, `bake_sf_native.gd`, `finalize_sf_native.py`, and Godot import. Native scenes are compressed to roughly 594 MB, and tree coordinates are consolidated into one indexed binary stream. The source snapshot hashes are in `docs/source/san_francisco/sha256.json`.
+
+## Aerial photography and distance detail
+
+Version 0.10.1 replaces repeated land-cover imagery with georeferenced USGS/USDA aerial photographs across all 23 land-bearing terrain buckets. Water and separate airport/runway geometry remain intact. Ground vertices, elevations, routes and collision samples are unchanged. Native scenes reference the original downloaded JPEGs, with mipmapping and GPU compression.
+
+The city and road meshes now have 4,807 standard Godot LOD levels across 1,874 scenes. Their original full-detail vertex arrays are retained exactly; the renderer selects simpler index buffers with distance. `tools/optimize_sf_lods.gd` asserts preservation while compiling these levels. This is format/rendering optimization of the source models.
+
+`tools/fetch_sf_aerial.py` retains exact returned WGS84 image extents and maps the original terrain coordinates to them. It downloads imagery from the public [USGS service](https://www.usgs.gov/national-map-supporting-themes); it does not synthesize terrain textures. Photo provenance is in `simulator/assets/san_francisco/aerial/manifest.json`. The raster source may show different acquisition dates from the historical building snapshot.
