@@ -59,22 +59,22 @@ func tick(dt: float) -> void:
 	if f.contact=="landed": transition("rollout")
 	app.combat.engagement_enabled = phase=="combat"
 func label() -> String:
-	if cinematic:return {"opening":"01 / SKYWARD","combat":"02 / PACIFIC COAST","anticipation":"03 / ANOMALOUS CONTACT","boss":"04 / THE FINAL HONK","aftermath":"05 / RETURN TO SFO","approach":"06 / SFO FINAL APPROACH","rollout":"07 / BRAKING"}.get(phase,"SF / FREE FLIGHT")
-	return {"takeoff":"01 / DEPARTURE","combat":"02 / INTERCEPT","return":"03 / RECOVERY","approach":"03 / FINAL APPROACH","rollout":"03 / ROLLOUT"}.get(phase,"")
+	if cinematic:return {"opening":"TAKE OFF","combat":"PACIFIC COAST","anticipation":"SOMETHING BIG","boss":"MOTHER GOOSE","aftermath":"HEAD HOME","approach":"LANDING","rollout":"BRAKING"}.get(phase,"FREE FLIGHT")
+	return {"takeoff":"TAKE OFF","combat":"GEESE","return":"HEAD HOME","approach":"LANDING","rollout":"BRAKING"}.get(phase,"")
+## "TITLE|words|[KEY]|words": the HUD draws the title in colour and [KEY] as a keycap.
 func instruction() -> String:
 	if cinematic:
-		if phase=="aftermath":return "B ON BADGE / L — DEPLOY FLAPS & LAND"
-		if phase=="approach":return "GEAR DOWN / FLAPS 2 — LANDING ASSIST ACTIVE"
-		if phase=="rollout":return "TOUCHDOWN — AUTOMATIC BRAKING"
-		if phase=="boss":return ""
-		if phase=="anticipation":return "LARGE SIGNATURE" if phase_clock<2 else ""
+		if phase=="aftermath":return "LAND AT SFO|Press badge|[B]|or|[L]"
+		if phase=="approach":return "LANDING|The jet lands itself"
+		if phase=="rollout":return "LANDED|Braking"
+		if phase=="anticipation":return "WARNING|Something big ahead" if phase_clock<2 else ""
 		return ""
-	if app.route_id in ["coast","sf"] and phase in ["combat","return"]: return route_names()[mini(route_index,route_names().size()-1)]+"  •  FOLLOW THE BLUE DIAMOND"
-	if phase=="takeoff": return "W  FULL POWER  •  ↑ ROTATE AT 105 KT" if not app.flight.airborne else "POSITIVE CLIMB  •  G GEAR UP"
-	if phase=="combat": return "W ACCELERATE  /  S AIRBRAKE  •  ALIGN THE ACQUISITION RING"
-	if phase=="return": return "NORTH FIELD / RWY 36  •  REDUCE POWER"
-	if phase=="approach": return "GEAR DOWN  •  FLAPS 2  •  HOLD THE GLIDEPATH"
-	return "HOLD SPACE TO BRAKE  •  A / D CENTRELINE"
+	if app.route_id in ["coast","sf"] and phase in ["combat","return"]: return "GO TO|"+route_names()[mini(route_index,route_names().size()-1)].capitalize()+"|Follow the diamond"
+	if phase=="takeoff": return "TAKE OFF|Hold|[W]|Pull up at 105 knots" if not app.flight.airborne else "GEAR UP|Press|[G]"
+	if phase=="combat": return "AIM|Put the ring on a goose"
+	if phase=="return": return "HEAD HOME|Slow down for the runway"
+	if phase=="approach": return "LANDING|Gear down, flaps 2, keep the diamond centered"
+	return "LANDED|Hold|[SPACE]|to brake"
 func controls() -> Vector3:
 	if cinematic:return app.approach_controls() if phase=="approach" else _showcase_controls()
 	var f: FlightDynamics = app.flight
@@ -153,7 +153,7 @@ func _tick_showcase(dt: float) -> void:
 		app.begin_landing()
 		return
 	if clock>=Tune.DEMO_LIMIT:
-		app.finish_sortie(c.boss_defeated,"THE SKY IS YOURS" if c.boss_defeated else "RUN COMPLETE — TAKE ANOTHER RUN");return
+		app.finish_sortie(c.boss_defeated,"You beat Mother Goose." if c.boss_defeated else "Time is up.");return
 	c.engagement_enabled=phase in ["opening","combat","boss"]
 	if phase=="anticipation":
 		for enemy: Dictionary in c.enemies:

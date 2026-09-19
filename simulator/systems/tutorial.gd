@@ -2,13 +2,13 @@ extends RefCounted
 class_name FlightTutorial
 ## Coaching happens inside Play. It never stops simulation or requires a menu.
 const LESSONS: Array[Dictionary]=[
- {"title":"FIRST CONTACTS","lines":["Let's clear your first three geese together.","Defeat the large boss later, then land safely at SFO."]},
- {"title":"YOUR CARDBOARD CONTROLS","lines":["Rotate the yoke to bank. Tilt toward you to climb; forward to descend.","Throttle forward accelerates; pull back to brake. Arrow keys and W/S also work."]},
- {"title":"PRIMARY SWITCH","lines":["Flip yoke switch 1 ON, or tap Space, for minigun and energy cannon.","Bring a goose into the aim ring. Flip OFF or tap again to stop firing."]},
- {"title":"MISSILE SWITCH","lines":["Flip yoke switch 2 ON, or tap T, for repeated four-missile salvos.","The lock guides your missiles. Both weapons have unlimited ammunition."]},
- {"title":"KEEP THE INTERCEPT GOING","lines":["Keep targets near the aiming ring and clear three geese.","Badge LEFT changes view; HOME pauses; UP toggles route assistance."]},
- {"title":"YOU'RE READY","lines":["Three geese cleared. You're ready to continue the intercept.","Defeat the boss, then press badge B or keyboard L to deploy flaps and land."]},
- {"title":"SFO LANDING ASSIST","lines":["Gear and full flaps deployed. Weapons safe. Follow the runway.","Assistance handles descent, touchdown and braking to a stop."]}
+ {"title":"FIRST THREE GEESE","lines":["We will shoot down your first three geese together.","After that: beat the boss, then land at SFO."]},
+ {"title":"HOW TO FLY","lines":["Turn the yoke to bank. Tilt it toward you to climb, away to dive.","Push the throttle to speed up, pull to slow down. Arrow keys and W / S work too."]},
+ {"title":"THE GUN","lines":["Flip yoke switch 1 ON, or tap Space, to fire the gun.","Put the ring on a goose. Flip it OFF or tap again to stop."]},
+ {"title":"MISSILES","lines":["Flip yoke switch 2 ON, or tap T, to fire missiles four at a time.","They follow the red LOCKED box. You never run out of ammo."]},
+ {"title":"KEEP GOING","lines":["Keep geese near the ring and shoot down three.","Badge LEFT changes the view, HOME pauses, UP turns auto-fly on or off."]},
+ {"title":"YOU ARE READY","lines":["Three geese down. The rest is up to you.","Beat the boss, then press badge B or L to land."]},
+ {"title":"LANDING AT SFO","lines":["Gear and flaps are down and the weapons are off.","The jet lands and brakes by itself. Enjoy the view."]}
 ]
 var app: Node
 var active:=false
