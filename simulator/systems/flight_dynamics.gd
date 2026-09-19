@@ -22,6 +22,10 @@ var touchdown_speed: float = 0.0
 var touchdown_sink: float = 0.0
 var touchdown_bank: float = 0.0
 var stall_time: float = 0.0
+var barrel_remaining: float = 0.0
+var barrel_direction: float = 1.0
+var barrel_start: float = 0.0
+const BARREL_DURATION := 1.8
 var flaps: int = 0
 var rollout_elapsed: float = 0.0
 var touchdown_center: float = 0.0
@@ -45,6 +49,7 @@ func reset(aircraft: Dictionary) -> void:
 	roughness = 0.0
 	contact = ""
 	stall_time = 0.0
+	barrel_remaining = 0.0
 	touchdown_speed = 0.0
 	touchdown_sink = 0.0
 	touchdown_bank = 0.0
@@ -52,7 +57,7 @@ func reset(aircraft: Dictionary) -> void:
 	rollout_elapsed = 0.0
 	touchdown_center = 0.0
 
-func step(dt: float, control: Vector3, brakes: bool, ground: float, runway: bool) -> void:
+func step(dt: float, control: Vector3, brakes: bool, ground: float, runway: bool, resolve_surface: bool = true) -> void:
 	if contact != "":
 		return
 	elapsed += dt
@@ -67,13 +72,21 @@ func step(dt: float, control: Vector3, brakes: bool, ground: float, runway: bool
 	speed = clampf(speed + (engine * acceleration - drag - sin(pitch) * 3.4) * dt, 0.0, max_speed * 1.12)
 	var authority: float = clampf(speed / rotation_speed, 0.0, 1.5)
 	if airborne:
-		roll += control.x * float(profile.roll_rate) * dt
-		roll = move_toward(roll, 0.0, dt * (0.10 if absf(control.x) < 0.05 else 0.0))
-		roll = clampf(roll, -0.95, 0.95)
+		var rolling: bool = barrel_remaining > 0
+		if rolling:
+			barrel_remaining = maxf(0,barrel_remaining-dt)
+			var progress: float = 1.0-barrel_remaining/BARREL_DURATION
+			roll = barrel_start+barrel_direction*TAU*smoothstep(0.0,1.0,progress)
+			if barrel_remaining==0: roll = barrel_start
+		else:
+			roll += control.x * float(profile.roll_rate) * dt
+			roll = move_toward(roll, 0.0, dt * (0.10 if absf(control.x) < 0.05 else 0.0))
+			roll = clampf(roll, -0.95, 0.95)
 		pitch += control.y * float(profile.pitch_rate) * dt * authority
 		pitch = move_toward(pitch, 0.0, dt * (0.018 if absf(control.y) < 0.05 else 0.0))
 		pitch = clampf(pitch, -0.40, 0.48)
-		heading += (tan(roll) * 18.0 / maxf(speed, 30.0) + control.z * 0.06) * dt
+		if not rolling:
+			heading += (tan(roll) * (30.0 if str(profile.id)=="f35" else 18.0) / maxf(speed, 30.0) + control.z * (0.15 if str(profile.id)=="f35" else 0.06)) * dt
 		var lift_factor: float = clampf(speed / (rotation_speed * 0.85), 0.0, 1.0)
 		var desired_vertical: float = sin(pitch) * speed - (1.0 - lift_factor) * 32.0
 		# Forgiving initial departure, but landing remains under player control.
@@ -98,6 +111,12 @@ func step(dt: float, control: Vector3, brakes: bool, ground: float, runway: bool
 	var forward := Vector3(sin(heading), 0, -cos(heading))
 	position += forward * speed * cos(pitch) * dt
 	distance += speed * dt
+	if resolve_surface:
+		resolve_contact(ground, runway)
+
+func resolve_contact(ground: float, runway: bool) -> void:
+	if contact != "":
+		return
 	if airborne and position.y <= ground + float(profile.clearance):
 		touchdown_speed = speed
 		touchdown_sink = vertical_speed
@@ -118,8 +137,21 @@ func step(dt: float, control: Vector3, brakes: bool, ground: float, runway: bool
 func get_heading_degrees() -> float:
 	return fposmod(rad_to_deg(heading), 360.0)
 
+func start_barrel_roll(direction: float = 1.0) -> bool:
+	if str(profile.id)!="f35" or not airborne or position.y<80 or barrel_remaining>0 or contact!="":
+		return false
+	barrel_remaining = BARREL_DURATION
+	barrel_direction = -1.0 if direction<0 else 1.0
+	barrel_start = roll
+	return true
+
 func get_smoothness() -> int:
-	return clampi(int(100.0 - roughness / maxf(elapsed, 1.0) * 220.0 - stall_time), 0, 100)
+	var landing_penalty: float = 0.0
+	if contact == "landed":
+		landing_penalty = maxf(absf(touchdown_sink) - 1.0, 0.0) * 3.0
+		landing_penalty += maxf(touchdown_speed / float(profile.rotation_speed) - 1.1, 0.0) * 50.0
+		landing_penalty += absf(touchdown_bank) * 30.0
+	return clampi(int(100.0 - roughness / maxf(elapsed, 1.0) * 220.0 - stall_time - landing_penalty), 0, 100)
 
 func effective_rotation_speed() -> float:
 	# Three assisted flap detents: retracted, takeoff, approach.
