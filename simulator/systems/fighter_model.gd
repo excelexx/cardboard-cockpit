@@ -39,7 +39,7 @@ static func create() -> Node3D:
 				material.roughness = 0.52
 			node.set_surface_override_material(surface,material)
 	var gun := Node3D.new(); gun.name = "CG26"
-	gun.position = Vector3(-1.5,.27,-3.10)
+	gun.position = Vector3(-.80,-.30,-3.10) # Intersects the source fuselage at x=-.869 m.
 	var gimbal := Node3D.new(); gimbal.name = "GunGimbal"; gun.add_child(gimbal)
 	var rotor: Node3D = load("res://assets/sourced_flight/cannon.gltf").instantiate()
 	rotor.name = "GatlingRotor"; gimbal.add_child(rotor)

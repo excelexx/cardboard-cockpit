@@ -12,6 +12,7 @@ var tree_positions := PackedFloat32Array()
 var elapsed := 0.0
 var focus := Vector3.ZERO
 var _built := false
+var detailed := true
 
 func _ready() -> void: build()
 func build() -> void:
@@ -71,7 +72,7 @@ func _mount(chunk: Dictionary,scene: PackedScene) -> void:
 						mat.normal_scale = 0.12; mat.roughness = 0.32
 						mat.uv1_triplanar = true; mat.uv1_world_triplanar = true; mat.uv1_scale = Vector3.ONE*0.003
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if chunk.kind=="terrain" else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-		mesh.visibility_range_end = 90000 if chunk.kind=="terrain" else 22000 if chunk.kind=="landmark" else 9000
+		mesh.visibility_range_end = _visual_range(chunk.kind)
 
 func _stream() -> void:
 	_stream_trees()
@@ -88,8 +89,19 @@ func update_local_shadows(at: Vector3,dt: float) -> void:
 	focus = at; elapsed += dt
 	if elapsed>0.15: elapsed = 0; _stream()
 func set_conditions(_id: String) -> void: pass
+func _visual_range(kind: String) -> float:
+	if kind=="terrain": return 90000
+	if kind=="landmark": return 22000
+	if kind=="road": return 12000 if detailed else 8000
+	return 9000 if detailed else 6000
 func apply_quality(high: bool) -> void:
+	detailed = high
 	if environment==null: return
+	for chunk in chunks:
+		if is_instance_valid(chunk.node):
+			for mesh in chunk.node.find_children("*","GeometryInstance3D",true,false): mesh.visibility_range_end = _visual_range(chunk.kind)
+	for chunk: Dictionary in tree_chunks:
+		if chunk.has("node"): chunk.node.visibility_range_end = 4200 if detailed else 3000
 	var forward: bool = RenderingServer.get_current_rendering_method()=="forward_plus"
 	environment.environment.ssao_enabled = high and forward
 	environment.environment.glow_enabled = high and forward
@@ -124,7 +136,7 @@ func _stream_trees() -> void:
 			var at := Vector3(points[i*3],points[i*3+1],points[i*3+2])
 			multi.set_instance_transform(i,Transform3D(Basis(Vector3.UP,fmod(at.x,TAU)).scaled(Vector3(15,25,15)),at-Vector3(center.x,0,center.y)))
 		var batch := MultiMeshInstance3D.new(); batch.multimesh = multi
-		batch.position = Vector3(center.x,0,center.y); batch.visibility_range_end = 4200
+		batch.position = Vector3(center.x,0,center.y); batch.visibility_range_end = 4200 if detailed else 3000
 		batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(batch); chunk.node = batch; mounted += 1
 		if mounted>=3: return
