@@ -1,0 +1,28 @@
+{
+  "firmware": "instrument-1",
+  "backup_sha256": "aa8bce2fc8bcbff9e43f9b4fe9b42d5d227b9b318e07f699ec2c10749032ab85",
+  "application_sha256": "28ddfc66e14be41b903e7f2b38d65b02bff32ef00c88d7905ca141461c853ff7",
+  "application_bytes": 648512,
+  "write_offset": "0x10000",
+  "flash_verified": true,
+  "preserved": {
+    "bootloader_and_partition_table": {
+      "unchanged": true,
+      "sha256": "450effb56b9420b7b52d73573c3c7b74f7a92ff60b6edbc3457cac8ee30b9a51"
+    },
+    "nvs": {
+      "unchanged": true,
+      "sha256": "6a3051918266c082eaa53832031c7f4cf008fbef919b85f8bbc5cf28537301c3"
+    },
+    "ota_data": {
+      "unchanged": true,
+      "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+    },
+    "provisioning": {
+      "unchanged": true,
+      "sha256": "72f93fa861818d387d954ee94b82d467c0757fbeb9dca8d07ae0aac4d834ea5f"
+    }
+  },
+  "physical_lcd_visual_confirmation": "pending",
+  "live_ble_acceptance": "pending; laptop Bluetooth was off"
+}

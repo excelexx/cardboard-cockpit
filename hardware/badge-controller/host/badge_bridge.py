@@ -4,9 +4,13 @@ Uses the branch's existing GATT protocol. No OS keyboard injection or firmware f
 """
 import argparse,asyncio,json,socket,time,uuid,os,sys
 from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from instrument_protocol import validate,encode,fragments,disconnected
 SERVICE_UUID='5f1d0000-9c2b-4e7a-a3d6-0b8e1c4f2a71'
 BUTTON_UUID='5f1d0001-9c2b-4e7a-a3d6-0b8e1c4f2a71'
 PHASE_UUID='5f1d0002-9c2b-4e7a-a3d6-0b8e1c4f2a71'
+INSTRUMENT_UUID='5f1d0003-9c2b-4e7a-a3d6-0b8e1c4f2a71'
+INFO_UUID='5f1d0004-9c2b-4e7a-a3d6-0b8e1c4f2a71'
 DEVICE_NAME='HTN Badge Buttons'
 PHASES={'idle':0,'takeoff':1,'sky':2,'landing':3}
 NAMES={0:'A',1:'B',2:'HOME',3:'DOWN',4:'LEFT',5:'RIGHT',6:'UP',8:'START'}
@@ -25,17 +29,24 @@ class Relay:
   except OSError:self.socket.close();raise
   self.socket.setblocking(False)
   self.destination=('127.0.0.1',input_port);self.session=uuid.uuid4().hex
+  self.instrument_supported=False;self.telemetry=None;self.telemetry_at=0.;self.telemetry_sequence=0
   self.sequence=0;self.phase=0;self.phase_at=0.;self.mask=0;self.connected=False;self.phase_supported=False
  def game_phase(self):
   for _ in range(32):
-   try:data,_=self.socket.recvfrom(2048)
+   try:data,_=self.socket.recvfrom(8192)
    except BlockingIOError:break
-   text=data.decode('utf-8','ignore').strip().lower()
+   if len(data)>4096:continue
+   text=data.decode('utf-8','ignore').strip()
+   if text.startswith('{'):
+    try:self.telemetry=validate(json.loads(text));self.telemetry_at=time.monotonic()
+    except (ValueError,TypeError):pass
+    continue
+   text=text.lower()
    if text in PHASES:self.phase=PHASES[text];self.phase_at=time.monotonic()
   return self.phase if time.monotonic()-self.phase_at<3 else 0
  def send(self):
   self.sequence+=1
-  packet={'version':1,'session':self.session,'sequence':self.sequence,'connected':self.connected,'mask':self.mask if self.connected else 0,'phase_supported':self.phase_supported}
+  packet={'version':1,'session':self.session,'sequence':self.sequence,'connected':self.connected,'mask':self.mask if self.connected else 0,'phase_supported':self.phase_supported,'instrument_supported':self.instrument_supported}
   self.socket.sendto(json.dumps(packet,separators=(',',':')).encode(),self.destination)
  def buttons(self,data):
   try:mask=decode(data)
@@ -55,12 +66,14 @@ async def run(relay,once=False):
     await asyncio.sleep(1);continue
    async with BleakClient(device) as client:
     relay.phase_supported=client.services.get_characteristic(PHASE_UUID) is not None
+    instrument=client.services.get_characteristic(INSTRUMENT_UUID);relay.instrument_supported=instrument is not None
     relay.connected=True;relay.mask=0;relay.session=uuid.uuid4().hex;relay.sequence=0
     print('CONNECTED — secondary flight/session panel; cardboard cockpit retains steering, throttle and weapons',flush=True)
     print('Phase feedback '+('available' if relay.phase_supported else 'not supported by installed firmware'),flush=True)
     relay.buttons(await client.read_gatt_char(BUTTON_UUID));relay.send()
     await client.start_notify(BUTTON_UUID,lambda _,data:relay.buttons(data))
-    last_poll=0.;last_phase=-1;phase_at=0.
+    last_poll=0.;last_phase=-1;phase_at=0.;telemetry_at=0.;info_at=0.
+    if instrument:print("INSTRUMENT available; BLE write payload="+str(instrument.max_write_without_response_size),flush=True)
     while client.is_connected:
      now=time.monotonic()
      # Polling also checks liveness when the notification stream is quiet.
@@ -73,7 +86,17 @@ async def run(relay,once=False):
        confirmed=await asyncio.wait_for(client.read_gatt_char(PHASE_UUID),timeout=.8)
        print('PHASE '+next(k for k,v in PHASES.items() if v==phase)+' readback='+str(list(confirmed)),flush=True)
       last_phase=phase;phase_at=now
-     relay.send();await asyncio.sleep(.04)
+     if instrument and now-telemetry_at>=.05:
+      snapshot=relay.telemetry if relay.telemetry is not None and now-relay.telemetry_at<1 else disconnected()
+      relay.telemetry_sequence=(relay.telemetry_sequence+1)&65535
+      packet=encode(snapshot,relay.telemetry_sequence)
+      for fragment in fragments(packet,relay.telemetry_sequence,max(20,instrument.max_write_without_response_size)):
+       await asyncio.wait_for(client.write_gatt_char(INSTRUMENT_UUID,fragment,response=False),timeout=.8)
+      telemetry_at=now
+     if instrument and now-info_at>10:
+      info=await asyncio.wait_for(client.read_gatt_char(INFO_UUID),timeout=.8)
+      print('INSTRUMENT '+info.decode('ascii','replace'),flush=True);info_at=now
+     relay.send();await asyncio.sleep(.01 if instrument else .04)
   except Exception as exc:print('Badge connection unavailable: '+type(exc).__name__+' — '+str(exc),flush=True)
   finally:relay.connected=False;relay.mask=0;relay.send()
   if once:return

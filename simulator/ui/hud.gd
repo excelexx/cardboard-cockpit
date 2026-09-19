@@ -163,6 +163,7 @@ func draw_title() -> void:
 	button("camera",Rect2(96,728,420,52),"SET UP CARDBOARD")
 	button("help",Rect2(96,790,205,48),"CONTROLS")
 	button("credits",Rect2(311,790,205,48),"CREDITS")
+	button("next_pilot",Rect2(96,852,420,48),"NEXT PILOT",false,"SPECTRE-%02d" % app.pilot_number)
 	status_dot(Vector2(96,930),"YOKE READY" if app.vision.tracking else "YOKE NOT FOUND",app.vision.tracking)
 	status_dot(Vector2(330,930),"BADGE CONNECTED" if app.badge.connected else "BADGE NOT FOUND",app.badge.connected)
 func status_dot(at: Vector2,label: String,ok: bool) -> void:
@@ -444,6 +445,7 @@ func draw_results() -> void:
 	put(body,Vector2(300,752),app.result_advice,18,SOFT)
 	button("fly",Rect2(300,790,300,68),"PLAY AGAIN",true,"START")
 	button("title",Rect2(612,790,260,68),"MAIN MENU")
+	button("next_pilot",Rect2(884,790,300,68),"NEXT PILOT")
 func draw_help() -> void:
 	zones.clear(); dim(); panel(Rect2(330,110,940,790),.9)
 	put(display_bold,Vector2(384,196),"CONTROLS",64,WHITE)

@@ -21,6 +21,7 @@ var _udp := PacketPeerUDP.new()
 var _open := false
 var _phase := "idle"
 var _since := 0.0
+var telemetry_clock:=0.0
 
 func _init() -> void:
 	_open = _udp.connect_to_host(HOST, PORT) == OK
@@ -45,6 +46,10 @@ func phase_for(app: Node) -> String:
 func tick(app: Node, dt: float) -> void:
 	if not _open:
 		return
+	telemetry_clock+=dt
+	if telemetry_clock>=.05:
+		telemetry_clock=0
+		_udp.put_packet(JSON.stringify(instrument_snapshot(app)).to_utf8_buffer())
 	var next: String = phase_for(app)
 	_since += dt
 	if next == _phase and _since < HEARTBEAT:
@@ -114,3 +119,31 @@ func accept_input(bytes: PackedByteArray,now: int) -> bool:
 	return true
 func held(code: int) -> bool: return connected and (mask&(1<<code))!=0
 func tapped(code: int) -> bool: return connected and (pressed&(1<<code))!=0
+
+func instrument_snapshot(app: Node) -> Dictionary:
+	var f: FlightDynamics=app.flight
+	var c: CombatDirector=app.combat
+	var mode_value: int=2 if app.mode=="results" else 3 if app.mode=="paused" else 1 if app.mode in ["flight","rollout"] and f.airborne or app.mode=="rollout" else 0
+	var flags:=0
+	if c.target_id>=0 and c.lock_progress>=1 and c.active:flags|=1
+	if c.incoming_distance<2200:flags|=2
+	if app.mission.phase in ["aftermath","approach","rollout"] or app.landing_started:flags|=4
+	if f.gear:flags|=8
+	if f.flaps>0:flags|=16
+	if app.copilot:flags|=32
+	if app.mode=="results" and app.mission_success:flags|=64
+	if c.active and c.gun_firing_time>0:flags|=128
+	var right:=Vector3(cos(f.heading),0,sin(f.heading));var forward:=Vector3(sin(f.heading),0,-cos(f.heading))
+	var contacts: Array=[]
+	if app.mode in ["flight","paused"] and c.active:
+		for enemy: Dictionary in c.enemies:
+			if enemy.health<=0 or enemy.get("retiring",false):continue
+			var delta: Vector3=enemy.position-f.position
+			contacts.append({"x":clampf(delta.dot(right),-32767,32767),"y":clampf(delta.dot(forward),-32767,32767),"kind":2 if enemy.kind=="boss" else 1,"selected":1 if enemy.id==c.target_id else 0})
+		for shot: Dictionary in c.shots:
+			if contacts.size()>=12:break
+			if shot.kind not in ["missile","hostile_missile"]:continue
+			var delta: Vector3=shot.position-f.position
+			contacts.append({"x":clampf(delta.dot(right),-32767,32767),"y":clampf(delta.dot(forward),-32767,32767),"kind":4 if shot.kind=="hostile_missile" else 3,"selected":0})
+	var target: Dictionary=c.target()
+	return {"kind":"instrument","version":1,"mode":mode_value,"flags":flags,"roll":clampf(rad_to_deg(f.roll),-180,180),"pitch":clampf(rad_to_deg(f.pitch),-90,90),"heading":fposmod(f.get_heading_degrees()+(298 if app.route_id=="sf" else 0),360),"speed":clampf(f.speed*1.94384,0,2000),"altitude":clampf(f.position.y*3.28084,-2000,1000000),"score":maxi(0,c.score),"kills":mini(c.kills,65535),"pilot":app.pilot_number,"name":"PILOT","landing":1 if f.contact=="landed" and f.speed<=.1 else 2 if app.landing_started else 0,"range":clampf(f.position.distance_to(target.position),0,65535) if not target.is_empty() else 0,"contacts":contacts.slice(0,12)}
