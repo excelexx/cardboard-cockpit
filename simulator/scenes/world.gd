@@ -1,5 +1,8 @@
 class_name FlightWorld
 extends Node3D
+
+func apply_quality(high: bool) -> void:
+	if _environment!=null: _environment.environment.ssao_enabled=high
 ## A deterministic alpine corridor. Flight collision samples exactly the same
 ## height function used to construct the visible terrain.
 

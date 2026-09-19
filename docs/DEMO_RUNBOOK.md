@@ -1,18 +1,15 @@
-# Azure Coast judge demo
+# Relaxed arcade demo — version 0.8
 
-Close older instances. Double-click **Launch Cardboard Cockpit.command**, then **Enter**. The source launcher loads the current map. The guided flight takes about **3 minutes 5 seconds**, starting stationary and ending after landing and braking.
+**Goal:** take off, enjoy clearing large flocks with unlimited weapons, then land. The geese never attack. No reload, heat, steady-lock or aircraft-upgrade systems interrupt play.
 
-| Time | View |
-|---|---|
-| 0:00–0:42 | Air station, runway acceleration, lift-off over Azure Bay |
-| 0:42–1:07 | Marina, planted waterfront streets, skyline |
-| 1:07–1:33 | Downtown flyby, ferry harbor, suspension bridge |
-| 1:33–1:51 | Island channel and panoramic climb |
-| 1:51–2:17 | Lighthouse coastline and descent |
-| 2:17–3:05 | Cape North approach, touchdown and full stop |
+- **Play / Enter:** assisted flight with player-controlled shooting. Hold Space + T, or both mouse buttons, to fire Gatling and missiles together. Aim generally toward a goose; missiles select targets immediately and Gatling assistance is generous.
+- **Watch demo:** the same complete flight with automatic shooting, useful for an uninterrupted judge demonstration. It takes approximately 2 minutes 45 seconds and ends stopped on Cape North's runway.
+- **Arrows:** optional manual steering. Hold for a smooth bank/pitch; release to level. H resumes route assistance.
+- **X / V:** missile inset / cockpit or chase view. Q performs a quick roll when altitude permits.
+- **Escape / R / F1:** pause / restart the current style of demo / controls. F10 changes quality.
 
-Times describe the copilot, not deadlines. Follow the blue diamond in manual flight. Six loadouts progress with route position. **Space / click** fires in combat; weapons are safe during takeoff and approach. **Space** brakes after touchdown. **H** toggles guidance; keyboard or tracked-cardboard steering takes control.
+Successful clears build a five-second streak, rising point rewards and confirmation tones. Play runs can set a local personal best. Watch demo does not overwrite the player's record.
 
-**R** restarts, **Escape** pauses, **V** changes view. Flights start in the cockpit. **F9**, then **1–6**, changes a developer loadout without teleporting. Guided runs and the training shield are visibly disclosed; do not present them as unassisted victories.
+The game launches in a larger window with automatic internal render scaling. The UI remains at window resolution. If another app gains focus, resume with Escape before continuing.
 
-No network is required for gameplay. Rehearse the actual webcam and printed controls separately; software tests do not validate physical props. The map is fictional and aircraft use arcade handling. Older valley screenshots do not represent the current coast.
+Cardboard controls remain optional. Use the setup guide, complete calibration in the tracker preview and enable it with C. Physical printed-prop testing is separate from synthetic software verification.

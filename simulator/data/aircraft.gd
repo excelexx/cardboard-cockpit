@@ -1,12 +1,13 @@
 extends RefCounted
 class_name AircraftCatalog
-
-# Assisted simulation tuning, not certified aircraft performance.
-const PLANES: Array[Dictionary] = [
-	{"id":"a380", "name":"AIRBUS A380", "short":"A380", "maker":"AIRBUS", "type":"DOUBLE-DECK AIRLINER", "tag":"THE SKY, ON A GRAND SCALE.", "description":"Four engines. Two decks. One extraordinary view.\nTake the world's largest passenger silhouette into the valley.", "span":79.8, "length":72.7, "engines":4, "rotation_speed":62.0, "max_speed":175.0, "acceleration":6.0, "roll_rate":0.45, "pitch_rate":0.22, "clearance":5.5, "color":Color(0.82,0.88,0.91), "label":"HEAVY / 4 ENGINES"},
-	{"id":"f35", "name":"F-35 LIGHTNING II", "short":"F-35", "maker":"LOCKHEED MARTIN", "type":"MULTIROLE FIGHTER", "tag":"PRECISION MEETS POSSIBILITY.", "description":"A compact silhouette with an unmistakable presence.\nExperience responsive handling and a fighter's-eye view.", "span":10.7, "length":15.7, "engines":1, "rotation_speed":52.0, "max_speed":420.0, "acceleration":18.0, "roll_rate":1.8, "pitch_rate":0.60, "clearance":2.3, "color":Color(0.28,0.33,0.38), "label":"AGILE / 1 ENGINE"},
-	{"id":"b2", "name":"B-2 SPIRIT", "short":"B-2", "maker":"NORTHROP GRUMMAN", "type":"FLYING WING", "tag":"AN ENTIRELY DIFFERENT HORIZON.", "description":"A sweeping flying wing, shaped for quiet confidence.\nExplore the landscape with smooth, deliberate control.", "span":52.4, "length":21.0, "engines":4, "rotation_speed":57.0, "max_speed":200.0, "acceleration":8.0, "roll_rate":0.65, "pitch_rate":0.28, "clearance":3.3, "color":Color(0.20,0.24,0.28), "label":"STEALTH / 4 ENGINES"},
-	{"id":"b737", "name":"BOEING 737-300", "short":"737", "maker":"BOEING", "type":"NARROW-BODY AIRLINER", "tag":"YOUR NEXT DEPARTURE STARTS HERE.", "description":"The familiar twin-engine workhorse, ready for a new route.\nBalanced handling makes this an ideal first flight.", "span":28.7, "length":33.3, "engines":2, "rotation_speed":55.0, "max_speed":180.0, "acceleration":8.0, "roll_rate":0.63, "pitch_rate":0.30, "clearance":3.0, "color":Color(0.88,0.88,0.82), "label":"BALANCED / 2 ENGINES"},
-	{"id":"b747", "name":"BOEING 747", "short":"747", "maker":"BOEING", "type":"WIDE-BODY AIRLINER", "tag":"THE QUEEN OF THE SKIES.", "description":"The iconic upper deck. The unmistakable four-engine sweep.\nBring a legend to life above a mountain wilderness.", "span":64.4, "length":70.7, "engines":4, "rotation_speed":61.0, "max_speed":185.0, "acceleration":6.5, "roll_rate":0.48, "pitch_rate":0.24, "clearance":5.0, "color":Color(0.80,0.87,0.91), "label":"ICONIC / 4 ENGINES"},
-	{"id":"an225", "name":"ANTONOV AN-225", "short":"AN-225", "maker":"ANTONOV", "type":"SUPER-HEAVY TRANSPORT", "tag":"SIX ENGINES. ONE LEGEND.", "description":"An 88.4-meter wing. Six engines. A true giant.\nDeliberate controls reward smooth, patient flying.", "span":88.4, "length":84.0, "engines":6, "rotation_speed":68.0, "max_speed":222.0, "acceleration":5.2, "roll_rate":0.30, "pitch_rate":0.17, "clearance":3.0, "color":Color(0.87,0.89,0.92), "label":"SUPER HEAVY / 6 ENGINES"}
-]
+## One fictional airframe. Numerical tuning is for this game, not a real aircraft.
+const PROFILE: Dictionary = {
+	"id":"f35", "name":"SPECTRE X-26", "short":"X-26", "maker":"SPECTRE FLIGHT SYSTEMS",
+	"type":"NEXT-GENERATION INTERCEPTOR", "tag":"CONTROL THE SKY.",
+	"description":"A single airframe. A permanent combat loadout.\nPrecision, momentum and pilot judgment.",
+	"span":12.6, "length":17.4, "engines":1,
+	"rotation_speed":56.0, "max_speed":430.0, "acceleration":29.0,
+	"roll_rate":3.15, "pitch_rate":1.02, "clearance":3.0,
+	"color":Color(0.22,0.27,0.31), "label":"CANNON / GUIDED MISSILES"
+}
+const PLANES: Array[Dictionary] = [PROFILE]
