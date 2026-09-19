@@ -1,3 +1,10 @@
+# Version 0.10.1 aerial photography and rendering verification
+
+- All 23 terrain photographs load and are bound to their geographic terrain meshes; `test_sf_assets.gd` passes. Original JPEG SHA-256 hashes and returned extents are retained.
+- Added 4,807 LOD levels across 1,874 city/road scenes. The compiler asserted that every original full-detail vertex array remained identical.
+- Repeated the same native High-quality camera checks: Golden Gate 120 FPS, downtown 120 FPS, SFO 120 FPS, cockpit 76 FPS on this Mac. Earlier corresponding samples were 70, 56, 65 and 42 FPS. These are observed samples, not constant-framerate guarantees.
+- Inspected actual aerial street/terrain alignment and preserved water/runway geometry. Terrain vertices and flight collision grids are unchanged.
+
 # Version 0.10 San Francisco verification
 
 - Full `tools/verify.sh`: PASS (flight, assisted controls, scene, audio, both legacy routes, SF route, ballistics, combat feel, balance, city grounding, vision validation and reconnect).

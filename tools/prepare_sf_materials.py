@@ -15,7 +15,8 @@ for root in [ROOT/'simulator/assets/san_francisco',ROOT/'simulator/assets/source
     im=Image.open(path);cache[path]='A' in im.getbands() and im.getextrema()[-1][0]<255
    if cache[path] and m.get('alphaMode')!='MASK':m['alphaMode']='MASK';m['alphaCutoff']=.4;dirty=True
   if dirty:p.write_text(json.dumps(g,separators=(',',':')));changed+=1
- for p in root.rglob('*.png.import'):
+ for p in list(root.rglob('*.png.import'))+list(root.rglob('*.jpg.import')):
   s=p.read_text();new=s.replace('mipmaps/generate=false','mipmaps/generate=true').replace('detect_3d/compress_to=1','detect_3d/compress_to=0')
+  if p.name.endswith('.jpg.import'):new=new.replace('compress/mode=0','compress/mode=2')
   if new!=s:p.write_text(new)
 print('alpha models corrected',changed,'unique textures checked',len(cache))

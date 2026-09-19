@@ -17,6 +17,7 @@ if [ ! -x .venv/bin/python ]; then ./tools/setup_vision.sh; fi
 "$engine" --headless --path simulator --script res://tests/test_balance_profile.gd
 "$engine" --headless --path simulator --script res://tests/test_scenic_route.gd
 "$engine" --headless --path simulator --script res://tests/test_sf_route.gd
+"$engine" --headless --path simulator --script res://tests/test_sf_assets.gd
 "$engine" --headless --path simulator --script res://tests/test_city.gd
 "$engine" --headless --path simulator --script res://tests/test_grounding.gd
 "$engine" --headless --path simulator --fixed-fps 60 -- --combat --autotest --route=alpine
