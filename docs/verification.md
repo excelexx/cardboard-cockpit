@@ -1,8 +1,18 @@
-# Goose Protocol 0.3 — demo verification
+# Goose Protocol 0.4 — demo verification
 
 The latest source combines the upstream cockpit/weather/rollout changes with the earlier fixes, adds the An-225 at a shared meter scale, and centers the new game on a six-stage, three-minute Waterloo-geese showcase.
 
 Passed locally: the showcase completes all six stages in 180.1 simulated seconds; its progression/one-weapon/developer-control/cardboard-takeover tests pass; the underlying interception, homing-projectile, damage, flare, barrel-roll and ejection checks pass. All six aircraft also pass valley, approach and keyboard-mission checks, including the upstream landing, weather and aircraft-animation tests. Python tracker and native WebSocket integration checks are retained.
+
+## Version 0.3 camera checks
+
+- **1,081 camera checks passed** across all five aircraft, seven views and three aircraft attitudes. The tests check finite transforms, camera direction, imported aircraft bounds fitting neutral exterior views, look-around behavior, direct keys, cycling, picker routing and preservation of the complete flight state.
+- **Four startup-option checks passed** for the new `--view=top` option and existing `--chase` alias.
+- **79 keyboard/UI checks passed**, including the complete seven-view cycle and a manual 737 mission through five checkpoints, touchdown and a full stop on North Field. Copilot remained disabled. Tests restore the user's saved settings.
+
+- Rendered and inspected all seven A380 views, top/tail views of the B-2, side views of the 737, the camera picker and the updated controls panel. The top-down camera centers the aircraft above the instruction panel. These are staged camera-framing captures, not additional completed flight missions.
+
+## Version 0.2 checks
 
 Native rendered screenshots verified the generated title art, goose encounters, upgrade HUD and finale. The showcase discloses guided piloting, aim assistance, timed progression and a training shield. It is a presentation mode, not an assertion of unassisted campaign completion. Actual cardboard tracking automatically takes over from the guided pilot.
 

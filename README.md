@@ -1,6 +1,6 @@
 # Goose Protocol · Cardboard Cockpit
 
-**Version 0.3 — a three-minute, cardboard-controlled arcade demo.** Waterloo geese have taken over the skies. Start with a tiny trainer and a worn gatling, upgrade through six aircraft and six single-weapon loadouts, and finish in a Millennium Falcon-style freighter firing twin plasma cannons.
+**Version 0.4 — a three-minute, cardboard-controlled arcade demo.** Waterloo geese have taken over the skies. Start with a tiny trainer and a worn gatling, upgrade through six aircraft and six single-weapon loadouts, and finish in a Millennium Falcon-style freighter firing twin plasma cannons.
 
 Double-click **Launch Cardboard Cockpit.command**, then press **Enter** or **Start the 3-minute demo**. Each stage lasts 30 seconds. Aim assistance fires the current weapon when a goose is locked; **Space / left click** fires manually. **H** hands the guided demonstration over to the pilot. Tracked cardboard controls take control automatically. **C** opens camera setup before launch.
 
@@ -16,7 +16,7 @@ The merged flight lab below remains accessible from **Aircraft hangar**. It pres
 
 A native Mac flight game with six real aircraft models, a cinematic mountain valley, and optional cardboard controls.
 
-**Version 0.2 — native keyboard/mouse flight prototype.** Choose a valley mission, landing practice, or free flight. Fly from detailed cockpits with live instruments, animated aircraft controls, selectable sky conditions, and a landing rollout. This is a standalone Godot application; it does not run in a browser or require an internet connection to fly.
+**Version 0.3 — native keyboard/mouse flight prototype.** Choose a valley mission, landing practice, or free flight. Fly from detailed cockpits with live instruments, animated aircraft controls, selectable sky conditions, and a landing rollout. This is a standalone Godot application; it does not run in a browser or require an internet connection to fly.
 
 ![The aircraft hangar](docs/screenshots/hangar.png)
 
@@ -27,7 +27,7 @@ Double-click **Launch Cardboard Cockpit.command** in this folder, or open **buil
 1. Choose the A380, F-35, B-2, 737, 747, or An-225 in the hangar.
 2. Click **Prepare flight**. Choose **Valley mission**, **Landing practice**, or **Free flight**, and select **Golden hour**, **Clear midday**, or **High overcast** conditions. Start the flight. Enter also advances these screens.
 3. Hold **W** for power. At the indicated rotation speed, gently hold **↑** to lift off.
-4. Follow the amber rings. Use **V** to switch between cockpit and chase views.
+4. Follow the amber rings. Use **V** to cycle camera views or click **View** at the top right.
 5. After the fifth ring, reduce power with **S**, lower gear with **G**, and press **F** to select approach flaps. Follow the approach diamonds toward runway 36 at North Field, using the aircraft's indicated speed target. Keep the wings level and descend gently.
 6. After touchdown, hold **Space** to brake to a stop and use **A / D** to stay on the runway. Results appear after stopping. Landing score reflects descent rate, speed, bank and distance from the centerline; a runway overrun fails the landing.
 
@@ -48,7 +48,9 @@ Switching to another app pauses the flight automatically. Help and camera setup 
 | Space | Wheel brakes |
 | G | Command landing gear; visible wheels/struts animate over two seconds |
 | F | Cycle assisted flap settings: up / takeoff 15° / approach 30° |
-| V | Cockpit / chase camera |
+| V / Shift+V | Next / previous camera view |
+| 1–7 in flight | Cockpit, chase, tail, top down, left side, right side, nose |
+| View menu | Click the current view at the top right to choose a camera |
 | Right mouse + drag | Look around; returns forward when released |
 | B | Toggle mouse yoke; cursor displacement controls pitch/roll |
 | H | Training copilot on/off |
@@ -63,10 +65,18 @@ Switching to another app pauses the flight automatically. Help and camera setup 
 | 1–5 | Select aircraft in the hangar |
 | Left drag / scroll | Orbit / zoom in the hangar |
 
+## Camera views
+
+Fly from the cockpit or inspect the aircraft from a chase, tail, top-down, left-side, right-side or nose camera. Press **V** to move through the views and **Shift+V** to go back. During flight, **1–7** select these views directly; in the hangar, **1–5** still select aircraft. The **View** menu is at the top right and also available while paused.
+
+Exterior cameras adapt to each aircraft’s wingspan and length. The top-down view keeps the aircraft’s heading toward the top of the screen. Changing views preserves your flight and selected view survives a restart.
+
+![Top-down view and camera selector](docs/screenshots/view-picker.png)
+
 ## What is included
 
 - Five externally sourced FlightGear aircraft, with original geometry, textures, source files, attribution, licenses, and reproducible conversion tools.
-- A native hangar, aircraft selection, three flight modes, briefing, cockpit/chase views, pause/reset/help/credits and synthesized engine audio.
+- A native hangar, aircraft selection, three flight modes, briefing, seven camera views, pause/reset/help/credits and synthesized engine audio.
 - Original cockpit interiors tailored to the aircraft, including a panoramic fighter display, flight/navigation/engine displays, moving yokes or sticks, and throttle levers. Instruments show airspeed, altitude, attitude, heading, climb, gear, flaps and engine power.
 - Animated landing gear and control surfaces, navigation lights, strobes, beacons and an F-35 exhaust effect. Original imported aircraft source geometry remains included.
 - Two detailed airports with runway markings, approach lighting, terminals, hangars and control towers; a mountain corridor, river, forests, village, photographic materials and sky.
@@ -148,6 +158,9 @@ The setup panel shows live roll, pitch, throttle and independent marker status. 
 
 # Aircraft animations, reset and imported-geometry preservation:
 .tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script res://tests/test_aircraft_visuals.gd
+
+# Camera framing, keyboard selection and flight-state preservation:
+.tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script res://tests/test_camera.gd
 
 # Landing, flaps, runway rollout and approach guidance:
 .tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script res://tests/test_landing.gd
