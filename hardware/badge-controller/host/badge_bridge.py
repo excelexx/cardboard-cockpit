@@ -2,7 +2,8 @@
 """BLE badge buttons -> local game UDP; local game phase -> badge LEDs.
 Uses the branch's existing GATT protocol. No OS keyboard injection or firmware flashing.
 """
-import argparse,asyncio,json,socket,time,uuid,os
+import argparse,asyncio,json,socket,time,uuid,os,sys
+from pathlib import Path
 SERVICE_UUID='5f1d0000-9c2b-4e7a-a3d6-0b8e1c4f2a71'
 BUTTON_UUID='5f1d0001-9c2b-4e7a-a3d6-0b8e1c4f2a71'
 PHASE_UUID='5f1d0002-9c2b-4e7a-a3d6-0b8e1c4f2a71'
@@ -93,6 +94,11 @@ async def owned_run(relay,once,parent):
   except asyncio.CancelledError:pass
 
 def main():
+ if getattr(sys,'frozen',False):
+  try:
+   folder=Path.home()/'Library'/'Logs'/'Cardboard Cockpit';folder.mkdir(parents=True,exist_ok=True)
+   sys.stdout=open(folder/'badge.log','w',buffering=1);sys.stderr=sys.stdout
+  except OSError:pass
  parser=argparse.ArgumentParser();parser.add_argument('--port',type=int,default=8770);parser.add_argument('--input-port',type=int,default=8771);parser.add_argument('--once',action='store_true');parser.add_argument('--simulate',action='store_true');parser.add_argument('--parent-pid',type=int,default=0);args=parser.parse_args()
  try:relay=Relay(args.port,args.input_port)
  except OSError as exc:
