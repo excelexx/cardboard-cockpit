@@ -1,20 +1,18 @@
-# Three-minute judge demo
+# Azure Coast judge demo
 
-Prepare before the timer: launch the app, start/calibrate the optional tracker, press C on the title screen and enable vision. Verify roll/pitch move. The game can also be demonstrated with keyboard/mouse, clearly identified as such. Enter starts the demo immediately; no network is needed during gameplay.
+Close older instances. Double-click **Launch Cardboard Cockpit.command**, then **Enter**. The source launcher loads the current map. The guided flight takes about **3 minutes 5 seconds**, starting stationary and ending after landing and braking.
 
-| Time | Aircraft | The only weapon | What to show |
-|---|---|---|---|
-| 0:00–0:30 | Kestrel trainer | Worn gatling | Move the cardboard yoke. Aim at a goose; the reticle locks and fires. |
-| 0:30–1:00 | F-35 | Guided missile | Automatic aircraft swap; a lock-on missile visibly tracks a goose. |
-| 1:00–1:30 | B-2 | Heavy autocannon | Larger aircraft and stronger shots against a bigger flock. |
-| 1:30–2:00 | An-225 | Missile battery | Six-engine giant, real relative wingspan, three guided rounds per trigger. |
-| 2:00–2:30 | VX-9 | Pulse plasma | Bright plasma, faster cadence and a growing flock. |
-| 2:30–3:00 | Falcon-style freighter | Twin plasma cannons | Recognizable freighter silhouette, twin bolts, largest flock, final score. |
+| Time | View |
+|---|---|
+| 0:00–0:42 | Air station, runway acceleration, lift-off over Azure Bay |
+| 0:42–1:07 | Marina, planted waterfront streets, skyline |
+| 1:07–1:33 | Downtown flyby, ferry harbor, suspension bridge |
+| 1:33–1:51 | Island channel and panoramic climb |
+| 1:51–2:17 | Lighthouse coastline and descent |
+| 2:17–3:05 | Cape North approach, touchdown and full stop |
 
-One sentence to open: “We turned cardboard into a flight controller—and Waterloo geese into an escalating three-minute arcade game.”
+Times describe the copilot, not deadlines. Follow the blue diamond in manual flight. Six loadouts progress with route position. **Space / click** fires in combat; weapons are safe during takeoff and approach. **Space** brakes after touchdown. **H** toggles guidance; keyboard or tracked-cardboard steering takes control.
 
-The showcase starts with a guided pilot and aim assistance. Actual tracked yoke input immediately takes over. H also toggles the pilot, keyboard steering takes over, and Space/left click fires manually. J toggles aim assistance in the combat lab; the judge demo keeps its single-weapon aim-to-fire behavior. The showcase uses a clearly labeled training shield and timed upgrades so a missed shot cannot prevent the finale. Pause stops the demo clock.
+**R** restarts, **Escape** pauses, **V** changes view. Flights start in the cockpit. **F9**, then **1–6**, changes a developer loadout without teleporting. Guided runs and the training shield are visibly disclosed; do not present them as unassisted victories.
 
-Recovery: F9 enables developer mode; 1–6 jumps directly to a stage, N advances, and R restarts. F9 disables developer shortcuts. Developer mode is visibly labeled. Never present a developer-skipped or guided run as an unassisted win.
-
-The final ship is a fan-made Millennium Falcon-style interpretation. Weapon behavior and aircraft performance are arcade approximations. The physical cardboard setup still needs rehearsal with the actual webcam and printed props.
+No network is required for gameplay. Rehearse the actual webcam and printed controls separately; software tests do not validate physical props. The map is fictional and aircraft use arcade handling. Older valley screenshots do not represent the current coast.

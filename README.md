@@ -1,10 +1,18 @@
 # Goose Protocol · Cardboard Cockpit
 
-**Version 0.4 — a three-minute, cardboard-controlled arcade demo.** Waterloo geese have taken over the skies. Start with a tiny trainer and a worn gatling, upgrade through six aircraft and six single-weapon loadouts, and finish in a Millennium Falcon-style freighter firing twin plasma cannons.
+**Photographic scenery update:** the generic city grid has been replaced with 8 km² of licensed Helsinki photogrammetry, relocated into the fictional coast. Real elevation data shapes the mountains. Fir forests, scanned shoreline rocks, depth-aware water, textured airfield surfaces and retained cockpit resources improve the scenery and frame consistency. See [verification and limits](docs/GRAPHICS_PASS.md). Relaunch the source command to load it; old packaged apps are unchanged.
 
-Double-click **Launch Cardboard Cockpit.command**, then press **Enter** or **Start the 3-minute demo**. Each stage lasts 30 seconds. Aim assistance fires the current weapon when a goose is locked; **Space / left click** fires manually. **H** hands the guided demonstration over to the pilot. Tracked cardboard controls take control automatically. **C** opens camera setup before launch.
+**Azure Coast:** coastal air station → marina → photographic city flyover → ferry harbor → suspension bridge → wooded island channel → panoramic climb → lighthouse → Cape North landing. This is a fictional arcade landscape combining photograph-derived city districts, real elevation relief and authored scenery, not a geographically accurate airport recreation.
 
-**Developer mode:** press **F9**, then **1–6** to jump to any stage or **N** for the next stage. F9 disables the shortcuts again. The HUD clearly marks developer mode and the showcase's training shield. The guided showcase advances on time; it does not claim to be an unassisted campaign victory.
+Every flight and restart starts in the cockpit. Transparent heading/pitch references, speed/altitude tapes, a weapon reticle, blue navigation diamond and one short instruction guide beginners. V selects external views.
+
+Eleven physical waypoints drive six weapon upgrades; progression is not on a timer. The guided regression takes approximately 185 seconds, reaches 1,041 m, visits every waypoint and ends in a full-stop landing without terrain safety corrections. High clouds frame the route without hiding the coast.
+
+Run `tools/Review Scenic Route.command` for checkpoint captures or `tools/Review City.command` for waterfront views. See [route details](docs/SCENIC_ROUTE.md) and [coastal asset credits](simulator/assets/city/CREDITS.md). Previously packaged apps require rebuilding; close older instances and relaunch the source command.
+
+Double-click **Launch Cardboard Cockpit.command**, then press **Enter** or **Start the full sortie**. Aim assistance fires at locked targets; **Space / left click** fires manually during combat. **Space** brakes after touchdown. **H** toggles the guided pilot. Keyboard or tracked cardboard takes control. **C** opens camera setup. The launcher prefers source when the bundled engine is present, avoiding stale packaged builds.
+
+**Developer mode:** press **F9**, then **1–6** to jump to a weapon stage or **N** for the next stage. This changes loadout, not scenic route position. F9 disables the shortcuts again. Guided runs are assisted demonstrations, not unassisted campaign victories.
 
 See [the three-minute judge runbook](docs/DEMO_RUNBOOK.md), [asset credits](docs/demo-assets.md), and [verification](docs/verification.md).
 
@@ -14,7 +22,7 @@ The merged flight lab below remains accessible from **Aircraft hangar**. It pres
 
 ---
 
-A native Mac flight game with six real aircraft models, a cinematic mountain valley, and optional cardboard controls.
+A native Mac flight game with six real aircraft models, a scenic fictional coastline, and optional cardboard controls.
 
 **Version 0.3 — native keyboard/mouse flight prototype.** Choose a valley mission, landing practice, or free flight. Fly from detailed cockpits with live instruments, animated aircraft controls, selectable sky conditions, and a landing rollout. This is a standalone Godot application; it does not run in a browser or require an internet connection to fly.
 
@@ -28,10 +36,10 @@ Double-click **Launch Cardboard Cockpit.command** in this folder, or open **buil
 2. Click **Prepare flight**. Choose **Valley mission**, **Landing practice**, or **Free flight**, and select **Golden hour**, **Clear midday**, or **High overcast** conditions. Start the flight. Enter also advances these screens.
 3. Hold **W** for power. At the indicated rotation speed, gently hold **↑** to lift off.
 4. Follow the amber rings. Use **V** to cycle camera views or click **View** at the top right.
-5. After the fifth ring, reduce power with **S**, lower gear with **G**, and press **F** to select approach flaps. Follow the approach diamonds toward runway 36 at North Field, using the aircraft's indicated speed target. Keep the wings level and descend gently.
+5. After the fifth ring, reduce power with **S**, lower gear with **G**, and press **F** to select approach flaps. Follow the approach diamonds toward runway 36 at Cape North, using the aircraft's indicated speed target. Keep the wings level and descend gently.
 6. After touchdown, hold **Space** to brake to a stop and use **A / D** to stay on the runway. Results appear after stopping. Landing score reflects descent rate, speed, bank and distance from the centerline; a runway overrun fails the landing.
 
-**Landing practice** starts airborne on the North Field approach with gear and approach flaps selected. **Free flight** removes the checkpoint requirement and lets you explore the fictional valley and land at either airport. The numbered instructions above describe the valley mission.
+**Landing practice** starts airborne on the Cape North approach with gear and approach flaps selected. **Free flight** removes the checkpoint requirement and lets you explore the fictional valley and land at either airport. The numbered instructions above describe the valley mission.
 
 **H** engages an optional training copilot that can fly the route and brake after landing. Steering or changing power with the keyboard immediately returns control to you. Results disclose when the copilot was used. **R** restarts the selected flight mode; **Escape** pauses.
 
@@ -69,7 +77,7 @@ Switching to another app pauses the flight automatically. Help and camera setup 
 
 Fly from the cockpit or inspect the aircraft from a chase, tail, top-down, left-side, right-side or nose camera. Press **V** to move through the views and **Shift+V** to go back. During flight, **1–7** select these views directly; in the hangar, **1–5** still select aircraft. The **View** menu is at the top right and also available while paused.
 
-Exterior cameras adapt to each aircraft’s wingspan and length. The top-down view keeps the aircraft’s heading toward the top of the screen. Changing views preserves your flight and selected view survives a restart.
+Exterior cameras adapt to each aircraft’s wingspan and length. The top-down view keeps the aircraft’s heading toward the top of the screen. Changing views preserves your flight and each restart begins in the cockpit.
 
 ![Top-down view and camera selector](docs/screenshots/view-picker.png)
 
@@ -92,11 +100,11 @@ Exterior cameras adapt to each aircraft’s wingspan and length. The top-down vi
 
 ## Scope and known limits
 
-This is an arcade flight prototype inspired by the presentation of larger flight simulators. It does not include global streamed scenery, real navigation databases, full airliner procedures, clickable aircraft-specific cockpit systems, weapons, or certified aerodynamics. The original cockpit designs are aircraft-inspired interpretations with simplified instruments, rather than faithful system replicas. Engine displays share a single simulated power state. All aircraft use the same assisted flight model with different handling profiles.
+This is an arcade flight prototype inspired by the presentation of larger flight simulators. It does not include global streamed scenery, real navigation databases, full airliner procedures, clickable aircraft-specific cockpit systems, or certified aerodynamics. The original cockpit designs are aircraft-inspired interpretations with simplified instruments, rather than faithful system replicas. Engine displays share a single simulated power state. All aircraft use the same assisted flight model with different handling profiles.
 
-Weather presets are visual only: there is no wind, turbulence, precipitation, real weather feed or advancing day/night cycle. The approach diamonds follow a geometric three-degree path to North Field; they are training aids, not a simulated radio navigation system. Flap angles and their handling effects are generic training settings. Gear folding and control-surface motion are approximate visual animations; touchdown checks use the commanded gear state rather than a full hydraulic or gear-lock simulation.
+Weather presets are visual only: there is no wind, turbulence, precipitation, real weather feed or advancing day/night cycle. The approach diamonds follow a geometric three-degree path to Cape North; they are training aids, not a simulated radio navigation system. Flap angles and their handling effects are generic training settings. Gear folding and control-surface motion are approximate visual animations; touchdown checks use the commanded gear state rather than a full hydraulic or gear-lock simulation.
 
-Collision uses the rendered terrain and simple bounds for major airport buildings. Trees, poles and small furniture remain forgiving, and aircraft-wide wing collision is not modeled. Landing limits are deliberately generous and do not represent real operating speeds or limits for these aircraft. Free flight remains within the same bounded fictional valley.
+Collision uses the rendered terrain and simple bounds for major airport buildings. Trees, poles and small furniture remain forgiving, and aircraft-wide wing collision is not modeled. Landing limits are deliberately generous and do not represent real operating speeds or limits for these aircraft. Free flight remains within the same bounded fictional coast.
 
 The optional tracker has passed synthetic detection and live local connection tests. **Real webcam tracking with physical cardboard props has not been validated.** The game starts in keyboard mode and never opens a webcam. The tracker opens a camera only when explicitly launched with `--camera`.
 

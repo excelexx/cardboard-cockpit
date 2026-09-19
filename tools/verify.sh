@@ -15,6 +15,9 @@ fi
 "$engine" --headless --path simulator --script res://tests/test_interactions.gd
 "$engine" --headless --path simulator --script res://tests/test_combat.gd
 "$engine" --headless --path simulator --script res://tests/test_campaign.gd
+"$engine" --headless --path simulator --script res://tests/test_scenic_route.gd
+"$engine" --headless --path simulator --script res://tests/test_city.gd
+"$engine" --headless --path simulator --script res://tests/test_grounding.gd
 "$engine" --headless --path simulator --script res://tests/test_camera.gd
 "$engine" --headless --path simulator --fixed-fps 60 -- --kind=campaign --autotest
 "$engine" --headless --path simulator --script res://tests/test_landing.gd
