@@ -61,6 +61,13 @@ func run_tests() -> void:
 	app._physics_process(0.1)
 	key(KEY_LEFT, false)
 	check(not app.mouse_yoke and app.control.x < 0, "Keyboard steering takes over from mouse yoke")
+	app.vision.enabled = true
+	app.copilot = true
+	tap(KEY_W)
+	check(not app.vision.enabled and not app.copilot, "A brief power key tap immediately takes control between physics frames")
+	app.mouse_yoke = true
+	tap(KEY_LEFT)
+	check(not app.mouse_yoke, "A brief steering tap immediately releases the mouse yoke")
 	app.start_flight()
 	app.notification(MainLoop.NOTIFICATION_APPLICATION_FOCUS_OUT)
 	check(app.mode == "paused", "Switching away from the app pauses flight")
