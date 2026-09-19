@@ -1,0 +1,33 @@
+shader_type spatial;
+render_mode cull_disabled;
+
+uniform sampler2D grass_texture : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D rock_texture : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+varying vec3 world_position;
+varying vec3 world_normal;
+
+void vertex() {
+	world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	world_normal = normalize(mat3(MODEL_MATRIX) * NORMAL);
+}
+vec3 triplanar(sampler2D source, vec3 point, vec3 weights) {
+	return texture(source, point.zy).rgb * weights.x + texture(source, point.xz).rgb * weights.y + texture(source, point.xy).rgb * weights.z;
+}
+void fragment() {
+	vec3 weights = pow(abs(world_normal), vec3(4.0));
+	weights /= max(dot(weights, vec3(1.0)), 0.0001);
+	vec3 grass_detail = texture(grass_texture, world_position.xz / 84.0).rgb;
+	vec3 grass_macro = texture(grass_texture, world_position.xz / 1100.0 + vec2(0.4)).rgb;
+	vec3 grass = mix(grass_detail, grass_macro, 0.42) * vec3(0.80, 1.02, 0.80);
+	vec3 rock = triplanar(rock_texture, world_position / 180.0, weights);
+	vec3 rock_macro = triplanar(rock_texture, world_position / 920.0 + vec3(0.3), weights);
+	rock = mix(rock, rock_macro, 0.3) * vec3(0.9, 0.92, 0.90);
+	float slope = 1.0 - world_normal.y;
+	float rocky = max(smoothstep(720.0, 1600.0, world_position.y), smoothstep(0.13, 0.45, slope));
+	vec3 terrain = mix(grass, rock, rocky);
+	float snowline = 2180.0 + sin(world_position.x * 0.0009) * 100.0 + sin(world_position.z * 0.0014) * 95.0;
+	float snow = smoothstep(snowline - 150.0, snowline + 120.0, world_position.y) * (1.0 - smoothstep(0.30, 0.62, slope));
+	vec3 snow_color = vec3(0.78, 0.83, 0.84) * (0.88 + rock_macro.r * 0.3);
+	ALBEDO = mix(terrain, snow_color, snow);
+	ROUGHNESS = 0.96;
+}

@@ -1,0 +1,11 @@
+* text=auto
+*.pdf binary
+*.glb binary
+*.hdr binary
+*.png binary
+*.jpg binary
+*.rgb binary
+*.rgba binary
+*.3ds binary
+# Preserve byte-identical upstream aircraft sources and make reviews readable.
+simulator/assets/aircraft/**/source/** -text -diff -whitespace

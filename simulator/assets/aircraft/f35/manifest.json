@@ -1,0 +1,50 @@
+{
+  "id": "f35",
+  "scene": "res://assets/aircraft/f35/f35.tscn",
+  "forward": "-Z",
+  "up": "+Y",
+  "unit": "meter",
+  "bounds": [
+    [
+      -5.52594,
+      -3.0,
+      -8.5766305
+    ],
+    [
+      5.52594,
+      1.8423859999999999,
+      8.5766305
+    ]
+  ],
+  "dimensions": {
+    "wingspan": 11.05188,
+    "height": 4.842385999999999,
+    "length": 17.153261
+  },
+  "triangle_count": 28387,
+  "mesh_count": 71,
+  "source_origin_removed": [
+    -0.6805094999999994,
+    1.001948,
+    5.745999999806628e-06
+  ],
+  "sha256_glb": "d6a8d806bf4d9d074db7588016a3dd681761633a5ff7b9a6e44f4bde7f12a526",
+  "landing_gear": "visual group Airframe/LandingGear, initially extended",
+  "gear_mesh_names": [
+    "gear2.R",
+    "gear2.L",
+    "wheel.F",
+    "wheel.R",
+    "wheel.L",
+    "gear1.F",
+    "gear4.L",
+    "gear4.R",
+    "gear2.F",
+    "gear3.F",
+    "gear3.R",
+    "gear3.L",
+    "gear1.R",
+    "gear1.L"
+  ],
+  "conversion": "Static source mesh assembly; FlightGear animation and systems are not imported."
+}

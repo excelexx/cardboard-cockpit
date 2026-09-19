@@ -1,0 +1,522 @@
+[
+  {
+    "id": "a380",
+    "repository": "https://github.com/FGMEMBERS/A380",
+    "commit": "715e972134a2a708115419d2d301b14e8323922a",
+    "license": "GPL-2.0",
+    "files": [
+      {
+        "path": "A380-set.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/A380-set.xml",
+        "sha256": "668f0ccc42f4ec32af92078b87ce302927b291b2920a09e684e91225a59ad58b",
+        "bytes": 49853
+      },
+      {
+        "path": "COPYING",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/COPYING",
+        "sha256": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa",
+        "bytes": 18007
+      },
+      {
+        "path": "Engines/Models/high.3ds",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Engines/Models/high.3ds",
+        "sha256": "877dad47272e017930b6f8459c6b5c8bea4eef8268520980bf6492cd1f8f2cd7",
+        "bytes": 23214
+      },
+      {
+        "path": "Engines/Textures/CONE.RGB",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Engines/Textures/CONE.RGB",
+        "sha256": "fa1b592daa6e3aeafee815c4a0eb7c8ede5f9347f089e1b2796468feff4c2f68",
+        "bytes": 3775
+      },
+      {
+        "path": "Engines/XML/engine1.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Engines/XML/engine1.xml",
+        "sha256": "85febbda19b5be176f79e396d84dde85f188eef936d10e089053e5b6c5c231f3",
+        "bytes": 484
+      },
+      {
+        "path": "Engines/XML/engine2.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Engines/XML/engine2.xml",
+        "sha256": "2765c41b301129d257181f0347674f7598016ba96a05d2fc55806dfe7d49990e",
+        "bytes": 484
+      },
+      {
+        "path": "Engines/XML/engine3.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Engines/XML/engine3.xml",
+        "sha256": "113d3ffc05f64bd88c8fcb5a959621df0816fab6d96d6ed847f40ff70e318ab5",
+        "bytes": 484
+      },
+      {
+        "path": "Engines/XML/engine4.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Engines/XML/engine4.xml",
+        "sha256": "081916de0b54a1dfc48bfdf3afb1023bd2b4ea16f2610c10be41281b5b16ab41",
+        "bytes": 484
+      },
+      {
+        "path": "Models/Wings/bathtub.3ds",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Models/Wings/bathtub.3ds",
+        "sha256": "102fd06ff6f144b63d111c1fb9a4cb1256184832fde553da4a2295104788eea4",
+        "bytes": 2238
+      },
+      {
+        "path": "Models/Wings/cowling.ac",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Models/Wings/cowling.ac",
+        "sha256": "0aca119847438d8004bcac17fcb83d2f924466813981d69f3e9c31730e063fa9",
+        "bytes": 89784
+      },
+      {
+        "path": "Models/Wings/pylon1.3ds",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Models/Wings/pylon1.3ds",
+        "sha256": "81fac72e98502baf0a0c93bfada1b4c570cbf31b2935507fd43524d08da8ca6d",
+        "bytes": 5073
+      },
+      {
+        "path": "Models/Wings/pylon2.3ds",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Models/Wings/pylon2.3ds",
+        "sha256": "15578d25c08812750caa606aab8402e942e063e13651e006074034a5de1b8f3d",
+        "bytes": 4611
+      },
+      {
+        "path": "Models/Wings/pylon3.3ds",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Models/Wings/pylon3.3ds",
+        "sha256": "c3f751b25d8cd0522e474ecbda65097d4e355d6bcff3a52640367b39ce8e483e",
+        "bytes": 4611
+      },
+      {
+        "path": "Models/Wings/pylon4.3ds",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Models/Wings/pylon4.3ds",
+        "sha256": "0406730064e12d892af97e6681ac73e3bd827f6449b2e46d9b1e326b08ec337b",
+        "bytes": 4117
+      },
+      {
+        "path": "Models/Wings/wings.ac",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Models/Wings/wings.ac",
+        "sha256": "8428c0bdb97cd8d45f9d6485abce54a99265991f9e56a7694dd06d565c32b1f4",
+        "bytes": 230701
+      },
+      {
+        "path": "Models/a380.ac",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Models/a380.ac",
+        "sha256": "df1b6de1d667d661a3a8573758950dc3c16305337a8a931c2f02f29a42d919fe",
+        "bytes": 795873
+      },
+      {
+        "path": "Models/htp.3ds",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Models/htp.3ds",
+        "sha256": "0b8f22c3db6d9c81d9fc5f7e0670b2a75c22a8bfe3073c012537804e30a58990",
+        "bytes": 14272
+      },
+      {
+        "path": "README.md",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/README.md",
+        "sha256": "6b9b2c87cdb69adfdf2379419bee6c740c151e852f5b2b8bd8b8fbb11e29bd50",
+        "bytes": 175
+      },
+      {
+        "path": "Textures/Livery/CSN/A380.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Textures/Livery/CSN/A380.png",
+        "sha256": "28b3024ace9c7a72e4902d4f5ccd9c0a917c256ddb23e5b3c8a7398575380e50",
+        "bytes": 76184
+      },
+      {
+        "path": "Textures/Livery/CSN/Tyre.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Textures/Livery/CSN/Tyre.png",
+        "sha256": "ccc3b33c5602b93322c1f9741fe7faf1271cdeac5b26e41e440703b94e5ca9e2",
+        "bytes": 3388
+      },
+      {
+        "path": "Textures/Livery/House/A380.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Textures/Livery/House/A380.png",
+        "sha256": "e08ec7672d609a9238083fca10c981ab077dad5cf99dae189ff0922688f4d79f",
+        "bytes": 176268
+      },
+      {
+        "path": "Textures/Livery/House/BYPASS.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Textures/Livery/House/BYPASS.png",
+        "sha256": "24378660baa7bec0e9a39cb2e61aa3e9ca5c6fe5567998c17a62b682bb6670d9",
+        "bytes": 145
+      },
+      {
+        "path": "Textures/Livery/House/Tyre.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Textures/Livery/House/Tyre.png",
+        "sha256": "ccc3b33c5602b93322c1f9741fe7faf1271cdeac5b26e41e440703b94e5ca9e2",
+        "bytes": 3388
+      },
+      {
+        "path": "Textures/Livery/House/cowling.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Textures/Livery/House/cowling.png",
+        "sha256": "5b2eb1a3e0e6df5f92dcfe9397be04969ab2229571eb223bbc117ef8c1fbf4a1",
+        "bytes": 2813
+      },
+      {
+        "path": "XML/A380.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/XML/A380.xml",
+        "sha256": "c5cee1dace9a951578dd114c7dbc288c5f74081cce2189f51470dd3b64ff112d",
+        "bytes": 29310
+      },
+      {
+        "path": "XML/Wings/bathtub.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/XML/Wings/bathtub.xml",
+        "sha256": "de3872bf9518cd10553be2249681f455250e6cb339b2659e0f8d8d60424a2fed",
+        "bytes": 1982
+      },
+      {
+        "path": "XML/Wings/cowling14.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/XML/Wings/cowling14.xml",
+        "sha256": "be126fab80e2b5a636a0708cad06cf6bb49bfdbb7e86a98616bf9beb79a3ea06",
+        "bytes": 723
+      },
+      {
+        "path": "XML/Wings/cowlingl.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/XML/Wings/cowlingl.xml",
+        "sha256": "0358a9612dea84c0dbb804297c6b177b9ea2c60c5dcdb2b6279ed2ee8d7d0179",
+        "bytes": 1499
+      },
+      {
+        "path": "XML/Wings/cowlingr.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/XML/Wings/cowlingr.xml",
+        "sha256": "44fde919ba4ed93d2af14144322cf007f412f67b8d9860db2d4f90c7e8e82d47",
+        "bytes": 1508
+      },
+      {
+        "path": "XML/Wings/pylon1.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/XML/Wings/pylon1.xml",
+        "sha256": "c172afb489ed318220d21be10156829d604f4f4873a504b45f28df15100df0bc",
+        "bytes": 685
+      },
+      {
+        "path": "XML/Wings/pylon2.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/XML/Wings/pylon2.xml",
+        "sha256": "212f76a41a51cb95e3edd138083e9a6c94e665681ded60c0ae523fb4cb01e243",
+        "bytes": 720
+      },
+      {
+        "path": "XML/Wings/pylon3.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/XML/Wings/pylon3.xml",
+        "sha256": "45f659b08f89a46c879085a048acda80b24b6b817b502f4ba23b67f8169e9f1d",
+        "bytes": 726
+      },
+      {
+        "path": "XML/Wings/pylon4.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/XML/Wings/pylon4.xml",
+        "sha256": "648f0d3dc9eab1cfcb376aa13c1cb1011bcd2b369c7cdd2c4aa8d1b9bbf7aa93",
+        "bytes": 721
+      },
+      {
+        "path": "XML/Wings/wings.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/XML/Wings/wings.xml",
+        "sha256": "5af21d27de8bd3ef5433aca08b44acf97e62f6a22d1aa83d5a3b6fc250477204",
+        "bytes": 39696
+      },
+      {
+        "path": "XML/htp.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/XML/htp.xml",
+        "sha256": "0a4cc7d3ea0aeee20fc3fb7fb09066b51e55dadb28477297539b928df81b9de8",
+        "bytes": 1546
+      },
+      {
+        "path": "Models/windshield.3ds",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/Models/windshield.3ds",
+        "sha256": "ef85f92af6e88d15c855bfad223fe4e7be24ac22e13b3e764f46bfe79bd94e33",
+        "bytes": 1850
+      },
+      {
+        "path": "XML/windshield.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/XML/windshield.xml",
+        "sha256": "355b3f1cd7399d6ee153a4157b5854ad162b5e77a366c1654804838a1f3bfbc7",
+        "bytes": 95
+      }
+    ]
+  },
+  {
+    "id": "f35",
+    "repository": "https://github.com/FGMEMBERS/F-35B",
+    "commit": "2726b3bdf3c7c54ea09a5d4a248e86a739604ca7",
+    "license": "GPL-3.0",
+    "files": [
+      {
+        "path": "F-35B-yasim-set.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/F-35B-yasim-set.xml",
+        "sha256": "f1c9d95580ed4bd06ea8c8d86f5d1c1da1bb8dffd1dbcd9db602b4ec8e798623",
+        "bytes": 19681
+      },
+      {
+        "path": "License.txt",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/License.txt",
+        "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+        "bytes": 35147
+      },
+      {
+        "path": "Models/Engine.ac",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Models/Engine.ac",
+        "sha256": "c7638a624428f9163b19242fa9a24b3c9f7ccbf8488ac6feeec04707d515a4f1",
+        "bytes": 94685
+      },
+      {
+        "path": "Models/Engine.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Models/Engine.xml",
+        "sha256": "2206938c0294490bada2caf04cccf7cd93f224508c202f173856fbfdd2630009",
+        "bytes": 6495
+      },
+      {
+        "path": "Models/F-35B.ac",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Models/F-35B.ac",
+        "sha256": "fce5758edc01a37c741605c4044425ba785790eaefad39c9d7ef772ee132e878",
+        "bytes": 1628471
+      },
+      {
+        "path": "Models/F-35B.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Models/F-35B.xml",
+        "sha256": "343478543918bd77bd9d213db372680f62128508e53ee3801b49ffa14761d36b",
+        "bytes": 19493
+      },
+      {
+        "path": "Models/Gear.ac",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Models/Gear.ac",
+        "sha256": "36de5d1a47132f8b5004783b9d1829eea466037b0129ab1beeba2bb12427caa9",
+        "bytes": 306146
+      },
+      {
+        "path": "Models/Gear.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Models/Gear.xml",
+        "sha256": "3f71d521d10f9b64c02d2c96e00f7d7b4e3e8d91c36bd745e5a7e93c938090d1",
+        "bytes": 7772
+      },
+      {
+        "path": "Models/Liveries/Default.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Models/Liveries/Default.png",
+        "sha256": "e3ecc422e573fa4f67d0dbc91c49d51daa99f10d673a86f61960cd227c54d32d",
+        "bytes": 553057
+      },
+      {
+        "path": "Models/Liveries/Engine.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Models/Liveries/Engine.png",
+        "sha256": "a8ce5c68a145679caf40c6239ca00349af5ca667dcf51ff62207f7899d87274c",
+        "bytes": 8908
+      },
+      {
+        "path": "Models/Liveries/Gear.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Models/Liveries/Gear.png",
+        "sha256": "6fcfacadd71247732f1b796ae763a740a1482d744e423fdeea2d697ddc5f0241",
+        "bytes": 19813
+      },
+      {
+        "path": "Models/Liveries/Pylons.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/F-35B/2726b3bdf3c7c54ea09a5d4a248e86a739604ca7/Models/Liveries/Pylons.png",
+        "sha256": "520270cb1c4fafdcd68835b489549074266599f188e0d330d6bc95c6cc73661c",
+        "bytes": 4898
+      }
+    ]
+  },
+  {
+    "id": "b2",
+    "repository": "https://github.com/FGMEMBERS/B-2",
+    "commit": "7c82ca7f00efab7988b43fad49c4bc2bf71d3ada",
+    "license": "GPL-2.0-or-later",
+    "files": [
+      {
+        "path": "B-2-set.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/B-2/7c82ca7f00efab7988b43fad49c4bc2bf71d3ada/B-2-set.xml",
+        "sha256": "33c62ef32a86088c58130b7b612878bb8750ade558b73b2f9c3cb75534379b58",
+        "bytes": 9760
+      },
+      {
+        "path": "COPYING",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/A380/715e972134a2a708115419d2d301b14e8323922a/COPYING",
+        "sha256": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa",
+        "bytes": 18007
+      },
+      {
+        "path": "Models/b2-spirit.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/B-2/7c82ca7f00efab7988b43fad49c4bc2bf71d3ada/Models/b2-spirit.xml",
+        "sha256": "0d8ad4b45fbc5ce11c76af24f4f0b355ba7a4e6016d3a338532425f4f92105c9",
+        "bytes": 24710
+      },
+      {
+        "path": "Models/cockpit.rgb",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/B-2/7c82ca7f00efab7988b43fad49c4bc2bf71d3ada/Models/cockpit.rgb",
+        "sha256": "47d6df4a0e8994f8f9ffd615713a3cdc519bfb642cde2432a42bb196da4e31db",
+        "bytes": 182986
+      },
+      {
+        "path": "Models/spirit.ac",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/B-2/7c82ca7f00efab7988b43fad49c4bc2bf71d3ada/Models/spirit.ac",
+        "sha256": "aed8b841d17582192dd82c2984a9f4d71df3e45acb9f6290a8de3a8f046908ab",
+        "bytes": 409156
+      },
+      {
+        "path": "Models/spirit_d.rgb",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/B-2/7c82ca7f00efab7988b43fad49c4bc2bf71d3ada/Models/spirit_d.rgb",
+        "sha256": "da1df36332472a1319121efb98af9462195176914d008bf859bb8e88f56a3c4c",
+        "bytes": 5504
+      },
+      {
+        "path": "Models/spirit_dl_sp.rgb",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/B-2/7c82ca7f00efab7988b43fad49c4bc2bf71d3ada/Models/spirit_dl_sp.rgb",
+        "sha256": "3d86b119b37b970742112eb6c5f3bd0d62b61ba3622e6f25ca0bb0f910bde82c",
+        "bytes": 19262
+      },
+      {
+        "path": "Models/spirit_hightex.rgb",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/B-2/7c82ca7f00efab7988b43fad49c4bc2bf71d3ada/Models/spirit_hightex.rgb",
+        "sha256": "455d5f483bfe22633d5cb62bdf50d123902010f5d6a36432aaddafd545954df5",
+        "bytes": 274607
+      },
+      {
+        "path": "Models/spirit_tex.rgb",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/B-2/7c82ca7f00efab7988b43fad49c4bc2bf71d3ada/Models/spirit_tex.rgb",
+        "sha256": "0660a453119c10b85ebaa04b2ddfd28a3cf98be5b3285c8d83c14d49a6afc3d9",
+        "bytes": 80855
+      },
+      {
+        "path": "Models/spirit_tex_adv.rgb",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/B-2/7c82ca7f00efab7988b43fad49c4bc2bf71d3ada/Models/spirit_tex_adv.rgb",
+        "sha256": "fca19503c93ad797738711fdb64aac86a24de87d8ecb3f945f449b2070c40022",
+        "bytes": 88588
+      },
+      {
+        "path": "README.txt",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/B-2/7c82ca7f00efab7988b43fad49c4bc2bf71d3ada/README.txt",
+        "sha256": "e8f13853e7b68637576c5064c09856d160086df70fa9d18dd9939b066580489e",
+        "bytes": 17
+      },
+      {
+        "path": "readme-spirit.txt",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/B-2/7c82ca7f00efab7988b43fad49c4bc2bf71d3ada/readme-spirit.txt",
+        "sha256": "f815a825fc12ebc37a15640ec21fccc1b04b193e824bfd38958ee4f281151448",
+        "bytes": 5060
+      }
+    ]
+  },
+  {
+    "id": "b737",
+    "repository": "https://github.com/FGMEMBERS/737-300",
+    "commit": "832d6691a7b210afd4b90ac046e838a1bade2e1f",
+    "license": "GPL-3.0",
+    "files": [
+      {
+        "path": "737-300-set.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/737-300/832d6691a7b210afd4b90ac046e838a1bade2e1f/737-300-set.xml",
+        "sha256": "a6eb323a71d71d20ccbfcd8f4e688b90c296db0a14e019c1bb9fc47268a28243",
+        "bytes": 52719
+      },
+      {
+        "path": "LICENSE.md",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/737-300/832d6691a7b210afd4b90ac046e838a1bade2e1f/LICENSE.md",
+        "sha256": "e1c0ad728983d8a57335e52cf1064f1affd1d454173d8cebd3ed8b4a72b48704",
+        "bytes": 35121
+      },
+      {
+        "path": "Models/733_white.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/737-300/832d6691a7b210afd4b90ac046e838a1bade2e1f/Models/733_white.png",
+        "sha256": "ac5e6a5b911c3ba8e9d3bd65d9004824b586bc7242f63806768dffd4cbdcf7dd",
+        "bytes": 162572
+      },
+      {
+        "path": "Models/737-300.ac",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/737-300/832d6691a7b210afd4b90ac046e838a1bade2e1f/Models/737-300.ac",
+        "sha256": "5a236e16ef01f5e831274ac3e766b1550ad672e13a957f71692d51f4fe305ac7",
+        "bytes": 3327850
+      },
+      {
+        "path": "Models/737-300.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/737-300/832d6691a7b210afd4b90ac046e838a1bade2e1f/Models/737-300.xml",
+        "sha256": "4bbed5e50331a143783a873063f33b7402f316879fe31867c055b4df109f052b",
+        "bytes": 50016
+      },
+      {
+        "path": "Models/bulkhead.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/737-300/832d6691a7b210afd4b90ac046e838a1bade2e1f/Models/bulkhead.png",
+        "sha256": "4bb2f46ee2e5e35bff231d6b864477d893c80cfd2dc3205fb66597e0e568a296",
+        "bytes": 4600
+      },
+      {
+        "path": "Models/carpeting.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/737-300/832d6691a7b210afd4b90ac046e838a1bade2e1f/Models/carpeting.png",
+        "sha256": "297ef4f90590f523079bb303ff0d59be65cb9a142f00e482bb14536ee2505db4",
+        "bytes": 1816
+      },
+      {
+        "path": "Models/fans.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/737-300/832d6691a7b210afd4b90ac046e838a1bade2e1f/Models/fans.png",
+        "sha256": "820daf19fe171f78d040d984efcc684693e5d822770e993ed7547c34980c883d",
+        "bytes": 96252
+      },
+      {
+        "path": "Models/halos.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/737-300/832d6691a7b210afd4b90ac046e838a1bade2e1f/Models/halos.png",
+        "sha256": "2ca33e537812c22dbbe6ac6f84b7150e904d377dca404395d6f1f361f7629938",
+        "bytes": 20231
+      },
+      {
+        "path": "Models/interior.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/737-300/832d6691a7b210afd4b90ac046e838a1bade2e1f/Models/interior.png",
+        "sha256": "460d204dfd063e68eb38104d86b1ccfd1423e440a744743be6e64b1f08ac5650",
+        "bytes": 1073
+      },
+      {
+        "path": "Models/wing.png",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/737-300/832d6691a7b210afd4b90ac046e838a1bade2e1f/Models/wing.png",
+        "sha256": "6834436c6808aa1bea078b8b996a35811416ecf8821f0462d75f80eb54c9d262",
+        "bytes": 87237
+      },
+      {
+        "path": "README.txt",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/737-300/832d6691a7b210afd4b90ac046e838a1bade2e1f/README.txt",
+        "sha256": "b219cfaa9fd89efce17fa0c75b08811c311947e66dd16c24166058365c7b7505",
+        "bytes": 1532
+      }
+    ]
+  },
+  {
+    "id": "b747",
+    "repository": "https://github.com/FGMEMBERS/747",
+    "commit": "abd1de993dc2ef6750c98136a2222c0a660e11b4",
+    "license": "GPL-2.0",
+    "files": [
+      {
+        "path": "747-base.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/747/abd1de993dc2ef6750c98136a2222c0a660e11b4/747-base.xml",
+        "sha256": "eb00ea9b024aa6476240a6aa791809813764c776b0c9ccccb6228def30ff1b30",
+        "bytes": 2998
+      },
+      {
+        "path": "COPYING",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/747/abd1de993dc2ef6750c98136a2222c0a660e11b4/COPYING",
+        "sha256": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa",
+        "bytes": 18007
+      },
+      {
+        "path": "Models/boeing747-400-jw-01.rgb",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/747/abd1de993dc2ef6750c98136a2222c0a660e11b4/Models/boeing747-400-jw-01.rgb",
+        "sha256": "b75c1100219c81e082a691de69a881933e64c3aa6014835adda9f9e1add59607",
+        "bytes": 1044641
+      },
+      {
+        "path": "Models/boeing747-400-jw-02.rgb",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/747/abd1de993dc2ef6750c98136a2222c0a660e11b4/Models/boeing747-400-jw-02.rgb",
+        "sha256": "2dce8a923a624229f45893bdf0f2a24680912c3c96c84410643edc22d789b71a",
+        "bytes": 377554
+      },
+      {
+        "path": "Models/boeing747-400-jw-03.rgb",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/747/abd1de993dc2ef6750c98136a2222c0a660e11b4/Models/boeing747-400-jw-03.rgb",
+        "sha256": "9153a9a9642d6f74bfe2d18aa5be75ae0f766cf6bc9f7f61fd3f7a1e73a0dd17",
+        "bytes": 213843
+      },
+      {
+        "path": "Models/boeing747-400-jw.ac",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/747/abd1de993dc2ef6750c98136a2222c0a660e11b4/Models/boeing747-400-jw.ac",
+        "sha256": "e23c9d02b50391c7f5eca0b8f635b50984165e3f5043fad86f3653e936179b65",
+        "bytes": 614027
+      },
+      {
+        "path": "Models/boeing747-400-jw.xml",
+        "url": "https://raw.githubusercontent.com/FGMEMBERS/747/abd1de993dc2ef6750c98136a2222c0a660e11b4/Models/boeing747-400-jw.xml",
+        "sha256": "3b0c50903374ea8065da7fea3c06d3825263f72228c2db4358484b48c6e18f57",
+        "bytes": 36963
+      }
+    ]
+  }
+]
