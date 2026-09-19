@@ -3,8 +3,8 @@ extends SceneTree
 ## godot --headless --fixed-fps 60 --path simulator --script res://tests/test_keyboard_mission.gd
 ## The controller requests only real key events. It never steps the flight model
 ## directly or enables the copilot. The existing pilot is used as a target oracle;
-## its throttle/gear writes are restored before those targets are translated into
-## W/S and G key presses.
+## its throttle/gear/flap writes are restored before those targets are translated
+## into W/S, G, and F key presses. Weather/mission selections use the HUD signals.
 
 var app: Node3D
 var held: Dictionary = {}
@@ -17,6 +17,8 @@ var settings_backup: PackedByteArray
 var finished: bool = false
 var mission_frames: int = 0
 var mission_plane: int = 3
+var rollout_seen := false
+var rollout_pause_checked := false
 
 
 func _initialize() -> void:
@@ -77,6 +79,37 @@ func run_test() -> void:
 	check(app.mode == "hangar", "Application starts in the hangar")
 	tap(KEY_4)
 	check(app.selected == 3, "Number 4 selects the Boeing 737")
+	# Invoke the same published action signals as the briefing buttons. Keeping
+	# these checks independent of rendering also exercises them in headless CI.
+	for weather: String in ["clear", "overcast", "golden"]:
+		app.hud.action.emit("weather_" + weather)
+		check(app.conditions == weather and app.world._condition_id == weather, "HUD weather selection reaches the world: " + weather)
+		var saved := ConfigFile.new()
+		check(saved.load("user://settings.cfg") == OK and str(saved.get_value("world", "conditions", "")) == weather, "Weather preference is saved: " + weather)
+	app.hud.action.emit("kind_approach")
+	check(app.flight_kind == "approach" and app.flight_kind_label() == "LANDING PRACTICE", "HUD landing-practice selection reaches mission routing")
+	tap(KEY_ENTER)
+	tap(KEY_ENTER)
+	check(app.mode == "flight" and app.flight.airborne and app.flight.ever_airborne and app.ring_index == 5, "Landing practice starts airborne with route checkpoints skipped")
+	check(app.flight.gear and app.flight.flaps == 2 and app.flight.speed > app.flight.effective_rotation_speed(), "Landing practice starts with gear, approach flaps, and flying airspeed")
+	check(app.flight.position.is_equal_approx(Vector3(0,155,-11200)), "Landing practice starts lined up before North Field")
+	check(app.approach_data() == ApproachGuidance.solution(app.flight.position), "HUD/controller approach data uses the shared guidance solution")
+	for ring in app.ring_nodes:
+		check(not ring.visible, "Landing practice hides valley checkpoint geometry")
+	tap(KEY_R)
+	check(app.flight.airborne and app.flight.flaps == 2 and app.ring_index == 5, "R restarts the selected landing-practice mission")
+	app.hud.action.emit("hangar")
+	app.hud.action.emit("kind_free")
+	check(app.flight_kind == "free" and app.flight_kind_label() == "FREE FLIGHT", "HUD free-flight selection reaches mission routing")
+	tap(KEY_ENTER)
+	tap(KEY_ENTER)
+	check(app.mode == "flight" and not app.flight.airborne and app.flight.position == Vector3(0,3,1100), "Free flight starts ready for runway departure")
+	check(app.ring_index == 0 and app.flight.flaps == 0 and app.flight.speed == 0.0, "Free flight clears landing-practice progress and flap state")
+	for ring in app.ring_nodes:
+		check(not ring.visible, "Free flight hides valley checkpoint geometry")
+	app.hud.action.emit("hangar")
+	app.hud.action.emit("kind_valley")
+	check(app.flight_kind == "valley", "HUD valley selection restores the five-checkpoint mission")
 	tap(KEY_ENTER)
 	check(app.mode == "briefing", "Enter opens the mission briefing")
 	tap(KEY_ESCAPE)
@@ -85,6 +118,14 @@ func run_test() -> void:
 	tap(KEY_ENTER)
 	check(app.mode == "flight", "Second Enter starts departure")
 
+	var initial_hud: bool = app.expanded_hud
+	tap(KEY_F2)
+	check(app.expanded_hud != initial_hud, "F2 toggles expanded flight instruments")
+	tap(KEY_F2)
+	check(app.expanded_hud == initial_hud, "F2 restores the prior instrument view")
+	for detent in [1, 2, 0]:
+		tap(KEY_F)
+		check(app.flight.flaps == detent, "F cycles flap detent to " + str(detent))
 	var first_view: bool = app.cockpit
 	tap(KEY_V)
 	check(app.cockpit != first_view, "V switches cockpit/chase view")
@@ -112,6 +153,8 @@ func run_test() -> void:
 	check(not app.calibration_visible, "Escape closes calibration")
 	tap(KEY_ESCAPE)
 	check(app.mode == "paused", "Escape pauses flight")
+	tap(KEY_F)
+	check(app.flight.flaps == 0, "Paused flight does not accept flap commands")
 	elapsed_before = app.flight.elapsed
 	await frames(8)
 	check(is_equal_approx(app.flight.elapsed, elapsed_before), "Paused flight does not advance")
@@ -170,23 +213,42 @@ func run_test() -> void:
 	app.select_plane(mission_plane)
 	app.start_flight()
 	print("KEYBOARD MISSION: ", app.profile().name, ", all controls injected as physical key events")
-	while app.mode == "flight" and app.flight.elapsed < 400.0:
+	while app.mode in ["flight", "rollout"] and app.flight.elapsed < 400.0:
 		await physics_frame
-		if app.mode != "flight":
+		if app.mode not in ["flight", "rollout"]:
 			break
 		mission_frames += 1
 		if app.copilot or app.used_copilot:
 			failures.append("Copilot unexpectedly enabled during keyboard mission")
 			break
+		if app.mode == "rollout":
+			if not rollout_seen:
+				release_all()
+			rollout_seen = true
+			if not rollout_pause_checked:
+				rollout_pause_checked = true
+				var rollout_position: Vector3 = app.flight.position
+				var rollout_time: float = app.flight.rollout_elapsed
+				tap(KEY_ESCAPE)
+				check(app.mode == "paused" and app.resume_mode == "rollout", "Escape pauses rollout with its own resume phase")
+				await frames(8)
+				check(app.flight.position == rollout_position and app.flight.rollout_elapsed == rollout_time, "Pause freezes wheel rollout")
+				tap(KEY_ESCAPE)
+				check(app.mode == "rollout", "Escape resumes rollout without re-entering flight")
+			key(KEY_SPACE, true)
+			continue
 		var actual_throttle: float = app.flight.throttle
 		var actual_gear: bool = app.flight.gear
+		var actual_flaps: int = app.flight.flaps
 		var wanted: Vector3 = app.pilot_controls()
 		var wanted_throttle: float = app.flight.throttle
 		var wanted_gear: bool = app.flight.gear
+		var wanted_flaps: int = app.flight.flaps
 		# Restore the oracle's side effects. Production input code must perform
 		# every real throttle change and gear transition from keyboard events.
 		app.flight.throttle = actual_throttle
 		app.flight.gear = actual_gear
+		app.flight.flaps = actual_flaps
 		var roll_pulse: int = pulse(wanted.x, 0)
 		var pitch_pulse: int = pulse(wanted.y, 1)
 		key(KEY_RIGHT, roll_pulse > 0)
@@ -197,6 +259,8 @@ func run_test() -> void:
 		key(KEY_S, wanted_throttle - actual_throttle < -0.004)
 		if wanted_gear != actual_gear:
 			tap(KEY_G)
+		for _detent in range(posmod(wanted_flaps - actual_flaps, 3)):
+			tap(KEY_F)
 		if app.ring_index != last_ring:
 			last_ring = app.ring_index
 			print("KEYBOARD CHECKPOINT ", last_ring, " t=", snappedf(app.flight.elapsed, 0.01), " position=", app.flight.position)
@@ -204,8 +268,11 @@ func run_test() -> void:
 			print("KEYBOARD STATUS t=", snappedf(app.flight.elapsed, 0.01), " rings=", app.ring_index, " position=", app.flight.position, " speed=", snappedf(app.flight.speed, 0.01))
 	release_all()
 	check(app.mission_success and app.ring_index == 5 and app.flight.contact == "landed", "Keyboard departure, all five rings, and North Field landing")
+	check(rollout_seen and app.flight.rollout_elapsed > 0.0 and app.flight.speed == 0.0, "Keyboard mission brakes through rollout to a complete stop")
+	check(app.is_on_runway(app.flight.position), "Successful mission stops entirely within the runway")
 	check(not app.copilot and not app.used_copilot, "Copilot stayed off for the entire mission")
 	check(int(key_presses.get(KEY_W, 0)) > 0 and int(key_presses.get(KEY_S, 0)) > 0 and int(key_presses.get(KEY_G, 0)) >= 4, "Throttle and gear changes used actual W/S/G events")
+	check(int(key_presses.get(KEY_F, 0)) >= 6 and int(key_presses.get(KEY_SPACE, 0)) >= 2, "Flap transitions and rollout brakes used actual F/Space events")
 	print("KEYBOARD RESULT: ", "PASS" if failures.is_empty() else "FAIL", " rings=", app.ring_index, " time=", app.flight.elapsed, " position=", app.flight.position, " speed=", app.flight.touchdown_speed, " sink=", app.flight.touchdown_sink, " contact=", app.flight.contact, " copilot=", app.copilot)
 	if app.mode == "results":
 		tap(KEY_ENTER)
