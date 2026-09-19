@@ -2,7 +2,7 @@
 
 Version 0.9.0 is a relaxed native Mac arcade flight game: **one SPECTRE fighter, unlimited Gatling fire and guided missiles, and large Waterloo geese to clear from the valley**. The geese do not attack. There are no upgrades, reloads, heat limits or steady-lock requirements.
 
-Open **Launch Cardboard Cockpit.command** or **build/Cardboard Cockpit.app**. Choose **Play** (or Enter): flight assistance handles takeoff and the route so you can concentrate on shooting. Hold **Space + T**, or both mouse buttons, to fire both weapons together. **Watch demo** runs the entire takeoff → flock-clearing → landing sequence automatically in about 2 minutes 18 seconds.
+Open **Launch Cardboard Cockpit.command** or **build/Cardboard Cockpit.app**. Choose **Play** (or Enter): flight assistance handles takeoff and the route so you can concentrate on shooting. Hold **Space + T**, or both mouse buttons, to fire both weapons together. **Watch demo** runs the entire takeoff → interception → landing sequence automatically. The default **Azure Coast** tour takes about three minutes; the preserved **Alpine Valley** sortie takes about 2 minutes 18 seconds. The ROUTE button switches between them.
 
 ![SPECTRE in the valley](docs/screenshots/combat-09-overview.png)
 
@@ -34,6 +34,12 @@ Bring a goose inside the small six-degree acquisition ring. The crosshair smooth
 Hold W for immediate acceleration and S for a strong airbrake, with a forgiving 80 m/s minimum while airborne with gear up. The HUD shows ACCEL, AIRBRAKE and CRUISE. Keyboard steering or power input takes over from route assistance. The manual controller maps inputs to a controlled bank or pitch angle; releasing settles the aircraft toward level flight. A gentle terrain guard pulls up through the physics model when needed. H rejoins the guided route. Switching applications pauses flight, and help/setup overlays freeze the simulation.
 
 Landing practice starts on final with gear and flaps selected. With neutral pitch input, landing assistance follows the descent and flare; neutral power input uses approach-speed assistance. After touchdown, Space brakes and A/D steers. The complete assisted sortie lands and brakes automatically. Touchdown preserves position and attitude and settles through a physical rollout.
+
+## Scenery and presentation
+
+Festyve’s `graphics/coastal-overhaul` is integrated: offline Helsinki photogrammetry, 128 base tiles with 256 detailed refinements, 60 Kominka countryside homes, a maritime air station, grounded airports, shoreline scenery and an eleven-landmark coastal tour. The cockpit improvements and instrument batching are retained. Blue navigation diamonds lead through the city and islands; our SPECTRE, permanent weapons, infinite ammunition and harmless geese are shared by both routes. The existing alpine environment remains selectable. [Coastal credits](simulator/assets/photogrammetry/CREDITS.md) · [Scenic route](docs/SCENIC_ROUTE.md).
+
+The active balance uses developer-published Sky Rogue references with documented metric-scale and difficulty adaptations. [Balance values and provenance](docs/balance.md) distinguish source values from our calibration.
 
 ## Presentation and handling
 

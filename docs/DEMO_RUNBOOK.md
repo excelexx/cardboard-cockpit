@@ -3,7 +3,8 @@
 **Goal:** take off, enjoy clearing small, staggered groups with unlimited weapons, then land. The geese never attack. No reload, heat, steady-lock or aircraft-upgrade systems interrupt play.
 
 - **Play / Enter:** assisted flight with player-controlled shooting. Hold Space + T, or both mouse buttons, to fire Gatling and missiles together. Bring a goose inside the six-degree ring; the crosshair tracks it and LOCK appears quickly. A small retention margin forgives drift. Unlocked missiles fly straight.
-- **Watch demo:** the same complete flight with automatic shooting, useful for an uninterrupted judge demonstration. It takes approximately 2 minutes 18 seconds and ends stopped on North Field's runway.
+- **Watch demo:** the same complete flight with automatic shooting, useful for an uninterrupted judge demonstration. Azure Coast takes about three minutes; Alpine Valley takes about 2 minutes 18 seconds and ends stopped on North Field's runway.
+- **ROUTE:** choose Azure Coast for Festyve’s city, villages and island tour, or Alpine Valley for the existing mountain sortie.
 - **W / S:** fast acceleration / strong airbrake, with a forgiving minimum airborne speed.
 - **Arrows:** optional manual steering. Hold for a smooth bank/pitch; release to level. H resumes route assistance.
 - **X / V:** missile inset / cockpit or chase view. Q performs a quick roll when altitude permits.

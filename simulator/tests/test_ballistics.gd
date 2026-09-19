@@ -7,7 +7,7 @@ func check(value: bool,label: String):
 	checks += 1
 	if not value: failures.append(label); push_error("BALLISTICS FAIL: "+label)
 func run():
-	app = load("res://scenes/main.tscn").instantiate(); root.add_child(app)
+	app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
 	app.start_flight("combat")
 	check(is_instance_valid(app.fighter_fx.gun_rotor) and is_instance_valid(app.fighter_fx.gun_muzzle),"Imported rotary gun retains animated rotor and physical muzzle")

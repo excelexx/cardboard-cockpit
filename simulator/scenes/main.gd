@@ -1,7 +1,9 @@
 extends Node3D
+const Tune = preload("res://data/balance.gd")
 const Catalog = preload("res://data/aircraft.gd")
 const Dynamics = preload("res://systems/flight_dynamics.gd")
 const World = preload("res://scenes/world.gd")
+const Coast = preload("res://scenes/coastal_world.gd")
 const Model = preload("res://systems/fighter_model.gd")
 const Visuals = preload("res://systems/aircraft_visuals.gd")
 const Effects = preload("res://systems/fighter_effects.gd")
@@ -20,7 +22,8 @@ var flight_kind := "demo"
 var mission: DemoMission = Mission.new()
 var flight: FlightDynamics = Dynamics.new()
 var vision: VisionClient = Vision.new()
-var world: FlightWorld
+var world: Node3D
+var route_id := "coast"
 var aircraft: Node3D
 var aircraft_visuals: AircraftVisuals
 var fighter_fx: FighterEffects
@@ -63,7 +66,8 @@ func _ready() -> void:
 	get_window().title = "Goose Protocol — SPECTRE X-26"
 	mission.app = self
 	load_settings()
-	world = World.new(); add_child(world)
+	route_id = str(get_meta("route_override",route_id))
+	world = Coast.new() if route_id=="coast" else World.new(); add_child(world)
 	world.set_conditions("golden")
 	flight.reset(profile())
 	aircraft = Node3D.new(); add_child(aircraft)
@@ -195,6 +199,7 @@ func take_manual_control(steering: bool) -> void:
 	vision.enabled = false; vision.status = "KEYBOARD / MOUSE"
 func on_action(action: String) -> void:
 	match action:
+		"route": select_route("alpine" if route_id=="coast" else "coast")
 		"fly": start_flight(); copilot = true; used_copilot = true; demo_auto_fire = false
 		"restart": start_flight(); copilot = true; used_copilot = true
 		"approach": start_flight("approach")
@@ -287,7 +292,7 @@ func _physics_process(dt: float) -> void:
 		if not test_mode and fire_guard<=0 and (Input.is_physical_key_pressed(KEY_SPACE) or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)): combat.fire_gun()
 		if not test_mode and fire_guard<=0 and (Input.is_physical_key_pressed(KEY_T) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)): combat.fire_missile()
 	var input := Vector3(float(Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_UP))-float(Input.is_physical_key_pressed(KEY_DOWN)),float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)))
-	input.x *= .76; input.y *= .76
+	input.x *= Tune.KEYBOARD_SCALE; input.y *= Tune.KEYBOARD_SCALE
 	var power: float = float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
 	if test_mode: input = Vector3.ZERO; power = 0
 	if input.length()>0 or power!=0: take_manual_control(input.length()>0)
@@ -305,10 +310,10 @@ func _physics_process(dt: float) -> void:
 			combat.fire_missile()
 	else:
 		if mouse_yoke and not Input.is_key_pressed(KEY_ALT):
-			var mouse: Vector2 = (get_viewport().get_mouse_position()-Vector2(800,470))/Vector2(430,300)
+			var mouse: Vector2 = (get_viewport().get_mouse_position()-Vector2(800,470))/Tune.MOUSE_RANGE
 			input.x = clampf(mouse.x,-1,1); input.y = clampf(-mouse.y,-1,1)
 		if vision.enabled and vision.throttle_confidence>0.4: flight.throttle = move_toward(flight.throttle,vision.throttle,dt*0.8)
-		flight.throttle = clampf(flight.throttle+power*dt*2.4,0,1)
+		flight.throttle = clampf(flight.throttle+power*dt*Tune.THROTTLE_RATE,0,1)
 		flight.power_input = power
 		flight.afterburner = Input.is_physical_key_pressed(KEY_SHIFT) and flight.airborne
 		var landing_assist: bool = flight.gear and (flight_kind=="approach" or (mission.active and mission.phase=="approach"))
@@ -318,8 +323,8 @@ func _physics_process(dt: float) -> void:
 				var ahead: Vector3 = flight.position+flight.forward()*flight.speed*seconds
 				clearance = minf(clearance,flight.position.y-world.ground_height(ahead.x,ahead.z))
 		input = Manual.command(flight,input,clearance,landing_assist)
-		if landing_assist and power==0 and not vision.enabled: flight.throttle = clampf(.22+(65-flight.speed)*.055,0,1)
-	control = control.lerp(input,1-exp(-dt*18))
+		if landing_assist and power==0 and not vision.enabled: flight.throttle = clampf(.22+(Tune.APPROACH_SPEED-flight.speed)*.055,0,1)
+	control = control.lerp(input,1-exp(-dt*Tune.INPUT_RESPONSE))
 	var agl: float = flight.position.y-world.ground_height(flight.position.x,flight.position.z)
 	flight.wind = Vector3(3.5+sin(flight.elapsed*.23)*1.7,0,sin(flight.elapsed*.17)*2.0)*clampf((agl-20)/90,0,1)
 	var was_airborne: bool = flight.airborne
@@ -365,7 +370,7 @@ func approach_controls() -> Vector3:
 	var wanted_pitch: float = clampf(-atan(Approach.GLIDESLOPE)+(float(guidance.ideal_height)-flight.position.y)*0.002,-0.15,0.08)
 	if flight.position.y<14: wanted_pitch = -0.022 if flight.position.y>5 else -0.012
 	flight.gear = true; flight.flaps = 2
-	flight.throttle = clampf(0.22+(65-flight.speed)*0.055,0,1)
+	flight.throttle = clampf(0.22+(Tune.APPROACH_SPEED-flight.speed)*0.055,0,1)
 	return Vector3(clampf((error*1.5-flight.roll)*1.8-flight.roll_velocity*0.3,-1,1),clampf((wanted_pitch-flight.pitch)*2.5-flight.pitch_velocity*0.3,-1,1),0)
 func is_on_runway(at: Vector3) -> bool: return world.is_runway(at.x,at.z)
 func approach_data() -> Dictionary: return Approach.solution(flight.position)
@@ -385,11 +390,23 @@ func load_settings() -> void:
 	var config := ConfigFile.new()
 	if config.load("user://settings.cfg")==OK:
 		high_quality = bool(config.get_value("video","spectre_quality",true))
-		best_score = int(config.get_value("arcade","best_score",0))
+		route_id = str(config.get_value("world","spectre_route","coast"))
+		best_score = int(config.get_value("arcade","best_score_v09",0))
 func save_settings() -> void:
 	if DisplayServer.get_name()=="headless": return
 	var config := ConfigFile.new()
+	config.load("user://settings.cfg")
 	config.set_value("video","spectre_quality",high_quality)
-	config.set_value("arcade","best_score",best_score)
+	config.set_value("arcade","best_score_v09",best_score)
+	config.set_value("world","spectre_route",route_id)
 	if is_instance_valid(audio): config.set_value("audio","muted",audio.muted)
 	config.save("user://settings.cfg")
+
+func select_route(value: String) -> void:
+	if value==route_id: return
+	route_id = value
+	if is_instance_valid(world): remove_child(world); world.queue_free()
+	world = Coast.new() if route_id=="coast" else World.new()
+	add_child(world); world.set_conditions("golden"); world.apply_quality(high_quality)
+	world.visible = mode!="title"
+	save_settings()
