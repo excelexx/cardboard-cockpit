@@ -63,6 +63,7 @@ func _draw() -> void:
 	else: draw_flight()
 	if app.mode=="paused": draw_pause()
 	if app.mode=="results": draw_results()
+	if app.toast_time>0 and app.mode=="flight":text(Vector2(510,170),app.toast,17,CYAN,true)
 	if app.mode=="flight" and app.mission.phase=="aftermath":button("land",Rect2(590,790,420,58),"LAND AT SFO  /  BADGE B",true)
 	if app.landing_transition>0:
 		draw_rect(Rect2(0,0,1600,1000),Color(0.01,.02,.03,clampf(app.landing_transition/1.2,0,1)))
@@ -86,7 +87,6 @@ func draw_title() -> void:
 	text(Vector2(500,615),"SAN FRANCISCO  /  2:30 MAX",14,CYAN,true)
 	button("guided",Rect2(74,659,187,48),"Watch demo")
 	button("approach",Rect2(279,659,189,48),"Landing practice")
-	button("tutorial",Rect2(500,659,210,48),"Tutorial")
 	button("camera",Rect2(74,737,187,43),"Cardboard setup")
 	button("help",Rect2(279,737,189,43),"Flight controls")
 	text(Vector2(74,846),"ENTER  PLAY    •    F1  CONTROLS",12,CYAN,true)
@@ -333,7 +333,7 @@ func draw_results() -> void:
 		text(Vector2(433+i*255,466),labels[i],11,MUTED,true)
 		text(Vector2(431+i*255,516),values[i],36,WHITE,true)
 	text(Vector2(433,575),app.result_advice,14,MUTED)
-	button("tutorial" if app.result_code.begins_with("training_") else "fly",Rect2(433,642,350,62),"REPEAT TRAINING" if app.result_code.begins_with("training_") else "PLAY AGAIN",true)
+	button("fly",Rect2(433,642,350,62),"PLAY AGAIN",true)
 	button("title",Rect2(816,642,350,62),"FLIGHT DECK")
 func draw_help() -> void:
 	zones.clear(); dim(); panel(Rect2(365,136,870,738),.97)
@@ -363,13 +363,7 @@ func draw_credits() -> void:
 	button("credits",Rect2(905,733,283,51),"BACK",true)
 
 func draw_tutorial() -> void:
-	panel(Rect2(210,708,1180,272),.96)
+	panel(Rect2(275,755,1050,140),.84)
 	var lesson: Dictionary=app.tutorial.lesson()
-	text(Vector2(238,742),"TRAINING %d / %d — %s" % [app.tutorial.index+1,app.tutorial.LESSONS.size(),lesson.title],18,CYAN,true)
-	for i in range(lesson.lines.size()):text(Vector2(238,777+i*28),str(lesson.lines[i]),18,WHITE)
-	text(Vector2(238,870),app.tutorial.voice_status(),12,MUTED,true)
-	button("tutorial_repeat",Rect2(238,905,185,48),"Repeat voice")
-	button("tutorial_exit",Rect2(445,905,180,48),"Exit tutorial")
-	if app.tutorial.index==7:button("tutorial_land",Rect2(1040,905,320,48),"LAND AT SFO",true)
-	elif app.tutorial.ready():button("tutorial_next",Rect2(1040,905,320,48),"CONTINUE / ENTER",true)
-	else:text(Vector2(837,936),"LANDING IN PROGRESS" if app.tutorial.index==8 else "COMPLETE THE EXERCISE",14,AMBER,true)
+	text(Vector2(300,788),lesson.title,15,CYAN,true)
+	for i in range(lesson.lines.size()):text(Vector2(300,820+i*27),str(lesson.lines[i]),17,WHITE)
