@@ -1,6 +1,28 @@
 # Cardboard camera controls
 
-The Python tracker reads ArUco `DICT_4X4_50` markers and sends controls to the native game at `ws://127.0.0.1:8765`. Images stay local in memory. A camera opens only with an explicit `--camera INDEX` command.
+The Python tracker reads ArUco `DICT_4X4_50` markers and sends controls to the native game at `ws://127.0.0.1:8765`. Images stay local in memory. Cameras open only when you launch a tracker or the two-camera launcher.
+
+## Laptop yoke + phone throttle
+
+Connect the phone as Apple Continuity Camera or a webcam app. Open **Launch Two-Camera Cockpit.command** to run the source game in airborne paper-test mode with both trackers and previews. Automatic selection recognizes the MacBook/FaceTime camera and one iPhone. For other apps, multiple phones, or manual selection:
+
+```sh
+./tools/dual_camera_tracker.sh --list-cameras
+./"Launch Two-Camera Cockpit.command" --yoke-camera 1 --throttle-camera 0
+```
+
+Those indices are an example: this Mac currently lists iPhone at 0 and MacBook Air at 1. Device order can change, so prefer automatic selection or check the list after reconnecting cameras. Camera indices must differ. The phone sees throttle tags 0/1/2; the laptop sees yoke 7 and the optional weapon switches. Tags seen by the wrong camera cannot take over the other control.
+
+For an ordinary mission, run these in separate terminals:
+
+```sh
+./tools/dual_camera_tracker.sh
+./tools/run.sh -- --dual-cameras --stickers
+```
+
+The laptop sends controls and its preview on port 8765; the phone uses 8766. The game shows **YOKE / LAPTOP** and **THROTTLE / PHONE** cards. Green indicates tracked control; amber means waiting or holding. Video disappears after a second without fresh frames. Phone loss does not interrupt laptop input. Game sockets reconnect automatically when a tracker returns; if a camera worker exits, the other stays running and the terminal tells you to restart the launcher. Q in the Python window stops both cameras; closing the combined launcher's game also releases them.
+
+Optional measured lens profiles are separate: `./tools/dual_camera_tracker.sh --yoke-intrinsics laptop.json --throttle-intrinsics phone.json`. Use profiles calibrated for each selected camera and resolution; see [lens calibration](camera-calibration.md).
 
 ## Relative throttle: your three tags
 
@@ -47,7 +69,7 @@ In a second terminal, launch the updated game:
 
 Return from the setup panel and choose Play. Tracking is already enabled by `--stickers`; alternatively press **C** in an ordinary game launch and enable tracking. **Arrow keys steer while camera throttle stays active. W/S explicitly takes over power and disables camera controls.** Re-enable tracking in the setup panel to use the physical throttle again.
 
-To use both the yoke and relative throttle:
+For a legacy single-camera setup with both the yoke and relative throttle:
 
 ```sh
 ./tools/tracker.sh --camera 0 --paper-test

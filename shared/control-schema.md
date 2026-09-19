@@ -83,3 +83,7 @@ Roll and pitch endpoints are raw orientation angles in degrees. Each axis requir
 `--simulate --loss-demo` supplies a deterministic 20-second loop for integration testing: yoke is absent at 8–11 s; throttle is absent at 13–16 s. It never accesses a camera. See `docs/vision-setup.md` for setup and known limits.
 
 Keyboard steering while the yoke is absent preserves throttle tracking. W/S explicitly releases camera input. In paper-test flight, automatic speed stops after the first valid relative throttle observation and stays off through marker loss until a flight restart.
+
+## Two-camera routing
+
+`vision/dual_camera.py` runs independent workers: laptop `--paper-test --yoke-only` on 8765 and phone `--throttle-only --no-preview` on 8766. Each uses this same packet schema and its own `/preview` endpoint. Suppressed roles have zero confidence; phone workers never emit weapon switches. In game `--dual-cameras` selects yoke and weapons exclusively from 8765 and throttle exclusively from 8766, even if a worker sends conflicting values. Each connection has independent sequencing, stale detection and reconnection. Disabling tracking closes both control and preview connections. Preview frames never enter the control JSON.

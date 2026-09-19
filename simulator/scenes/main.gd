@@ -39,6 +39,8 @@ var flight_kind := "demo"
 var mission: DemoMission = Mission.new()
 var flight: FlightDynamics = Dynamics.new()
 var vision: VisionClient = Vision.new()
+var throttle_vision: VisionClient = Vision.new()
+var dual_cameras := false
 var world: Node3D
 var route_id := "sf"
 var aircraft: Node3D
@@ -126,6 +128,11 @@ func _ready() -> void:
 		elif arg=="--combat": flight_kind = "combat"; start = true
 		elif arg=="--demo": flight_kind = "demo"; start = true
 		elif arg=="--cockpit": cockpit = true
+		elif arg=="--dual-cameras":
+			dual_cameras = true
+			throttle_vision.endpoint = "ws://127.0.0.1:8766"
+			vision.enabled = true
+			mouse_yoke = false
 		elif arg=="--stickers":
 			vision.enabled = true
 			mouse_yoke = false
@@ -292,9 +299,19 @@ func on_action(action: String) -> void:
 			world.visible = false; aircraft.visible = false; fighter_fx.visible = false; cockpit_frame.set_presentation_visible(false)
 			audio.radio.reset(); camera_rig.reset()
 
+func poll_camera_controls(dt: float) -> void:
+	vision.poll(dt)
+	throttle_vision.enabled = dual_cameras and vision.enabled
+	throttle_vision.poll(dt)
+	if dual_cameras and vision.enabled:
+		# Only the phone owns power. Laptop steering and switches remain independent.
+		vision.throttle = throttle_vision.throttle
+		vision.throttle_confidence = throttle_vision.throttle_confidence
+		vision.status = "LAPTOP YOKE: %s / PHONE POWER: %s" % ["LIVE" if vision.tracking else "WAITING", "LIVE" if vision.throttle_confidence > .4 else "HELD"]
+
 func _process(dt: float) -> void:
 	runtime += dt; toast_time = maxf(0,toast_time-dt)
-	vision.poll(dt);tutorial.tick(dt)
+	poll_camera_controls(dt);tutorial.tick(dt)
 	if vision.weapons_available and cv_weapon_revision!=vision.weapons_revision:
 		cv_weapon_revision=vision.weapons_revision;primary_latched=vision.primary_switch;salvo_latched=vision.salvo_switch
 	var paused: bool = mode=="paused" or overlay_visible()
@@ -588,5 +605,7 @@ func select_route(value: String) -> void:
 	save_settings()
 
 func _exit_tree() -> void:
+	vision.enabled = false
+	throttle_vision.enabled = false
 	tutorial.stop()
 	badge.close()

@@ -10,6 +10,7 @@ var zones: Dictionary = {}
 var hot := ""
 var clock := 0.0
 var camera_preview = preload("res://systems/camera_preview.gd").new()
+var throttle_preview = preload("res://systems/camera_preview.gd").new()
 const WHITE := Color(0.91,0.95,0.97)
 const MUTED := Color(0.70,0.82,0.85)
 const CYAN := Color(0.33,0.86,0.87)
@@ -24,10 +25,13 @@ func _ready() -> void:
 	if ResourceLoader.exists("res://assets/art/spectre-title.png"): title_art = load("res://assets/art/spectre-title.png")
 	mouse_filter = Control.MOUSE_FILTER_PASS
 func _process(dt: float) -> void:
-	if is_instance_valid(app): camera_preview.poll(app.vision.enabled, app.vision.endpoint)
+	if is_instance_valid(app):
+		camera_preview.poll(app.vision.enabled, app.vision.endpoint)
+		throttle_preview.poll(app.vision.enabled and app.dual_cameras, app.throttle_vision.endpoint)
 	clock += dt; queue_redraw()
 func _exit_tree() -> void:
 	camera_preview.close()
+	throttle_preview.close()
 func text(at: Vector2, value: String, size: int = 18, color: Color = WHITE, technical: bool = false) -> void:
 	if not app.text_hud and app.mode=="flight" and not app.overlay_visible() and not app.tutorial.active:return
 	draw_string(mono if technical else font,at+Vector2(0,1),value,HORIZONTAL_ALIGNMENT_LEFT,-1,maxi(size,12),Color(0.005,0.015,0.025,color.a*.85))
@@ -78,18 +82,21 @@ func _draw() -> void:
 	if app.calibration_visible: draw_camera_setup()
 	if app.credits_visible: draw_credits()
 func draw_camera_preview() -> void:
-	var card := Rect2(1300,780,264,192)
+	draw_preview_card(camera_preview, Rect2(1300,780,264,192), "YOKE / LAPTOP" if app.dual_cameras else "YOKE CAMERA", app.vision.tracking)
+	if app.dual_cameras:
+		draw_preview_card(throttle_preview, Rect2(1016,780,264,192), "THROTTLE / PHONE", app.vision.throttle_confidence > .4)
+
+func draw_preview_card(preview, card: Rect2, label: String, tracked: bool) -> void:
 	panel(card,.94)
-	var live: bool = camera_preview.texture != null
-	draw_circle(card.position+Vector2(14,16),3,GREEN if live else AMBER)
-	text(card.position+Vector2(25,21),"CAMERA" if live else "CAMERA / WAITING",12,WHITE,true)
-	text(card.position+Vector2(187,21),"LOCAL",12,MUTED,true)
+	var live: bool = preview.texture != null
+	draw_circle(card.position+Vector2(14,16),3,GREEN if tracked else AMBER)
+	text(card.position+Vector2(25,21),label,12,WHITE,true)
 	var area := Rect2(card.position+Vector2(8,30),Vector2(248,154))
 	draw_rect(area,Color(.005,.012,.02))
 	if live:
-		var native_size: Vector2 = camera_preview.texture.get_size()
+		var native_size: Vector2 = preview.texture.get_size()
 		var fitted: Vector2 = native_size * minf(area.size.x/native_size.x,area.size.y/native_size.y)
-		draw_texture_rect(camera_preview.texture,Rect2(area.position+(area.size-fitted)/2,fitted),false)
+		draw_texture_rect(preview.texture,Rect2(area.position+(area.size-fitted)/2,fitted),false)
 	else:
 		text(area.position+Vector2(25,80),"Waiting for webcam",15,MUTED)
 
@@ -293,7 +300,7 @@ func draw_clear_flight() -> void:
 	else:
 		text(Vector2(52,951),"POWER %d%%  ·  GEAR %s" % [int(f.throttle*100),"DOWN" if f.gear else "UP"],17,MUTED)
 		if c.active and c.engagement_enabled:
-			text(Vector2(960 if app.vision.enabled else 1090,951),"SPACE  FIRE    T  MISSILE",17,MUTED)
+			text(Vector2(700 if app.dual_cameras else 960 if app.vision.enabled else 1090,951),"SPACE  FIRE    T  MISSILE",17,MUTED)
 			text(Vector2(680,170),"MISSILE LOCK" if c.lock_progress>=1 else "",20,GREEN)
 	if c.incoming_distance<2200: text(Vector2(610,210),"MISSILE INBOUND — Z FLARES",20,DANGER)
 	if f.stall_time>.6: text(Vector2(660,250),"STALL — LOWER NOSE",20,AMBER)
@@ -373,7 +380,7 @@ func draw_camera_setup() -> void:
 	zones.clear(); dim(); panel(Rect2(370,175,860,650),.97)
 	text(Vector2(421,236),"CARDBOARD / LOCAL INPUT",13,CYAN,true)
 	text(Vector2(419,291),"Your cockpit. Your aircraft.",32,WHITE)
-	var lines: Array[String] = ["1. Start tools/tracker.sh --camera 0 --paper-test.","2. Hold yoke 7 steady; throttle tags: 0 idle, 1 slider, 2 full.","3. Enable tracking below, then centre the yoke.","Throttle alone: use --throttle-only; arrows steer, W/S takes over.","Keep all three throttle tags flat and visible to the camera."]
+	var lines: Array[String] = ["1. Open Launch Two-Camera Cockpit.command." if app.dual_cameras else "1. Start tools/tracker.sh --camera INDEX --paper-test.","2. Hold yoke 7 steady; throttle tags: 0 idle, 1 slider, 2 full.","3. Laptop sees the yoke; phone sees all three throttle tags." if app.dual_cameras else "3. Enable tracking below, then centre the yoke.","Throttle alone: use --throttle-only; arrows steer, W/S takes over.","Keep all three throttle tags flat and visible to the camera."]
 	for i in range(lines.size()): text(Vector2(423,345+i*42),lines[i],17,MUTED if i>2 else WHITE)
 	text(Vector2(423,586),app.vision.status,13,CYAN if app.vision.tracking else AMBER,true)
 	text(Vector2(423,626),"ROLL %+.2f / PITCH %+.2f / POWER %03d%%" % [app.vision.yoke.x,app.vision.yoke.y,int(app.vision.throttle*100)],15,WHITE,true)

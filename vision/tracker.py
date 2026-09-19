@@ -538,8 +538,11 @@ async def run(args):
                         if wizard:
                             wizard.width, wizard.height = frame.shape[1], frame.shape[0]
                         yoke, throttle = detector.detect(frame, frame_start, not args.no_preview)
-                        if args.throttle_only:
-                            yoke = None
+                # Roles are enforced before filtering, even if the other tags are visible.
+                if args.throttle_only:
+                    yoke = None
+                if args.yoke_only:
+                    throttle = None
                 if wizard:
                     wizard.observe(yoke, throttle)
                     yoke = throttle = None
@@ -549,7 +552,7 @@ async def run(args):
                 for axis in ("roll", "pitch"):
                     gain = args.yoke_sensitivity * (args.bank_scale if axis == "roll" else 1.0)
                     packet["yoke"][axis] = clamp(packet["yoke"][axis] * gain, -1, 1)
-                weapons = weapon_switches.step(getattr(detector,"weapon_observations",{}) if frame is not None and not wizard else {}, time.monotonic())
+                weapons = weapon_switches.step(getattr(detector,"weapon_observations",{}) if frame is not None and not wizard and not args.throttle_only else {}, time.monotonic())
                 if weapon_switches.configured and not wizard:
                     packet['weapons'] = weapons
                 serialized = json.dumps(packet, allow_nan=False, separators=(",", ":"))
@@ -614,7 +617,9 @@ def parser():
     result.add_argument("--intrinsics", type=Path, metavar="JSON", help="Load measured lens profile, or save here with --calibrate-lens")
     result.add_argument("--calibrate", action="store_true", help="Run the five-step yoke calibration; throttle endpoints are tracked live")
     result.add_argument("--paper-test", action="store_true", help="Auto-center yoke 7, with optional relative throttle tags 0/1/2")
-    result.add_argument("--throttle-only", action="store_true", help="Track throttle 0/1/2 without yoke calibration; steer in game with keyboard")
+    roles = result.add_mutually_exclusive_group()
+    roles.add_argument("--yoke-only", action="store_true", help="Ignore throttle tags; use a separate camera for power")
+    roles.add_argument("--throttle-only", action="store_true", help="Track throttle 0/1/2 without yoke calibration; steer in game with keyboard")
     result.add_argument("--calibration", type=Path, default=DEFAULT_CALIBRATION)
     result.add_argument("--no-preview", action="store_true", help="Hide camera/debug window after calibration")
     result.add_argument("--print-json", action="store_true", help="Print every normalized packet for inspection")
