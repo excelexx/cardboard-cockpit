@@ -2,7 +2,7 @@ extends SceneTree
 func _initialize() -> void: call_deferred("run")
 func run() -> void:
 	var app=load("res://scenes/main.tscn").instantiate()
-	root.add_child(app)
+	app.set_meta("route_override","coast"); root.add_child(app)
 	await process_frame
 	app.set_process(false)
 	app.set_physics_process(false)
@@ -16,7 +16,7 @@ func run() -> void:
 	app.on_action("guided")
 	print("PREPARATION_MS ",(Time.get_ticks_usec()-start)/1000.0)
 	var samples: Array[float]=[]
-	var stage: String=app.mission.phase
+	var stage: int=app.mission.route_index
 	var rendered: bool="--render" in OS.get_cmdline_user_args()
 	var render_samples: Array[float]=[]
 	var render_start: int=Time.get_ticks_usec()
@@ -26,9 +26,9 @@ func run() -> void:
 		if frame%6==0: app._process(1.0/60.0)
 		var ms: float=(Time.get_ticks_usec()-start)/1000.0
 		samples.append(ms)
-		if app.mission.phase!=stage:
-			stage=app.mission.phase
-			print("UPGRADE_CPU_MS stage=",stage," ms=",ms)
+		if app.mission.route_index!=stage:
+			stage=app.mission.route_index
+			print("CHECKPOINT_CPU_MS index=",stage," ms=",ms)
 		if rendered and frame%6==0:
 			await process_frame
 			var interval: float=(Time.get_ticks_usec()-render_start)/1000.0

@@ -1,4 +1,4 @@
-extends "res://scenes/world.gd"
+extends "res://scenes/coastal_base_world.gd"
 var elevation_samples:=PackedFloat32Array()
 const VILLAGES: Array[Vector2]=[Vector2(1750,-2650),Vector2(2050,-8450),Vector2(1900,-10200),Vector2(2150,-12300),Vector2(2100,-1450)]
 var village_home_count: int=0
@@ -116,7 +116,7 @@ func build() -> void:
 	sea.mesh=plane
 	sea.position=Vector3(0,-8.5,-7500)
 	var water:=ShaderMaterial.new()
-	water.shader=load("res://assets/environment/water.gdshader")
+	water.shader=load("res://assets/environment/coastal/water.gdshader")
 	sea.material_override=water
 	add_child(sea)
 	_build_airport(0,"AZURE AIR STATION","36","18")
@@ -345,6 +345,6 @@ func _shore_details() -> void:
 func cloud_immersion(_at: Vector3) -> float: return 0.0
 
 func apply_quality(high: bool) -> void:
+	super.apply_quality(high)
 	if _environment==null: return
-	_environment.environment.ssao_enabled=high
 	_sun.directional_shadow_max_distance=3500 if high else 2000

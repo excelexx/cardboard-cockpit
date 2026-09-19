@@ -14,3 +14,11 @@ a*=.82/max(np.max(np.abs(a)),.01)
 with wave.open(str(p/'gatling_loop.wav'),'wb') as w:
     w.setnchannels(channels);w.setsampwidth(2);w.setframerate(rate);w.writeframes((a*32767).astype('<i2').tobytes())
 print('GATLING_LOOP',len(a)/rate,rate,channels)
+# A short mechanical onset gives individual trigger presses a crisp attack.
+attack=samples[int(.16*rate):int(.245*rate)].copy()
+envelope=np.minimum(np.arange(len(attack))/(rate*.002),1)*np.maximum(0,1-np.arange(len(attack))/len(attack))**1.8
+attack*=envelope[:,None]
+attack*=.88/max(np.max(np.abs(attack)),.01)
+with wave.open(str(p/'gatling_attack.wav'),'wb') as w:
+    w.setnchannels(channels);w.setsampwidth(2);w.setframerate(rate);w.writeframes((attack*32767).astype('<i2').tobytes())
+print('GATLING_ATTACK',len(attack)/rate)

@@ -80,8 +80,8 @@ func _ready() -> void:
 		wind.play()
 		tone.stream = make_sound(0.22, true)
 		player.play()
-		for effect_name: String in ["cannon","missile","explosion","impact","flare","eject","sonic","gear_motor","flap_motor","touchdown_tires","touchdown_thump"]:
-			effects[effect_name] = load("res://assets/audio/%s.%s" % [effect_name,"wav" if effect_name in ["cannon","gear_motor","flap_motor","touchdown_tires","touchdown_thump","sonic"] else "ogg"])
+		for effect_name: String in ["gatling_attack","cannon","missile","explosion","impact","flare","eject","sonic","gear_motor","flap_motor","touchdown_tires","touchdown_thump"]:
+			effects[effect_name] = load("res://assets/audio/%s.%s" % [effect_name,"wav" if effect_name in ["gatling_attack","cannon","gear_motor","flap_motor","touchdown_tires","touchdown_thump","sonic"] else "ogg"])
 		for index in range(12):
 			var effect := AudioStreamPlayer.new()
 			add_child(effect)

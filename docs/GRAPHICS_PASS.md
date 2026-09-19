@@ -1,3 +1,5 @@
+> Historical graphics-branch report. The integrated SPECTRE 0.9 release preserves this scenery and the original alpine route; current checks are in [verification](verification.md). The older campaign/loadout references below describe the source branch.
+
 # Photographic scenery and frame consistency — September 19, 2026
 
 Replaced the generated grid with two City of Helsinki photogrammetry districts: 128 base tiles plus 256 near-detail tiles, approximately 63 MB of GLBs available offline. Real USGS/Mapzen elevation supplies the mountain relief, rescaled into the fictional coast. Three baked fir silhouettes populate forests; nearby street trees and shoreline rocks retain their textured 3D models. Irregular water normals and depth-based shallows replace the repeating wave pattern. Concrete slab joints, photographic asphalt, touchdown rubber and instanced parked F-35s detail the airfield.

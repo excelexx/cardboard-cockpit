@@ -1,43 +1,25 @@
 shader_type spatial;
 render_mode cull_disabled;
-
 varying vec3 world_position;
-uniform bool glacial = false;
-uniform sampler2D scene_depth : hint_depth_texture, repeat_disable, filter_nearest;
-float hash(vec2 p) {
-	vec3 q=fract(vec3(p.xyx)*0.1031);
-	q+=dot(q,q.yzx+33.33);
-	return fract((q.x+q.y)*q.z);
+float hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float noise(vec2 p) {
+	vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
+	return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);
 }
-// Value plus analytic derivatives: irregular wind ripples without a checkerboard.
-vec3 wave_noise(vec2 p) {
-	vec2 i=floor(p), f=fract(p);
-	vec2 u=f*f*(3.0-2.0*f), du=6.0*f*(1.0-f);
-	float a=hash(i), b=hash(i+vec2(1,0)), c=hash(i+vec2(0,1)), d=hash(i+vec2(1));
-	float k=a-b-c+d;
-	return vec3(a+(b-a)*u.x+(c-a)*u.y+k*u.x*u.y,du.x*(b-a+k*u.y),du.y*(c-a+k*u.x));
+float height(vec2 p,float footprint) {
+	p += vec2(TIME*.7,TIME*.23);
+	return noise(p*.13)*.42*(1.0-smoothstep(.3,.8,footprint*.13))+noise(p*.43+vec2(7.3))*.12*(1.0-smoothstep(.3,.8,footprint*.43))+noise(p*1.07)*.026*(1.0-smoothstep(.3,.8,footprint*1.07));
 }
-void vertex() {
-	world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-}
+void vertex() { world_position=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz; }
 void fragment() {
 	vec2 p=world_position.xz;
-	vec3 swell=wave_noise(p*0.018+vec2(TIME*0.04,TIME*0.025));
-	vec3 ripple=wave_noise(p*0.19+vec2(-TIME*0.09,TIME*0.13));
-	vec3 fine=wave_noise(p*0.73+vec2(TIME*0.2,-TIME*0.16));
-	float distance_fade=1.0-smoothstep(200.0,2000.0,length(VERTEX));
-	vec2 gradient=swell.yz*0.026+ripple.yz*0.024+fine.yz*0.011*distance_fade;
-	NORMAL=normalize((VIEW_MATRIX*vec4(normalize(vec3(-gradient.x,1.0,-gradient.y)),0.0)).xyz);
-	float depth=texture(scene_depth,SCREEN_UV).r;
-	vec4 below=INV_PROJECTION_MATRIX*vec4(SCREEN_UV*2.0-1.0,depth,1.0);
-	below/=below.w;
-	float thickness=max(0.0,VERTEX.z-below.z);
-	float shallow=exp(-thickness*0.12);
-	vec3 deep_color=glacial ? vec3(0.012,0.10,0.15) : vec3(0.009,0.028,0.036);
-	ALBEDO=mix(deep_color,vec3(0.075,0.19,0.16),shallow);
-	float foam=(1.0-smoothstep(0.15,1.4,thickness)) * smoothstep(0.32,0.7,ripple.x);
-	ALBEDO=mix(ALBEDO,vec3(0.55,0.62,0.60),foam*0.75);
-	ROUGHNESS=0.22+foam*0.5;
-	METALLIC=0.0;
-	SPECULAR=0.5;
+	float footprint=max(length(dFdx(p)),length(dFdy(p)));
+	float h=height(p,footprint);
+	vec3 normal_world=normalize(vec3((h-height(p+vec2(.2,0),footprint))*2.8,1.0,(h-height(p+vec2(0,.2),footprint))*2.8));
+	NORMAL=normalize((VIEW_MATRIX*vec4(normal_world,0.0)).xyz);
+	float centre=1030.0+sin(p.y*.00034)*170.0+sin(p.y*.00091)*60.0;
+	float width=113.0+470.0*exp(-pow((p.y+7000.0)/2550.0,2.0))+200.0*exp(-pow((p.y+19000.0)/2300.0,2.0));
+	float shallows=smoothstep(width-65.0,width+70.0,abs(p.x-centre));
+	ALBEDO=mix(vec3(.008,.041,.054),vec3(.048,.115,.106),shallows);
+	METALLIC=0.0; ROUGHNESS=.14+smoothstep(1.0,15.0,footprint)*.13+shallows*.04; SPECULAR=.55;
 }

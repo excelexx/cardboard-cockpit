@@ -7,7 +7,7 @@ func check(ok: bool,message: String) -> void:
 	if not ok: failures.append(message)
 func run() -> void:
 	var app=load("res://scenes/main.tscn").instantiate()
-	root.add_child(app)
+	app.set_meta("route_override","coast"); root.add_child(app)
 	await process_frame
 	app.set_process(false)
 	app.set_physics_process(false)
@@ -75,7 +75,8 @@ func run() -> void:
 			app.flight.pitch=-0.04
 			app.mission.route_index=4
 			app.mission.phase="combat"
-			app.cockpit=shot.name=="city-cockpit"
+			app.cockpit = shot.name=="city-cockpit"
+			app.apply_aircraft_pose(); app.camera_rig.reset()
 			app._process(1.0/60.0)
 			if shot.name!="city-cockpit":
 				app.aircraft.visible=false
