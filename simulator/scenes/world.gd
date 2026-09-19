@@ -31,6 +31,10 @@ var _forest_transforms: Array[Transform3D] = []
 var _forest_shadow: MultiMeshInstance3D
 var _shadow_refresh := 0.0
 var _quality_high := true
+var _height_cache := PackedFloat32Array()
+var _height_columns := 0
+var _height_rows := 0
+var _forest_cells: Dictionary = {}
 
 
 func _init() -> void:
@@ -61,6 +65,7 @@ func build() -> void:
 	_build_airport(0.0, "NORTHSTAR", "36", "18")
 	_build_airport(DESTINATION_Z, "NORTH FIELD", "36", "18")
 	_build_forests()
+	_build_shore_details()
 	_build_valley_landmarks()
 
 
@@ -70,7 +75,10 @@ func _smooth(a: float, b: float, value: float) -> float:
 
 
 func _river_center(z: float) -> float:
-	return 1560.0 + sin(z * 0.00034) * 270.0 + sin(z * 0.00091) * 90.0
+	return 1030.0 + sin(z * 0.00034) * 170.0 + sin(z * 0.00091) * 60.0
+
+func _river_width(z: float) -> float:
+	return 113.0+470.0*exp(-pow((z+7000)/2550.0,2))+200.0*exp(-pow((z+19000)/2300.0,2))
 
 
 func _terrain_height(x: float, z: float) -> float:
@@ -80,14 +88,20 @@ func _terrain_height(x: float, z: float) -> float:
 	var mountain_weight: float = maxf(_smooth(1350.0, 5100.0, absf(x)), end_weight)
 	var ridge: float = 1.0 - absf(_noise.get_noise_2d(x + 2810.0, z - 5400.0))
 	var floor_height: float = -2.0 + broad * 23.0 + detail * 5.0
-	var elevation: float = floor_height + mountain_weight * (1050.0 + broad * 1450.0 + pow(ridge, 3.0) * 1480.0)
+	var sharp_detail: float = 260.0*_detail_noise.get_noise_2d(x*.65,z*.65)
+	var elevation: float = floor_height + mountain_weight * (1180.0 + broad * 1450.0 + pow(ridge, 3.0) * 1480.0+sharp_detail)
 	# Both airports have a generous level safety area and smooth earth embankments.
 	var nearest_airport: float = minf(absf(z), absf(z - DESTINATION_Z))
 	var airport_weight: float = (1.0 - _smooth(1050.0, 1370.0, absf(x))) * (1.0 - _smooth(1900.0, 2600.0, nearest_airport))
 	elevation = lerpf(elevation, -0.20, airport_weight)
 	var river_distance: float = absf(x - _river_center(z))
-	var river_weight: float = (1.0 - _smooth(75.0, 205.0, river_distance)) * (1.0 - end_weight)
+	var river_weight: float = (1.0 - _smooth(_river_width(z)-35, _river_width(z)+75, river_distance)) * (1.0 - end_weight)
 	elevation = lerpf(elevation, -23.0, river_weight)
+	for island_z in [-5200.0,-6500.0,-7550.0,-8300.0,-17600.0]:
+		if absf(z-island_z)>260: continue
+		var island_x: float = _river_center(island_z)+sin(island_z)*180
+		var island: float = Vector2((x-island_x)/120,(z-island_z)/230).length()
+		elevation += (1-_smooth(.35,1,island))*35
 	return elevation
 
 
@@ -137,27 +151,29 @@ func _cylinder(parent: Node3D, title: String, position_value: Vector3, radius: f
 
 
 func _build_atmosphere() -> void:
-	var sky_material: PanoramaSkyMaterial = PanoramaSkyMaterial.new()
-	sky_material.panorama = load("res://assets/environment/kloppenheim_06_puresky_2k.hdr") as Texture2D
-	sky_material.energy_multiplier = 0.50
-	var sky: Sky = Sky.new()
+	var sky_material := ShaderMaterial.new()
+	sky_material.shader = load("res://assets/environment/sunset_sky.gdshader")
+	sky_material.set_shader_parameter("panorama",load("res://assets/environment/alpine-sunset.png"))
+	sky_material.set_shader_parameter("front_clouds",load("res://assets/environment/alpine-cloud-front.png"))
+	var sky := Sky.new()
 	sky.sky_material = sky_material
-	sky.radiance_size = Sky.RADIANCE_SIZE_256
+	sky.radiance_size = Sky.RADIANCE_SIZE_512
 	_condition_skies["golden"] = sky
 	_condition_skies["clear"] = _make_weather_sky(false)
 	_condition_skies["overcast"] = _make_weather_sky(true)
 	var environment: Environment = Environment.new()
 	environment.background_mode = Environment.BG_SKY
 	environment.sky = sky
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	environment.ambient_light_energy = 0.25
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.ambient_light_color = Color(.48,.56,.67)
+	environment.ambient_light_energy = 0.90
 	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	environment.tonemap_exposure = 0.85
+	environment.tonemap_exposure = 0.98
 	environment.fog_enabled = true
 	environment.fog_light_color = Color(0.62, 0.73, 0.80)
 	environment.fog_light_energy = 0.85
-	environment.fog_density = 0.000026
-	environment.fog_aerial_perspective = 0.78
+	environment.fog_density = 0.000041
+	environment.fog_aerial_perspective = 0.92
 	environment.fog_sky_affect = 0.12
 	_environment = WorldEnvironment.new()
 	_environment.name = "MountainAtmosphere"
@@ -165,7 +181,7 @@ func _build_atmosphere() -> void:
 	add_child(_environment)
 	_sun = DirectionalLight3D.new()
 	_sun.name = "ValleySun"
-	_sun.directional_shadow_max_distance = 2400.0
+	_sun.directional_shadow_max_distance = 5000.0
 	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	_sun.shadow_bias = 0.04
 	_sun.shadow_normal_bias = 1.2
@@ -221,15 +237,15 @@ func set_conditions(preset: String) -> void:
 			environment.fog_aerial_perspective = 0.86
 			environment.fog_sky_affect = 0.22
 		_:
-			_sun.rotation_degrees = Vector3(-22.0, -48.0, 0.0)
+			_sun.rotation_degrees = Vector3(-12.0, 152.0, 0.0)
 			_sun.light_color = Color(1.0, 0.85, 0.66)
-			_sun.light_energy = 1.65
-			environment.ambient_light_energy = 0.25
-			environment.tonemap_exposure = 0.85
+			_sun.light_energy = 1.1
+			environment.ambient_light_energy = 0.90
+			environment.tonemap_exposure = 0.98
 			environment.fog_light_color = Color(0.62, 0.73, 0.80)
 			environment.fog_light_energy = 0.85
-			environment.fog_density = 0.000026
-			environment.fog_aerial_perspective = 0.78
+			environment.fog_density = 0.000041
+			environment.fog_aerial_perspective = 0.92
 			environment.fog_sky_affect = 0.12
 
 
@@ -272,6 +288,10 @@ func _terrain_color(x: float, z: float, h: float, normal: Vector3) -> Color:
 func _build_terrain() -> void:
 	var columns: int = int(ceil((TERRAIN_X_MAX - TERRAIN_X_MIN) / TERRAIN_STEP)) + 1
 	var rows: int = int(ceil((TERRAIN_Z_MAX - TERRAIN_Z_MIN) / TERRAIN_STEP)) + 1
+	_height_columns = columns; _height_rows = rows
+	_height_cache.resize(columns*rows)
+	for row in range(rows):
+		for column in range(columns): _height_cache[row*columns+column] = _terrain_height(TERRAIN_X_MIN+column*TERRAIN_STEP,TERRAIN_Z_MIN+row*TERRAIN_STEP)
 	var vertices: PackedVector3Array = PackedVector3Array()
 	var normals: PackedVector3Array = PackedVector3Array()
 	var colors: PackedColorArray = PackedColorArray()
@@ -283,12 +303,12 @@ func _build_terrain() -> void:
 		var z: float = TERRAIN_Z_MIN + row * TERRAIN_STEP
 		for column in range(columns):
 			var x: float = TERRAIN_X_MIN + column * TERRAIN_STEP
-			var h: float = _terrain_height(x, z)
-			var normal: Vector3 = Vector3(_terrain_height(x - TERRAIN_STEP, z) - _terrain_height(x + TERRAIN_STEP, z), TERRAIN_STEP * 2.0, _terrain_height(x, z - TERRAIN_STEP) - _terrain_height(x, z + TERRAIN_STEP)).normalized()
+			var h: float = _height_at_grid(column,row)
+			var normal: Vector3 = Vector3(_height_at_grid(column-1,row)-_height_at_grid(column+1,row),TERRAIN_STEP*2,_height_at_grid(column,row-1)-_height_at_grid(column,row+1)).normalized()
 			var index: int = row * columns + column
 			vertices[index] = Vector3(x, h, z)
 			normals[index] = normal
-			colors[index] = _terrain_color(x, z, h, normal)
+			colors[index] = Color.WHITE
 	for row in range(rows - 1):
 		for column in range(columns - 1):
 			var a: int = row * columns + column
@@ -307,7 +327,7 @@ func _build_terrain() -> void:
 	var material: ShaderMaterial = ShaderMaterial.new()
 	material.shader = load("res://assets/environment/terrain.gdshader") as Shader
 	material.set_shader_parameter("grass_texture", load("res://assets/environment/aerial_grass_rock_diff_1k.jpg"))
-	material.set_shader_parameter("rock_texture", load("res://assets/environment/aerial_rocks_02_diff_1k.jpg"))
+	material.set_shader_parameter("rock_texture", load("res://assets/environment/alpine-granite.png"))
 	var terrain: MeshInstance3D = MeshInstance3D.new()
 	terrain.name = "AlpineTerrain"
 	terrain.mesh = terrain_mesh
@@ -324,7 +344,7 @@ func _build_river() -> void:
 	for i in range(count):
 		var z: float = -25500.0 + i * 70.0
 		var center: float = _river_center(z)
-		var width: float = 113.0 + sin(z * 0.002) * 8.0
+		var width: float = _river_width(z)+110+sin(z*.002)*7
 		vertices.append(Vector3(center - width, RIVER_Y, z))
 		vertices.append(Vector3(center + width, RIVER_Y, z))
 		normals.append(Vector3.UP)
@@ -530,90 +550,61 @@ func _build_windsock(airport: Node3D, at: Vector3) -> void:
 
 
 func _make_tree_mesh() -> ArrayMesh:
-	var surface: SurfaceTool = SurfaceTool.new()
-	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	# Asymmetric layered conifers: shared geometry is instanced across the valley.
-	var bark: Color = Color(0.22, 0.20, 0.16)
-	var leaves: Array[Color] = [Color(0.14, 0.23, 0.16), Color(0.17, 0.27, 0.18), Color(0.20, 0.29, 0.20)]
-	for segment in range(7):
-		var angle_a: float = segment * TAU / 7.0
-		var angle_b: float = (segment + 1) * TAU / 7.0
-		var a: Vector3 = Vector3(cos(angle_a) * 0.35, 0.0, sin(angle_a) * 0.35)
-		var b: Vector3 = Vector3(cos(angle_b) * 0.35, 0.0, sin(angle_b) * 0.35)
-		var c: Vector3 = b + Vector3(0.0, 9.0, 0.0)
-		var d: Vector3 = a + Vector3(0.0, 9.0, 0.0)
-		for point in [a, b, c, a, c, d]:
-			surface.set_color(bark)
-			surface.add_vertex(point)
-	for layer in range(4):
-		var bottom: float = 3.0 + layer * 3.0
-		var radius: float = 4.5 - layer * 0.84
-		var tip: Vector3 = Vector3(0.16 * sin(layer * 2.1), bottom + 7.0 - layer * 0.6, 0.1)
-		for segment in range(10):
-			var angle_a: float = segment * TAU / 10.0
-			var angle_b: float = (segment + 1) * TAU / 10.0
-			var a: Vector3 = Vector3(cos(angle_a) * radius, bottom + sin(angle_a * 3.0) * 0.4, sin(angle_a) * radius)
-			var b: Vector3 = Vector3(cos(angle_b) * radius, bottom + sin(angle_b * 3.0) * 0.4, sin(angle_b) * radius)
-			for point in [a, tip, b]:
-				surface.set_color(leaves[(segment + layer) % leaves.size()])
-				surface.add_vertex(point)
-	surface.generate_normals()
+	var surface := SurfaceTool.new(); surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for index in range(3):
+		var basis := Basis(Vector3.UP,index*PI/3)
+		for item: Array in [[Vector3(-8,0,0),Vector2(0,1)],[Vector3(-8,24,0),Vector2(0,0)],[Vector3(8,24,0),Vector2(1,0)],[Vector3(-8,0,0),Vector2(0,1)],[Vector3(8,24,0),Vector2(1,0)],[Vector3(8,0,0),Vector2(1,1)]]:
+			surface.set_uv(item[1]); surface.set_normal(basis*Vector3(0,.25,1).normalized()); surface.add_vertex(basis*item[0])
 	return surface.commit()
 
+func _tree_variation(at: Vector3) -> float:
+	var value: int = (roundi(at.x*8)*73856093) ^ (roundi(at.z*8)*19349663)
+	return float(absi(value%1000))/1000.0
 
 func _build_forests() -> void:
-	var transforms: Array[Transform3D] = []
-	var groves: Array[Vector2] = []
-	for grove_index in range(100):
-		var side: float = -1.0 if grove_index % 2 == 0 else 1.0
-		groves.append(Vector2(side * (_rng.randf_range(180.0, 850.0) if grove_index%3==0 else _rng.randf_range(850.0, 4100.0)), _rng.randf_range(-22000.0, 5700.0)))
-	for attempt in range(39000):
-		var x: float = _rng.randf_range(-9100.0, 9200.0)
-		var z: float = _rng.randf_range(-23800.0, 7400.0)
-		if attempt >= 9000:
-			var grove: Vector2 = groves[int((attempt - 9000) / 300)]
-			var radius: float = sqrt(_rng.randf()) * 245.0
-			var angle: float = _rng.randf_range(0.0, TAU)
-			x = grove.x + cos(angle) * radius
-			z = grove.y + sin(angle) * radius
-		var h: float = ground_height(x, z)
-		var nearest_airport: float = minf(absf(z), absf(z - DESTINATION_Z))
-		if absf(x) < 140.0 or (absf(x) < 1180.0 and nearest_airport < 2580.0):
-			continue
-		if h < -15.0 or h > 1600.0 or absf(x - _river_center(z)) < 215.0:
-			continue
-		var forest_density: float = _noise.get_noise_2d(x * 3.0 + 1200.0, z * 3.0)
-		if forest_density < -0.14:
-			continue
-		var size: float = _rng.randf_range(1.0, 2.5) * (1.0 - _smooth(950.0, 1750.0, h) * 0.5)
-		var basis: Basis = Basis(Vector3.UP, _rng.randf_range(0.0, TAU)).scaled(Vector3(size, size * _rng.randf_range(0.9, 1.2), size))
-		transforms.append(Transform3D(basis, Vector3(x, h - 0.5, z)))
-	var material: StandardMaterial3D = _mat("trees", Color.WHITE)
-	material.vertex_color_use_as_albedo = true
-	material.vertex_color_is_srgb = true
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var mesh: ArrayMesh = _make_tree_mesh()
-	mesh.surface_set_material(0, material)
-	var multimesh: MultiMesh = MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	multimesh.mesh = mesh
-	multimesh.instance_count = transforms.size()
-	for index in range(transforms.size()):
-		multimesh.set_instance_transform(index, transforms[index])
-	var forest: MultiMeshInstance3D = MultiMeshInstance3D.new()
-	forest.name = "AlpineConiferForest"
-	forest.multimesh = multimesh
-	forest.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(forest)
-	_forest_transforms = transforms
+	var cells: Dictionary = {}
+	for grid_z in range(-21000,3400,22):
+		for grid_x in range(-3300,3300,22):
+			var x: float = grid_x+_rng.randf_range(-7,7)
+			var z: float = grid_z+_rng.randf_range(-7,7)
+			var h: float = ground_height(x,z)
+			var airport: float = minf(absf(z),absf(z-DESTINATION_Z))
+			if (absf(x)<760 and airport<1920) or (absf(x)<120 and (z<-10000 or z>-2400)): continue
+			if x>-1500 and x<-700 and z>-8500 and z<-6800: continue
+			if absf(x-(-640+sin(z*.00038)*75))<14: continue
+			if h < -7.0 or h>1850: continue
+			if _noise.get_noise_2d(x*2+1200,z*2)<-.35: continue
+			var size: float = _rng.randf_range(1.8,2.7)*(1-_smooth(1250,2000,h)*.45)
+			var basis := Basis(Vector3.UP,_rng.randf()*TAU).scaled(Vector3(size,size*_rng.randf_range(.9,1.2),size))
+			var transform := Transform3D(basis,Vector3(x,h-.5,z))
+			_forest_transforms.append(transform)
+			var key := Vector2i(floori(x/1400),floori(z/1400))
+			if not cells.has(key): cells[key] = []
+			cells[key].append(transform)
+	_forest_cells = cells
+	var material := ShaderMaterial.new()
+	material.shader = load("res://assets/environment/foliage.gdshader")
+	material.set_shader_parameter("foliage",load("res://assets/environment/alpine-fir.png"))
+	material.set_shader_parameter("foliage_b",load("res://assets/environment/alpine-fir-b.png"))
+	var mesh := _make_tree_mesh(); mesh.surface_set_material(0,material)
+	for key: Vector2i in cells:
+		var transforms: Array = cells[key]
+		var forest := MultiMeshInstance3D.new(); forest.name = "Conifers_%s_%s" % [key.x,key.y]
+		var multimesh := MultiMesh.new(); multimesh.transform_format = MultiMesh.TRANSFORM_3D
+		multimesh.mesh = mesh; multimesh.use_custom_data = true; multimesh.instance_count = transforms.size()
+		var origin := Vector3(key.x*1400,0,key.y*1400)
+		for i in range(transforms.size()):
+			var transform: Transform3D = transforms[i]; transform.origin -= origin
+			multimesh.set_instance_transform(i,transform)
+			multimesh.set_instance_custom_data(i,Color(_tree_variation(transforms[i].origin),0,0,0))
+		forest.multimesh = multimesh; forest.position = origin
+		forest.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		forest.visibility_range_end = 9500
+		add_child(forest)
 	_forest_shadow = MultiMeshInstance3D.new()
-	var shadow_mesh := MultiMesh.new()
-	shadow_mesh.transform_format = MultiMesh.TRANSFORM_3D
-	shadow_mesh.mesh = mesh
-	shadow_mesh.instance_count = 400
-	shadow_mesh.visible_instance_count = 0
-	_forest_shadow.multimesh = shadow_mesh
-	_forest_shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+	var shadow_mesh := MultiMesh.new(); shadow_mesh.transform_format = MultiMesh.TRANSFORM_3D
+	shadow_mesh.mesh = mesh; shadow_mesh.use_custom_data = true; shadow_mesh.instance_count = 700; shadow_mesh.visible_instance_count = 0
+	_forest_shadow.multimesh = shadow_mesh; _forest_shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 	add_child(_forest_shadow)
 
 
@@ -713,6 +704,10 @@ func _batch_static_geometry(parent: Node3D) -> void:
 func is_runway(x: float, z: float) -> bool:
 	return absf(x) <= 50.0 and minf(absf(z), absf(z - DESTINATION_Z)) <= 1600.0
 
+func _height_at_grid(x: int, z: int) -> float:
+	if x>=0 and z>=0 and x<_height_columns and z<_height_rows and not _height_cache.is_empty(): return _height_cache[z*_height_columns+x]
+	return _terrain_height(TERRAIN_X_MIN+x*TERRAIN_STEP,TERRAIN_Z_MIN+z*TERRAIN_STEP)
+
 func ground_height(x: float, z: float) -> float:
 	# Runway deck is at zero; terrain immediately underneath remains recessed.
 	if is_runway(x, z):
@@ -725,12 +720,12 @@ func ground_height(x: float, z: float) -> float:
 	var z0: float = TERRAIN_Z_MIN + floorf(grid_z) * TERRAIN_STEP
 	var u: float = grid_x - floorf(grid_x)
 	var v: float = grid_z - floorf(grid_z)
-	var a: float = _terrain_height(x0, z0)
-	var b: float = _terrain_height(x0 + TERRAIN_STEP, z0)
-	var c: float = _terrain_height(x0, z0 + TERRAIN_STEP)
+	var a: float = _height_at_grid(floori(grid_x),floori(grid_z))
+	var b: float = _height_at_grid(floori(grid_x)+1,floori(grid_z))
+	var c: float = _height_at_grid(floori(grid_x),floori(grid_z)+1)
 	if u + v <= 1.0:
 		return a + u * (b - a) + v * (c - a)
-	var d: float = _terrain_height(x0 + TERRAIN_STEP, z0 + TERRAIN_STEP)
+	var d: float = _height_at_grid(floori(grid_x)+1,floori(grid_z)+1)
 	return d + (1.0 - u) * (c - d) + (1.0 - v) * (b - d)
 
 var _fog_volumes: Array[FogVolume] = []
@@ -739,8 +734,8 @@ func apply_quality(high: bool) -> void:
 	if _environment == null: return
 	var environment: Environment = _environment.environment
 	environment.adjustment_enabled = true
-	environment.adjustment_contrast = 1.12
-	environment.adjustment_saturation = 0.92
+	environment.adjustment_contrast = 1.03
+	environment.adjustment_saturation = 1.0
 	var capable: bool = RenderingServer.get_current_rendering_method() == "forward_plus"
 	environment.glow_enabled = high and capable
 	environment.glow_intensity = 0.38
@@ -750,8 +745,9 @@ func apply_quality(high: bool) -> void:
 	environment.ssao_intensity = 1.1
 	environment.ssr_enabled = high and capable
 	environment.volumetric_fog_enabled = high and capable
-	environment.volumetric_fog_density = 0.00015
-	environment.volumetric_fog_length = 1500
+	environment.volumetric_fog_density = 0.000025
+	environment.volumetric_fog_anisotropy = 0.28
+	environment.volumetric_fog_length = 4500
 	environment.volumetric_fog_albedo = Color(0.78,0.84,0.91)
 	environment.volumetric_fog_emission = Color(0.12,0.16,0.22)
 	if high and capable and _fog_volumes.is_empty() and DisplayServer.get_name()!="headless":
@@ -760,15 +756,15 @@ func apply_quality(high: bool) -> void:
 		for index in range(8):
 			var cloud := FogVolume.new()
 			cloud.shape = RenderingServer.FOG_VOLUME_SHAPE_ELLIPSOID
-			cloud.size = Vector3(1300,330,1900)
-			cloud.position = Vector3((-1 if index%2 else 1)*(2200+index*170),1500+index*85,-2000-index*2100)
-			var material := FogMaterial.new(); material.density = 0.009; material.albedo = Color(0.88,0.91,0.94); material.density_texture = texture
+			cloud.size = Vector3(1800,400,2200)
+			cloud.position = Vector3((-1 if index%2 else 1)*(2200+index*170),950+index*105,-2000-index*2100)
+			var material := FogMaterial.new(); material.density = 0.0015; material.albedo = Color(0.68,0.74,0.82); material.density_texture = texture
 			cloud.material = material
 			add_child(cloud); _fog_volumes.append(cloud)
 		for index in range(5):
-			var mist := FogVolume.new(); mist.size = Vector3(800,95,1800)
+			var mist := FogVolume.new(); mist.shape = RenderingServer.FOG_VOLUME_SHAPE_ELLIPSOID; mist.size = Vector3(1450,100,2200)
 			mist.position = Vector3(_river_center(-4500-index*2000),30,-4500-index*2000)
-			var material := FogMaterial.new(); material.density = 0.0025; material.albedo = Color(0.68,0.78,0.86)
+			var material := FogMaterial.new(); material.density = 0.0005; material.density_texture = texture; material.albedo = Color(0.68,0.78,0.86)
 			mist.material = material; add_child(mist); _fog_volumes.append(mist)
 	for volume: FogVolume in _fog_volumes: volume.visible = high and capable
 
@@ -779,10 +775,43 @@ func update_local_shadows(at: Vector3, dt: float) -> void:
 	_shadow_refresh -= dt
 	if _shadow_refresh>0: return
 	_shadow_refresh = 1.0
-	var count := 0
-	for transform: Transform3D in _forest_transforms:
-		if Vector2(transform.origin.x-at.x,transform.origin.z-at.z).length_squared()<810000:
-			_forest_shadow.multimesh.set_instance_transform(count,transform)
-			count += 1
-			if count>=400: break
+	var candidates: Array[Dictionary] = []
+	var cell := Vector2i(floori(at.x/1400),floori(at.z/1400))
+	for dx in range(-1,2):
+		for dz in range(-1,2):
+			for transform: Transform3D in _forest_cells.get(cell+Vector2i(dx,dz),[]):
+				var distance: float = Vector2(transform.origin.x-at.x,transform.origin.z-at.z).length_squared()
+				if distance<490000: candidates.append({"distance":distance,"transform":transform})
+	candidates.sort_custom(func(a: Dictionary,b: Dictionary): return a.distance<b.distance)
+	var count: int = mini(700,candidates.size())
+	for i in range(count):
+		_forest_shadow.multimesh.set_instance_transform(i,candidates[i].transform)
+		_forest_shadow.multimesh.set_instance_custom_data(i,Color(_tree_variation(candidates[i].transform.origin),0,0,0))
 	_forest_shadow.multimesh.visible_instance_count = count
+
+func _build_shore_details() -> void:
+	var shape := SphereMesh.new(); shape.radius = 1; shape.height = 2; shape.radial_segments = 12; shape.rings = 6
+	var arrays: Array = shape.get_mesh_arrays()
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	for i in range(vertices.size()):
+		var v: Vector3 = vertices[i]
+		vertices[i] *= 1+.19*sin(v.x*7+v.z*5)+.11*cos(v.y*9-v.x*4)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	var mesh := ArrayMesh.new(); mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+	var material := ShaderMaterial.new(); material.shader = load("res://assets/environment/shore_rock.gdshader")
+	material.set_shader_parameter("granite",load("res://assets/environment/alpine-granite.png")); mesh.surface_set_material(0,material)
+	var transforms: Array[Transform3D] = []
+	for z in range(-19000,-2600,45):
+		for side in [-1,1]:
+			for i in range(3):
+				var at_z: float = z+_rng.randf_range(-24,24)
+				var x: float = _river_center(at_z)+side*(_river_width(at_z)+_rng.randf_range(15,85))
+				var h: float = ground_height(x,at_z)
+				if h < -14 or h>12: continue
+				var size: float = _rng.randf_range(2.5,8.0)
+				var basis := Basis(Vector3.UP,_rng.randf()*TAU).scaled(Vector3(size,size*_rng.randf_range(.4,.8),size*_rng.randf_range(.7,1.5)))
+				transforms.append(Transform3D(basis,Vector3(x,h+size*.1,at_z)))
+	var stones := MultiMeshInstance3D.new(); stones.name = "GraniteShoreline"
+	var multi := MultiMesh.new(); multi.transform_format = MultiMesh.TRANSFORM_3D; multi.mesh = mesh; multi.instance_count = transforms.size()
+	for i in range(transforms.size()): multi.set_instance_transform(i,transforms[i])
+	stones.multimesh = multi; add_child(stones)

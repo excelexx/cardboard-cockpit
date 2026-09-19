@@ -8,6 +8,7 @@ var speed := 0.0
 var throttle := 0.0
 var engine := 0.0
 var afterburner := false
+var wind := Vector3.ZERO
 var pitch := 0.0
 var roll := 0.0
 var heading := 0.0
@@ -40,7 +41,7 @@ const BARREL_DURATION := 1.7
 func reset(aircraft: Dictionary) -> void:
 	profile = aircraft.duplicate(true)
 	position = Vector3(0,float(profile.clearance),1100)
-	velocity = Vector3.ZERO
+	velocity = Vector3.ZERO; wind = Vector3.ZERO
 	speed = 0; throttle = 0; engine = 0
 	pitch = 0; roll = 0; heading = 0
 	pitch_velocity = 0; roll_velocity = 0; yaw_velocity = 0
@@ -75,7 +76,7 @@ func step(dt: float, controls: Vector3, brakes: bool, ground: float, runway: boo
 func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> void:
 	elapsed += dt
 	engine = move_toward(engine,throttle,dt*(0.52 if throttle>engine else 0.7))
-	var thrust: float = float(profile.acceleration)*engine*(1.46 if afterburner and not gear else 1.0)
+	var thrust: float = float(profile.acceleration)*engine*(1.58 if afterburner and not gear else 1.0)
 	var drag: float = float(profile.acceleration)*pow(speed/float(profile.max_speed),2)
 	drag += (0.70 if gear else 0.15)+flaps*(0.35+speed*0.007)
 	if not airborne: drag += 0.45+(19 if brakes else 0)
@@ -83,8 +84,8 @@ func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> voi
 	var previous_velocity: Vector3 = velocity
 	if airborne:
 		var authority: float = clampf(speed/effective_rotation_speed(),0.15,1.25)
-		roll_velocity = lerpf(roll_velocity,controls.x*float(profile.roll_rate),1-exp(-dt*10.0))
-		pitch_velocity = lerpf(pitch_velocity,controls.y*float(profile.pitch_rate)*authority,1-exp(-dt*8.5))
+		roll_velocity = lerpf(roll_velocity,controls.x*float(profile.roll_rate),1-exp(-dt*13.0))
+		pitch_velocity = lerpf(pitch_velocity,controls.y*float(profile.pitch_rate)*authority,1-exp(-dt*12.0))
 		var rolling: bool = barrel_remaining>0
 		if rolling:
 			barrel_remaining = maxf(0,barrel_remaining-dt)
@@ -92,11 +93,8 @@ func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> voi
 			if barrel_remaining==0: roll = barrel_start
 		else:
 			roll = wrapf(roll+roll_velocity*dt,-PI,PI)
-			if absf(controls.x)<0.03:
-				roll = move_toward(roll,0,dt*0.18)
 		pitch = clampf(pitch+pitch_velocity*dt,-1.10,1.20)
-		if absf(controls.y)<0.03: pitch = move_toward(pitch,0,dt*0.008)
-		var coordinated: float = sin(roll)*52.0/maxf(speed,55.0)
+		var coordinated: float = sin(roll)*64.0/maxf(speed,55.0)
 		var desired_yaw: float = coordinated+controls.z*0.13
 		yaw_velocity = lerpf(yaw_velocity,0.0 if rolling else desired_yaw,1-exp(-dt*5.0))
 		heading = wrapf(heading+yaw_velocity*dt,-PI,PI)
@@ -105,7 +103,7 @@ func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> voi
 		var desired_vertical: float = sin(pitch)*speed-sink
 		if airborne_time<5 and position.y-ground<25: desired_vertical = maxf(desired_vertical,2)
 		vertical_speed = lerpf(vertical_speed,desired_vertical,1-exp(-dt*3.0))
-		var horizontal := Vector3(sin(heading),0,-cos(heading))*speed*cos(pitch)
+		var horizontal := Vector3(sin(heading),0,-cos(heading))*speed*cos(pitch)+wind
 		if velocity.length()<0.01 and speed>1: velocity = Vector3(horizontal.x,vertical_speed,horizontal.z)
 		velocity.x = lerpf(velocity.x,horizontal.x,1-exp(-dt*4.0))
 		velocity.z = lerpf(velocity.z,horizontal.z,1-exp(-dt*4.0))
