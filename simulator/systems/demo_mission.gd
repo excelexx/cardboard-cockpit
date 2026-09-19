@@ -57,10 +57,13 @@ func tick(dt: float) -> void:
 	if f.contact=="landed": transition("rollout")
 	app.combat.engagement_enabled = phase=="combat"
 func label() -> String:
-	if cinematic:return {"opening":"01 / SKYWARD","combat":"02 / CITY RUSH","anticipation":"03 / ANOMALOUS CONTACT","boss":"04 / THE FINAL HONK","aftermath":"SIGNAL CLEAR"}.get(phase,"SF / FREE FLIGHT")
+	if cinematic:return {"opening":"01 / SKYWARD","combat":"02 / CITY RUSH","anticipation":"03 / ANOMALOUS CONTACT","boss":"04 / THE FINAL HONK","aftermath":"05 / RETURN TO SFO","approach":"06 / SFO FINAL APPROACH","rollout":"07 / BRAKING"}.get(phase,"SF / FREE FLIGHT")
 	return {"takeoff":"01 / DEPARTURE","combat":"02 / INTERCEPT","return":"03 / RECOVERY","approach":"03 / FINAL APPROACH","rollout":"03 / ROLLOUT"}.get(phase,"")
 func instruction() -> String:
 	if cinematic:
+		if phase=="aftermath":return "B ON BADGE / L — DEPLOY FLAPS & LAND"
+		if phase=="approach":return "GEAR DOWN / FLAPS 2 — LANDING ASSIST ACTIVE"
+		if phase=="rollout":return "TOUCHDOWN — AUTOMATIC BRAKING"
 		if phase=="boss":return ""
 		if phase=="anticipation":return "LARGE SIGNATURE" if phase_clock<2 else ""
 		return ""
@@ -71,7 +74,7 @@ func instruction() -> String:
 	if phase=="approach": return "GEAR DOWN  •  FLAPS 2  •  HOLD THE GLIDEPATH"
 	return "HOLD SPACE TO BRAKE  •  A / D CENTRELINE"
 func controls() -> Vector3:
-	if cinematic:return _showcase_controls()
+	if cinematic:return app.approach_controls() if phase=="approach" else _showcase_controls()
 	var f: FlightDynamics = app.flight
 	if phase=="takeoff":
 		f.throttle = 1 if clock>2.4 else 0; f.gear = true; f.flaps = 1; f.afterburner = false
@@ -130,6 +133,7 @@ func coastal_controls() -> Vector3:
 
 func _tick_showcase(dt: float) -> void:
 	var c: CombatDirector=app.combat
+	if phase in ["approach","rollout"]:return
 	if phase=="opening" and clock>=22:act=1;transition("combat")
 	elif phase=="combat" and clock>=60:act=2;transition("anticipation");app.audio.radio.say("warning",2);c.event("boss_signature",app.flight.position+app.flight.forward()*1700,4)
 	elif phase=="anticipation" and clock>=76:
@@ -140,11 +144,11 @@ func _tick_showcase(dt: float) -> void:
 	if phase=="anticipation" and clock>=66 and c.boss_id<0:c.spawn_contact("boss")
 	if phase=="boss" and c.boss_defeated:
 		boss_dead_at=clock;transition("aftermath");act=4
-	if phase=="boss" and clock>=139:
+	if phase=="boss" and clock>=107:
 		boss_dead_at=clock;transition("aftermath");act=4
 		for enemy: Dictionary in c.enemies:enemy.retiring=true
 	if phase=="aftermath" and (clock-boss_dead_at>=7 or clock>=Tune.DEMO_LIMIT):
-		app.finish_sortie(c.boss_defeated,"THE SKY IS YOURS" if c.boss_defeated else "INTERCEPT WINDOW CLOSED — TAKE ANOTHER RUN")
+		app.begin_landing()
 		return
 	if clock>=Tune.DEMO_LIMIT:
 		app.finish_sortie(c.boss_defeated,"THE SKY IS YOURS" if c.boss_defeated else "RUN COMPLETE — TAKE ANOTHER RUN");return

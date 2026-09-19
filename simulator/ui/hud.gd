@@ -63,6 +63,10 @@ func _draw() -> void:
 	else: draw_flight()
 	if app.mode=="paused": draw_pause()
 	if app.mode=="results": draw_results()
+	if app.mode=="flight" and app.mission.phase=="aftermath":button("land",Rect2(590,790,420,58),"LAND AT SFO  /  BADGE B",true)
+	if app.landing_transition>0:
+		draw_rect(Rect2(0,0,1600,1000),Color(0.01,.02,.03,clampf(app.landing_transition/1.2,0,1)))
+		text(Vector2(580,480),"RETURNING TO SFO FINAL",24,WHITE)
 	if app.help_visible: draw_help()
 	if app.calibration_visible: draw_camera_setup()
 	if app.credits_visible: draw_credits()
@@ -343,7 +347,7 @@ func draw_camera_setup() -> void:
 	zones.clear(); dim(); panel(Rect2(370,175,860,650),.97)
 	text(Vector2(421,236),"CARDBOARD / LOCAL INPUT",13,CYAN,true)
 	text(Vector2(419,291),"Your cockpit. Your aircraft.",32,WHITE)
-	var lines: Array[String] = ["1. Start tools/tracker.sh --camera 0 --calibrate.","2. Capture the seven poses in the tracker preview.","3. Enable tracking below, then centre the yoke.","Yoke switches: primary 31/32, salvo 41/42. Flip ON or OFF.","Badge: A gear / B flaps / arrows views, assist, text."]
+	var lines: Array[String] = ["1. Start tools/tracker.sh --camera 0 --calibrate.","2. Capture the seven poses in the tracker preview.","3. Enable tracking below, then centre the yoke.","Yoke switches: primary 31/32, salvo 41/42. Flip ON or OFF.","Badge B: deploy flaps + assisted landing at SFO."]
 	for i in range(lines.size()): text(Vector2(423,345+i*42),lines[i],17,MUTED if i>2 else WHITE)
 	text(Vector2(423,586),app.vision.status,13,CYAN if app.vision.tracking else AMBER,true)
 	text(Vector2(423,626),"ROLL %+.2f / PITCH %+.2f / POWER %03d%%" % [app.vision.yoke.x,app.vision.yoke.y,int(app.vision.throttle*100)],15,WHITE,true)
