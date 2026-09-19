@@ -4,7 +4,7 @@ class_name FlightTutorial
 const LESSONS: Array[Dictionary]=[
  {"title":"FIRST CONTACTS","lines":["Let's clear your first three geese together.","Defeat the large boss later, then land safely at SFO."]},
  {"title":"YOUR CARDBOARD CONTROLS","lines":["Rotate the yoke to bank. Tilt toward you to climb; forward to descend.","Throttle forward accelerates; pull back to brake. Arrow keys and W/S also work."]},
- {"title":"PRIMARY SWITCH","lines":["Flip yoke switch 1 ON, or tap Space, for minigun and energy cannon.","Bring a goose into the aim ring. Flip OFF or tap again to stop firing."]},
+ {"title":"PRIMARY SWITCH","lines":["Flip yoke switch 1 ON, or tap Space, to fire the minigun.","Bring a goose into the aim ring. Flip OFF or tap again to stop firing."]},
  {"title":"MISSILE SWITCH","lines":["Flip yoke switch 2 ON, or tap T, for repeated four-missile salvos.","The lock guides your missiles. Both weapons have unlimited ammunition."]},
  {"title":"KEEP THE INTERCEPT GOING","lines":["Keep targets near the aiming ring and clear three geese.","Badge LEFT changes view; HOME pauses; UP toggles route assistance."]},
  {"title":"YOU'RE READY","lines":["Three geese cleared. You're ready to continue the intercept.","Defeat the boss, then press badge B or keyboard L to deploy flaps and land."]},

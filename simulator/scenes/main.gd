@@ -330,6 +330,16 @@ func _process(dt: float) -> void:
 		if cockpit:
 			cockpit_frame.update_instruments(flight,control,dt if active else 0)
 			cockpit_frame.set_navigation("sf" if route_id=="sf" else "free",mission.route_index)
+			for display in cockpit_frame.displays:
+				display.mission_navigation=mission.active
+				if mission.active:
+					display.mission_points=mission.route_points()
+					display.mission_target=mission.route_target()
+					display.mission_target_name="SFO / 28R FINAL" if route_id=="sf" and mission.phase in ["aftermath","approach","rollout","secured"] else mission.route_names()[mini(mission.route_index,mission.route_names().size()-1)]
+					if mission.phase in ["aftermath","approach","rollout","secured"]:
+						display.navigation_checkpoint=display.mission_points.size()
+						display.mission_target=Vector3(0,4,1300) if route_id=="sf" else Vector3(0,3,-14100)
+						display.mission_target_name="SFO / 28R FINAL" if route_id=="sf" else "NORTH FIELD / 36"
 	audio.gun_wanted = active and combat.active and combat.gun_firing_time>0
 	audio.beam_wanted=active and combat.beam_active
 	audio.instructor_speaking=tutorial.speaking()

@@ -57,7 +57,7 @@ func build(aircraft: Dictionary) -> void:
 	if airframe=="f35":
 		_active_root = load("res://assets/sourced_flight/cockpit.gltf").instantiate()
 		_active_root.name = "SourcedF35Interior"; _active_root.set_meta("cached_interior",true)
-		_active_root.position = Vector3(0,-.07,-.10)
+		_active_root.position = Vector3(0,.035,-.10)
 		add_child(_active_root)
 		var live_panel := _instrument_texture("panorama")
 		for viewport: Node in get_children():
@@ -77,7 +77,29 @@ func build(aircraft: Dictionary) -> void:
 					display_material.uv1_offset = Vector3(-.005975,-.016487,0)
 					display_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 					geometry.set_surface_override_material(surface,display_material)
-		pilot_control = Node3D.new(); _active_root.add_child(pilot_control); control_rest = Vector3.ZERO
+		# The imported shell has no animated controls. Add a training yoke and
+		# independent throttle quadrant rather than caching an empty pivot.
+		shell=_material(Color(.09,.11,.13),.78)
+		trim_material=_material(Color(.17,.20,.23),.55)
+		metal=_material(Color(.40,.44,.48),.32,.65)
+		black=_material(Color(.018,.023,.028),.65)
+		rubber=_material(Color(.032,.038,.043),.93)
+		control_is_stick=false
+		_build_controls()
+		pilot_control.name="AnimatedYoke"
+		pilot_control.position=Vector3(0,-.285,-.43)
+		pilot_control.scale=Vector3.ONE*.55
+		_fighter_console()
+		# Place the quadrant within the forward view, behind the yoke but in
+		# front of the imported panel. Keep the full lever travel unobstructed.
+		for child in get_children():
+			if child!=_active_root and child!=pilot_control and child is Node3D and not child.get_meta("cached_interior",false):
+				child.position=child.position*.5+Vector3(0,.06,-.30)
+				child.scale*=.5
+		_build_lighting()
+		for child in get_children():
+			if child!=_active_root and child is Node3D and not child.get_meta("cached_interior",false): child.reparent(_active_root)
+		control_rest=pilot_control.position
 		return
 	var boeing: bool = airframe in ["b737","b747"]
 	var panel_color := Color(0.24,0.23,0.21) if boeing else Color(0.16,0.20,0.23)

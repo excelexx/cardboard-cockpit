@@ -76,7 +76,6 @@ func _ready() -> void:
 		if ResourceLoader.exists("res://assets/audio/geese.ogg"):
 			geese.stream = load("res://assets/audio/geese.ogg")
 			geese.stream.loop = true
-		beam_loop.stream=load("res://assets/audio/plasma_beam.ogg").duplicate();beam_loop.stream.loop=true;beam_loop.play()
 		gun_loop.stream = loop_sample("res://assets/audio/gatling_loop.wav")
 		gun_loop.play()
 		burner.stream = loop_sample("res://assets/audio/afterburner.wav")

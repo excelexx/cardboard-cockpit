@@ -6,7 +6,7 @@ Build two **latched flip tabs**, each with one marker on each face, using the pr
 
 | Switch | ON marker | OFF marker | Behavior |
 |---|---|---|---|
-| Primary | 31 | 32 | Continuous minigun and energy cannon together |
+| Primary | 31 | 32 | Continuous minigun |
 | Quad salvo | 41 | 42 | Four missiles per salvo, repeated while ON |
 
 Use the existing `DICT_4X4_50` tracker. A face must remain stable for 90 ms to switch. Brief occlusion retains its latched state; after 0.8 seconds unseen the switch turns off. Transport loss stops physical weapon commands within 350 ms. Contradictory ON/OFF faces or duplicate IDs are rejected. Move a switch OFF and ON again after loss. The two physical switches work independently and together. Keyboard Space and T provide equivalent toggles for development or fallback.

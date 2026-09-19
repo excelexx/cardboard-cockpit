@@ -15,7 +15,26 @@ func run() -> void:
 	key(KEY_SPACE);key(KEY_T)
 	check(app.primary_latched and app.salvo_latched,"One switch action latches both weapon systems")
 	for i in range(180):app._physics_process(1.0/60)
-	check(app.combat.rounds_fired>160 and app.combat.missiles_fired>=8 and app.combat.beam_active,"Released switches sustain minigun, beam and repeated four-shot salvos")
+	check(app.combat.rounds_fired>160 and app.combat.missiles_fired>=8 and not app.combat.beam_active,"Released switches sustain minigun and salvos without plasma")
+	check(app.combat.visuals.beams.is_empty(),"No plasma meshes are created")
+	check(app.cockpit_frame.throttles.size()>0 and app.cockpit_frame.pilot_control.get_child_count()>0,"Imported cockpit includes visible animated controls")
+	var cockpit=app.cockpit_frame
+	var throttle=cockpit.throttles[0]
+	var old_throttle: float=app.flight.throttle
+	for power in [0.0,1.0]:
+		app.flight.throttle=power
+		for bank in [-1.0,1.0]:
+			for pitch in [-1.0,1.0]:
+				cockpit.update_instruments(app.flight,Vector3(bank,pitch,0),1)
+				check(absf(cockpit.pilot_control.rotation.z+bank*.55)<.001,"Yoke follows bank input")
+				for side in [-1.0,1.0]:
+					var grip: Vector3=cockpit.to_local(cockpit.pilot_control.to_global(Vector3(side*.146,.139,.012)))
+					check(grip.z<-.12 and absf(grip.y/grip.z)<tan(deg_to_rad(38)),"Yoke grips remain in forward vertical view at full travel")
+		check(absf(throttle.rotation.x-lerpf(.30,-.38,power))<.001,"Throttle follows actual engine power")
+		var handle: Vector3=cockpit.to_local(throttle.to_global(Vector3(0,.148,0)))
+		check(handle.z<-.12 and absf(handle.y/handle.z)<tan(deg_to_rad(38)),"Throttle handle stays visible at idle and maximum")
+	app.flight.throttle=old_throttle
+	cockpit.update_instruments(app.flight,Vector3.ZERO,1)
 	key(KEY_SPACE);key(KEY_T)
 	var fired: int=app.combat.rounds_fired
 	for i in range(60):app._physics_process(1.0/60)

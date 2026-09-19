@@ -21,9 +21,6 @@ var flash_texture: Texture2D
 var smoke_texture: Texture2D
 func _ready() -> void:
 	flash_texture=load("res://assets/vfx/flash.png");smoke_texture=load("res://assets/sourced_flight/smoke.png")
-	beams.append(Art.beam(self,Color(.8,.96,1),.18,1))
-	beams.append(Art.energy_sheath(self,.58,0))
-	beams.append(Art.energy_sheath(self,.95,1.4))
 	for beam in beams:beam.visible=false
 	beam_light=OmniLight3D.new();beam_light.light_color=Color(.15,.7,1);beam_light.omni_range=35;beam_light.shadow_enabled=false;beam_light.visible=false;add_child(beam_light)
 	lead_mesh=MeshInstance3D.new();lead_mesh.mesh=ImmediateMesh.new();lead_mesh.material_override=Art.emissive(Color(.08,.55,.8),1.3,.15);lead_mesh.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;add_child(lead_mesh)

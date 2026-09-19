@@ -3,7 +3,11 @@ class_name CockpitInstruments
 
 # Purpose-built training flight displays; these are artistic interpretations.
 const SFRoute = preload("res://systems/san_francisco_route.gd")
-func route_points() -> Array[Vector3]: return SFRoute.POINTS if navigation_kind=="sf" else ROUTE
+var mission_points: Array[Vector3]=[]
+var mission_target := Vector3.ZERO
+var mission_target_name := ""
+var mission_navigation := false
+func route_points() -> Array[Vector3]: return mission_points if mission_navigation else SFRoute.POINTS if navigation_kind=="sf" else ROUTE
 func display_heading() -> float: return fposmod(heading+(298.0 if navigation_kind=="sf" else 0.0),360.0)
 var display_mode: String = "pfd"
 var aircraft_name: String = "737"
@@ -46,11 +50,13 @@ func set_navigation(kind: String, checkpoint: int) -> void:
 	_refresh_texture()
 
 func navigation_target() -> Vector3:
+	if mission_navigation: return mission_target
 	if navigation_kind in ["valley","sf"] and navigation_checkpoint < route_points().size():
 		return route_points()[navigation_checkpoint]
 	return Vector3(0,4,1300) if navigation_kind=="sf" else NORTH_FIELD_AIM
 
 func navigation_target_label() -> String:
+	if mission_navigation: return mission_target_name
 	if navigation_kind in ["valley","sf"] and navigation_checkpoint < route_points().size():
 		return "CP%02d" % (navigation_checkpoint+1)
 	return "SFO / 28R" if navigation_kind=="sf" else "NORTH FIELD"
@@ -93,18 +99,18 @@ func _draw() -> void:
 		_panel_transform(Vector2(12,12), 0.78)
 		_pfd()
 		draw_set_transform(Vector2.ZERO)
-		# Large, readable essentials instead of three miniaturized avionics pages.
-		_text("SPEED / KNOTS",Vector2(680,78),32,CYAN)
-		_text("%03d" % int(speed),Vector2(675,215),124,WHITE)
-		_text("ALTITUDE / FEET",Vector2(1120,78),32,CYAN)
-		_text("%d" % int(altitude),Vector2(1110,215),112,WHITE)
-		_text("HEADING",Vector2(680,305),30,MUTED)
-		_text("%03d°" % int(heading),Vector2(675,405),82,WHITE)
-		_text("THRUST",Vector2(1120,305),30,MUTED)
-		_text("%d%%" % int(throttle*100),Vector2(1115,405),82,GREEN)
-		_text("GEAR "+("DOWN" if gear else "UP"),Vector2(680,540),34,AMBER if gear else MUTED)
-		_text("FLAPS %d" % flaps,Vector2(1120,540),34,MUTED)
-		_text("STALL — LOWER NOSE" if stall else "SPECTRE  /  FLIGHT SYSTEM",Vector2(680,615),30,AMBER if stall else CYAN)
+		_panel_transform(Vector2(615,12),.80)
+		_nav()
+		draw_set_transform(Vector2.ZERO)
+		_line(Vector2(1244,30),Vector2(1244,615),MUTED)
+		_text("ENGINE / CONFIG",Vector2(1270,64),25,CYAN)
+		_text("THRUST",Vector2(1270,125),25,MUTED)
+		_text("%d%%" % int(throttle*100),Vector2(1265,209),76,GREEN)
+		_text("ALTITUDE / FT",Vector2(1270,276),25,MUTED)
+		_text("%d" % int(altitude),Vector2(1265,349),62,WHITE)
+		_text("GEAR "+("DOWN" if gear else "UP"),Vector2(1270,438),29,AMBER if gear else MUTED)
+		_text("FLAPS %d" % flaps,Vector2(1270,492),29,MUTED)
+		_text("STALL" if stall else "FLIGHT SYSTEM",Vector2(1270,592),25,AMBER if stall else CYAN)
 	else:
 		_panel_transform(Vector2.ZERO, size.x / 768.0)
 		match display_mode:
@@ -207,14 +213,21 @@ func _tape(rect: Rect2, value: float, step: float, spacing: float, caption: Stri
 
 func _nav() -> void:
 	draw_rect(Rect2(0,0,768,768),BACK)
-	var map_scale: float = 0.015 if navigation_kind == "free" else 0.039
-	_text("MAP",Vector2(24,40),27,GREEN)
-	_center("%03d°  TRK" % roundi(display_heading()),Vector2(382,40),29,WHITE)
-	_text("12 NM" if navigation_kind == "free" else "4 NM",Vector2(641,40),24,CYAN)
+	var target_delta: Vector3=navigation_target()-position_world
+	var distance_nm: float=Vector2(target_delta.x,target_delta.z).length()/1852.0
+	var range_nm: float=clampf(ceil(distance_nm*1.4/2)*2,2,24)
+	var map_scale: float=330.0/(range_nm*1852.0)
+	_text("NAV / HDG UP",Vector2(24,40),23,GREEN)
+	_center("%03d°" % roundi(display_heading()),Vector2(382,40),29,WHITE)
+	_text("%d NM" % int(range_nm),Vector2(630,40),24,CYAN)
 	_line(Vector2(20,58),Vector2(748,58),MUTED)
 	var center := Vector2(384,466)
+	var active_point: Vector2=center+Vector2(target_delta.x,target_delta.z).rotated(-deg_to_rad(heading))*map_scale
+	active_point=active_point.clamp(Vector2(46,100),Vector2(720,570))
+	_line(center,active_point,MAGENTA,5)
+	draw_circle(active_point,10,MAGENTA)
 	for radius: float in [110.0,220.0,330.0]:
-		draw_arc(center,radius,PI,TAU,72,Color(0.2,0.29,0.32),1.5,true)
+		draw_arc(center,radius,PI,TAU,72,Color(0.35,0.52,0.57),2,true)
 	for angle: int in range(-90,91,10):
 		var actual: float = float(angle)-90.0
 		var unit := Vector2(cos(deg_to_rad(actual)),sin(deg_to_rad(actual)))
@@ -247,20 +260,18 @@ func _nav() -> void:
 	_line(center+Vector2(-24,6),center+Vector2(24,6),WHITE,3)
 	_text("GS  %03d KT" % roundi(speed),Vector2(24,614),26,GREEN)
 	var checkpoint_active: bool = navigation_kind in ["valley","sf"] and navigation_checkpoint < route_points().size()
-	_text(("SF BAY TOUR" if navigation_kind=="sf" else "VALLEY TOUR") if checkpoint_active else ("FREE FLIGHT" if navigation_kind == "free" else "RWY 36"),Vector2(477,614),24,CYAN)
+	_text("SFO / 28R" if navigation_kind=="sf" else "ROUTE",Vector2(500,614),24,CYAN)
 	_line(Vector2(20,650),Vector2(748,650),MUTED)
 	var target: Vector3 = navigation_target()
-	var distance_nm: float = position_world.distance_to(target)/1852.0
-	_text(navigation_target_label(),Vector2(24,700),29,MAGENTA if checkpoint_active else CYAN)
-	_text("%.1f NM" % distance_nm,Vector2(174 if checkpoint_active else 311,700),29,WHITE)
+	# Keep the next-leg readout above the yoke, not beneath its hub.
+	_text(navigation_target_label().left(28),Vector2(24,91),25,MAGENTA if checkpoint_active else CYAN)
+	_text("%.1f NM" % distance_nm,Vector2(24,125),29,WHITE)
 	if checkpoint_active:
-		_text("TARGET %04d FT" % roundi(target.y*3.28084),Vector2(405,700),24,CYAN)
-		_text(("ACTIVE LEG %02d  /  SAN FRANCISCO BAY" if navigation_kind=="sf" else "ACTIVE LEG %02d  /  MOUNTAIN DEPARTURE") % (navigation_checkpoint+1),Vector2(24,746),19,MUTED)
+		_text("TARGET %04d FT" % roundi(target.y*3.28084),Vector2(400,125),24,CYAN)
 	elif navigation_kind == "free":
-		_text("AIRPORT REFERENCE  /  NO CHECKPOINTS",Vector2(24,746),19,MUTED)
+		_text("AIRPORT REFERENCE",Vector2(350,735),22,MUTED)
 	else:
-		_text("3° APPROACH",Vector2(528,700),23,CYAN)
-		_text("SFO  /  RUNWAY 28R FINAL" if navigation_kind=="sf" else "NORTH FIELD  /  RUNWAY 36 FINAL",Vector2(24,746),19,MUTED)
+		_text("RUNWAY GUIDANCE",Vector2(400,735),23,CYAN)
 
 func _engines() -> void:
 	draw_rect(Rect2(0,0,768,768),BACK)

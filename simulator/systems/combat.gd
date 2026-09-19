@@ -497,22 +497,10 @@ func hurt_enemy(enemy: Dictionary,damage: float,source: String,at: Vector3) -> v
 	if enemy.kind=="boss":boss_defeated=true
 	else:spawn_clock=minf(spawn_clock,.75);app.audio.radio.say("target_down" if kills%2 else "target_down_alt")
 
-func update_beam(dt: float) -> void:
-	beam_active=active and app.flight.airborne and gun_firing_time>0
-	beam_hit_id=-1;beam_clock-=dt
-	if not beam_active:return
-	var basis:=Basis.from_euler(Vector3(app.flight.pitch,-app.flight.heading,-app.flight.roll))
-	var start: Vector3=app.flight.position+basis*Vector3(.75,-.30,-3.8)
-	var direction: Vector3=assisted_direction();var length: float=Tune.BEAM_RANGE;var hit: Dictionary={}
-	for enemy: Dictionary in enemies:
-		if enemy.health<=0:continue
-		var along: float=(enemy.position-start).dot(direction)
-		if along>0 and along<length and Vector3(enemy.position).distance_to(start+direction*along)<float(enemy.hit_radius)+4+intent.help_amount*5:
-			length=along;hit=enemy
-	beam_end=start+direction*length
-	if not hit.is_empty():
-		beam_hit_id=hit.id;hurt_enemy(hit,Tune.BEAM_DPS*dt,"beam",beam_end)
-		if beam_clock<=0:burst(beam_end,Color(.35,.85,1),3);beam_clock=.09
+func update_beam(_dt: float) -> void:
+	# Compatibility state for effects/UI; primary fire is ballistic only.
+	beam_active=false
+	beam_hit_id=-1
 
 func pilot_controls() -> Vector3:
 	var at: Vector3 = app.flight.position
