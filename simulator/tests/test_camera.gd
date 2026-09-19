@@ -64,11 +64,10 @@ func run_checks() -> void:
 		finish()
 		return
 	app.on_action("hangar")
-	for index in range(5):
+	for index in range(6):
 		tap((KEY_1 + index) as Key)
 		expect(app.selected == index, "Hangar key %d still selects its aircraft" % (index + 1))
 	var selected_before: int = app.selected
-	tap(KEY_6)
 	tap(KEY_7)
 	expect(app.selected == selected_before, "Hangar ignores aircraft number keys outside the fleet")
 	app.on_action("fly")
@@ -105,7 +104,7 @@ func run_checks() -> void:
 
 	# Real imported aircraft have markedly different spans and lengths. Exercise
 	# each camera across level, climbing and banked poses before checking orbit.
-	for plane_index in range(5):
+	for plane_index in range(6):
 		app.select_plane(plane_index)
 		app.start_flight()
 		await process_frame
