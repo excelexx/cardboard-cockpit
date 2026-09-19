@@ -10,21 +10,21 @@ const POINTS: Array[Vector3] = [
 	Vector3(0,145,-12000)
 ]
 const NAMES: Array[String] = [
-	"AZURE BAY", "THE MARINA", "WATERFRONT SKYLINE",
+	"CITY DEPARTURE", "THE MARINA", "WATERFRONT SKYLINE",
 	"DOWNTOWN FLYBY", "THE WORKING HARBOR", "SUSPENSION BRIDGE",
-	"THE ISLAND CHANNEL", "PACIFIC PANORAMA", "LIGHTHOUSE POINT",
+	"METROPOLITAN CROSSING", "CITY PANORAMA", "NORTH DISTRICTS",
 	"HOMEWARD DESCENT", "CAPE NORTH APPROACH"
 ]
 const HINTS: Array[String] = [
-	"Lift off over the bay · Follow the blue diamond",
+	"Lift off between the city districts · Follow the blue diamond",
 	"Turn inland over the marina · The city is ahead",
 	"Cross the waterfront rooftops · Keep following the diamond",
 	"Fly above downtown · Look down through the side windows",
 	"Pass the ferry terminal · Begin a gentle climb",
 	"Cross above the bridge · Keep following the diamond",
-	"Wooded islands below · Snowy peaks to the east",
-	"Level out for the ocean view · Then lower the nose",
-	"Descend past the lighthouse toward Cape North",
+	"City blocks below · Snowy peaks to the east",
+	"Level out for the metropolitan panorama · Then lower the nose",
+	"Descend over the north districts toward Cape North",
 	"Ease off power · Keep the runway straight ahead",
 	"Landing guidance takes over · H enables the copilot"
 ]

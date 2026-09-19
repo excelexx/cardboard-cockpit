@@ -103,7 +103,7 @@ func _batch_fixed_panels() -> void:
 		var vertices: PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
 		var normals: PackedVector3Array=arrays[Mesh.ARRAY_NORMAL]
 		var uv: PackedVector2Array=arrays[Mesh.ARRAY_TEX_UV]
-		var indices: PackedInt32Array=arrays[Mesh.ARRAY_INDEX]
+		var indices: PackedInt32Array=arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX]!=null else PackedInt32Array()
 		for i in range(indices.size() if not indices.is_empty() else vertices.size()):
 			var index: int=indices[i] if not indices.is_empty() else i
 			surface.set_normal((child.basis*normals[index]).normalized())
@@ -161,12 +161,58 @@ func _box(parent: Node3D, dimensions: Vector3, at: Vector3, material: Material, 
 	var node := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = dimensions
-	node.mesh = mesh
+	node.mesh = _chamfered_box(dimensions) if dimensions.x>0.025 and dimensions.y>0.025 and dimensions.z>0.025 else mesh
 	node.material_override = material
 	node.position = at
 	node.rotation = rotate
 	parent.add_child(node)
 	return node
+
+func _chamfered_box(size_value: Vector3) -> ArrayMesh:
+	# Real bevels catch cockpit lighting; no razor-sharp rectangular controls.
+	var half: Vector3=size_value*0.5
+	var radius: float=minf(0.008,minf(half.x,minf(half.y,half.z))*0.22)
+	var inner: Vector3=half-Vector3.ONE*radius
+	var surface:=SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var polygons: Array=[]
+	for axis in range(3):
+		var u: int=(axis+1)%3
+		var v: int=(axis+2)%3
+		for sign_value in [-1.0,1.0]:
+			var face: Array[Vector3]=[]
+			for corner in [Vector2(-1,-1),Vector2(1,-1),Vector2(1,1),Vector2(-1,1)]:
+				var point:=Vector3.ZERO
+				point[axis]=half[axis]*sign_value; point[u]=inner[u]*corner.x; point[v]=inner[v]*corner.y
+				face.append(point)
+			polygons.append(face)
+	for axis in range(3):
+		var u: int=(axis+1)%3
+		var v: int=(axis+2)%3
+		for su in [-1.0,1.0]:
+			for sv in [-1.0,1.0]:
+				var face: Array[Vector3]=[]
+				for corner in [Vector2(-1,0),Vector2(1,0),Vector2(1,1),Vector2(-1,1)]:
+					var point:=Vector3.ZERO
+					point[axis]=inner[axis]*corner.x
+					point[u]=(half[u] if corner.y==0 else inner[u])*su
+					point[v]=(inner[v] if corner.y==0 else half[v])*sv
+					face.append(point)
+				polygons.append(face)
+	for x in [-1.0,1.0]:
+		for y in [-1.0,1.0]:
+			for z in [-1.0,1.0]:
+				polygons.append([Vector3(half.x*x,inner.y*y,inner.z*z),Vector3(inner.x*x,half.y*y,inner.z*z),Vector3(inner.x*x,inner.y*y,half.z*z)])
+	for face in polygons:
+		var normal: Vector3=(face[1]-face[0]).cross(face[2]-face[0]).normalized()
+		var center:=Vector3.ZERO
+		for p: Vector3 in face: center+=p
+		if normal.dot(center)<0: face.reverse(); normal=-normal
+		# Godot front faces use clockwise winding.
+		for i in range(1,face.size()-1):
+			for point: Vector3 in [face[0],face[i+1],face[i]]:
+				surface.set_normal(normal); surface.set_uv(Vector2(point.x,point.y)); surface.add_vertex(point)
+	return surface.commit()
 
 func _cylinder(parent: Node3D, radius: float, height: float, at: Vector3, material: Material, rotate: Vector3 = Vector3.ZERO) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
@@ -363,7 +409,8 @@ func _build_controls() -> void:
 	pilot_control = Node3D.new()
 	add_child(pilot_control)
 	if control_is_stick:
-		pilot_control.position = Vector3(-0.68 if airframe == "a380" else 0.72,-0.61,-0.85)
+		# Behind the instrument panel, with room for the entire animated grip arc.
+		pilot_control.position = Vector3(-0.68 if airframe == "a380" else 0.72,-0.64,-0.36)
 		_cylinder(pilot_control,0.053,0.07,Vector3.ZERO,rubber)
 		_cylinder(pilot_control,0.021,0.19,Vector3(0,0.105,0),black,Vector3(-0.18,0,0))
 		_box(pilot_control,Vector3(0.055,0.064,0.071),Vector3(0,0.218,-0.020),rubber,Vector3(-0.18,0,0))
@@ -384,6 +431,9 @@ func _build_controls() -> void:
 		_box(self,Vector3(0.24,0.15,0.54),Vector3(side*0.90,-1.14,0.04),rubber)
 
 func _build_console() -> void:
+	if airframe == "f35":
+		_fighter_console()
+		return
 	var x: float = -0.72 if airframe == "f35" else 0.58
 	_box(self,Vector3(0.34,0.19,0.63),Vector3(x,-0.80,-0.57),shell)
 	_box(self,Vector3(0.31,0.026,0.54),Vector3(x,-0.691,-0.57),trim_material)
@@ -415,6 +465,45 @@ func _build_console() -> void:
 	_box(self,Vector3(0.012,0.073,0.04),Vector3(gear_x,-0.65,-0.82),metal)
 	_cylinder(self,0.021,0.026,Vector3(gear_x,-0.69,-0.792),_material(Color(0.77,0.79,0.72)),Vector3(0,0,PI/2))
 	_label(self,"GEAR",Vector3(gear_x,-0.53,-0.824),0.012)
+
+func _fighter_console() -> void:
+	# Two separate ergonomic armrests. Controls are aft of the dashboard (z=-0.85).
+	for side in [-1.0,1.0]:
+		_box(self,Vector3(0.30,0.20,0.78),Vector3(side*0.74,-0.80,-0.34),shell)
+		_box(self,Vector3(0.28,0.018,0.72),Vector3(side*0.74,-0.691,-0.34),trim_material)
+		_box(self,Vector3(0.24,0.048,0.20),Vector3(side*0.74,-0.657,-0.01),rubber)
+		for z in [-0.62,-0.10]:
+			for dx in [-0.115,0.115]:
+				_cylinder(self,0.0035,0.003,Vector3(side*0.74+dx,-0.679,z),metal)
+		for i in range(3):
+			_box(self,Vector3(0.038,0.011,0.038),Vector3(side*0.74+(i-1)*0.066,-0.675,-0.60),black)
+			_cylinder(self,0.004,0.020,Vector3(side*0.74+(i-1)*0.066,-0.660,-0.60),metal)
+	var lever:=Node3D.new()
+	lever.name="ThrustLever_0"
+	lever.position=Vector3(-0.74,-0.662,-0.34)
+	add_child(lever)
+	throttles.append(lever)
+	_box(self,Vector3(0.042,0.006,0.24),Vector3(-0.74,-0.679,-0.34),black)
+	_cylinder(lever,0.013,0.13,Vector3(0,0.065,0),metal)
+	_box(lever,Vector3(0.16,0.061,0.090),Vector3(0,0.148,0),rubber)
+	for i in range(7):
+		_box(lever,Vector3(0.135,0.003,0.003),Vector3(0,0.180,-0.035+i*0.011),trim_material)
+	_cylinder(lever,0.011,0.009,Vector3(0.084,0.153,0),metal,Vector3(0,0,PI/2))
+	for i in range(7):
+		_box(self,Vector3(0.025,0.002,0.003),Vector3(-0.79,-0.679,-0.44+i*0.032),metal)
+	var plate:=_label(self,"THRUST   IDLE / MIL / AB",Vector3(-0.84,-0.674,-0.34),0.009)
+	plate.rotation=Vector3(-PI/2,0,PI/2)
+	var gear:=_label(self,"FLIGHT CONTROL",Vector3(0.83,-0.674,-0.33),0.009)
+	gear.rotation=Vector3(-PI/2,0,-PI/2)
+	# Small illuminated trim strips, not a glowing dashboard-sized slab.
+	var light_material:=_material(Color(0.13,0.32,0.33),0.45)
+	light_material.emission_enabled=true
+	light_material.emission=Color(0.08,0.36,0.34)
+	light_material.emission_energy_multiplier=0.6
+	for side in [-1,1]:
+		_box(self,Vector3(0.003,0.005,0.56),Vector3(side*0.895,-0.673,-0.34),light_material)
+	_label(self,"GEAR",Vector3(0.91,-0.60,-0.75),0.011)
+	_cylinder(self,0.018,0.024,Vector3(0.91,-0.66,-0.72),metal,Vector3(0,0,PI/2))
 
 func _build_overhead() -> void:
 	_box(self,Vector3(0.70,0.24,0.042),Vector3(0.25,0.57,-0.82),shell,Vector3(0.25,0,0))

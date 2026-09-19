@@ -2,10 +2,10 @@ extends "res://scenes/coastal_base_world.gd"
 var elevation_samples:=PackedFloat32Array()
 const VILLAGES: Array[Vector2]=[Vector2(1750,-2650),Vector2(2050,-8450),Vector2(1900,-10200),Vector2(2150,-12300),Vector2(2100,-1450)]
 var village_home_count: int=0
+var urban_expansion: Node3D
 
-func _in_settlement(x: float,z: float) -> bool:
-	for center in VILLAGES:
-		if Vector2((x-center.x)/245.0,(z-center.y-50)/280.0).length()<1: return true
+func _in_settlement(_x: float,_z: float) -> bool:
+	# The active route is metropolitan; legacy rural clearings no longer cut holes in it.
 	return false
 
 func _build_countryside() -> void:
@@ -124,10 +124,13 @@ func build() -> void:
 	metropolis=load("res://scenes/coastal_city.gd").new()
 	add_child(metropolis)
 	metropolis.build(self)
+	urban_expansion=load("res://scenes/urban_expansion.gd").new()
+	add_child(urban_expansion)
+	urban_expansion.build(self)
 	_airbase_activity()
 	_coastal_forest()
 	_shore_details()
-	_build_countryside()
+	# Rural crop patches are not part of the city-first route.
 	# The photographic HDR sky already contains natural clouds; avoid overlaying
 	# the old flat, repeating cloud cards on top of it.
 	set_conditions(_condition_id)
@@ -175,26 +178,30 @@ func set_conditions(preset: String) -> void:
 	env.tonemap_mode=Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure=1.0
 	env.ssao_enabled=true
-	env.ssao_radius=3.0
-	env.ssao_intensity=1.4
-	env.ssil_enabled=false
-	env.ssil_radius=5.0
-	env.ssil_intensity=0.55
+	env.ssao_radius=2.0
+	env.ssao_intensity=1.65
+	env.ssil_enabled=true
+	env.ssil_radius=2.5
+	env.ssil_intensity=0.35
 	env.ssr_enabled=false
 	env.glow_enabled=true
 	env.glow_intensity=0.30
-	env.fog_density=0.000065
+	env.fog_density=0.000035
 	env.fog_aerial_perspective=0.55
 	env.fog_light_color=Color(0.62,0.71,0.75)
-	_sun.shadow_bias=0.06
-	_sun.shadow_normal_bias=1.2
+	_sun.shadow_bias=0.025
+	_sun.shadow_normal_bias=0.65
+	_sun.directional_shadow_split_1=0.10
+	_sun.directional_shadow_split_2=0.28
+	_sun.directional_shadow_split_3=0.55
+	_sun.directional_shadow_blend_splits=true
 	_sun.directional_shadow_max_distance=3500
 	if preset=="golden":
-		_sun.rotation_degrees=Vector3(-24,-68,0)
+		_sun.rotation_degrees=Vector3(-32,-58,0)
 		_sun.light_color=Color(1.0,0.88,0.72)
-		_sun.light_energy=1.8
-		env.ambient_light_energy=0.36
-		env.tonemap_exposure=0.95
+		_sun.light_energy=1.35
+		env.ambient_light_energy=0.27
+		env.tonemap_exposure=0.90
 		env.fog_light_color=Color(0.78,0.72,0.61)
 
 func coast_x(z: float) -> float:
@@ -242,6 +249,11 @@ func _terrain_height(x: float,z: float) -> float:
 	# Recess the complete airfield, not just its runway centerline. All airport
 	# meshes were authored around elevation zero; coast terrain must respect it.
 	var city_pad: float=(1.0-_smooth(1100,1300,absf(x-2200)))*(1.0-_smooth(2200,2450,absf(z+5500)))
+	# A broad metropolitan plain replaces the empty airfield islands and grass valley.
+	# Preserve a working harbor / bridge basin and the scanned downtown's original pad.
+	var urban_pad: float=(1.0-_smooth(4800,5400,absf(x-1300)))*(1.0-_smooth(10100,10800,absf(z+7500)))
+	var harbor: float=(1.0-_smooth(900,1400,absf(x+300)))*(1.0-_smooth(650,1000,absf(z+7200)))
+	h=lerpf(h,11.5,urban_pad*(1.0-harbor))
 	h=lerpf(h,11.5,city_pad)
 	for airport_z in [0.0,-15000.0]:
 		var pad: float=(1.0-_smooth(1050,1350,absf(x-250)))*(1.0-_smooth(2050,2350,absf(z-airport_z)))
@@ -258,6 +270,7 @@ func _coastal_forest() -> void:
 		var z: float=_rng.randf_range(-20000,3200)
 		var h: float=ground_height(x,z)
 		if h<8 or h>1750: continue
+		if x> -3900 and x<6700 and z> -18100 and z<3100: continue
 		# Broad groves and natural openings replace evenly peppered hillsides.
 		var grove: float=_noise.get_noise_2d(x*1.6+700,z*1.6-400)
 		if grove< -0.12: continue
@@ -309,12 +322,13 @@ func _conifer_mesh() -> Mesh:
 	mesh.center_offset=Vector3(0,7.2,0)
 	var material:=StandardMaterial3D.new()
 	material.albedo_texture=load("res://assets/nature/tree_impostor.png")
+	material.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 	material.alpha_scissor_threshold=0.12
 	material.billboard_mode=BaseMaterial3D.BILLBOARD_FIXED_Y
 	material.billboard_keep_scale=true
 	material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color=Color(0.7,0.78,0.7)
+	material.albedo_color=Color(0.88,0.92,0.83)
 	material.cull_mode=BaseMaterial3D.CULL_DISABLED
 	mesh.material=material
 	return mesh
@@ -344,7 +358,12 @@ func _shore_details() -> void:
 
 func cloud_immersion(_at: Vector3) -> float: return 0.0
 
+func obstacle_collision(at: Vector3,radius: float=2.0) -> bool:
+	if urban_expansion!=null and urban_expansion.collides(at,radius): return true
+	return super.obstacle_collision(at,radius)
+
 func apply_quality(high: bool) -> void:
 	super.apply_quality(high)
 	if _environment==null: return
+	_environment.environment.ssil_enabled=high and RenderingServer.get_current_rendering_method()=="forward_plus"
 	_sun.directional_shadow_max_distance=3500 if high else 2000

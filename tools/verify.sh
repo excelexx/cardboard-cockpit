@@ -9,6 +9,7 @@ if [ ! -x .venv/bin/python ]; then ./tools/setup_vision.sh; fi
 "$engine" --headless --path simulator --script res://scenes/main.gd --check-only
 "$engine" --headless --path simulator --script res://tests/test_fighter.gd
 "$engine" --headless --path simulator --script res://tests/test_arcade_controls.gd
+"$engine" --headless --path simulator --script res://tests/test_sticker_controls.gd
 "$engine" --headless --path simulator --script res://tests/test_spectre_scene.gd
 "$engine" --headless --path simulator --script res://tests/test_radio.gd
 "$engine" --headless --path simulator --script res://tests/test_demo_mission.gd
@@ -18,6 +19,7 @@ if [ ! -x .venv/bin/python ]; then ./tools/setup_vision.sh; fi
 "$engine" --headless --path simulator --script res://tests/test_scenic_route.gd
 "$engine" --headless --path simulator --script res://tests/test_city.gd
 "$engine" --headless --path simulator --script res://tests/test_grounding.gd
+"$engine" --headless --path simulator --script res://tests/test_urban_expansion.gd
 "$engine" --headless --path simulator --fixed-fps 60 -- --combat --autotest
 "$engine" --headless --path simulator --fixed-fps 60 -- --approach --autotest
 .venv/bin/python -m unittest discover -s vision/tests -v
