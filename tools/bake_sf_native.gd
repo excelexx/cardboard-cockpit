@@ -9,9 +9,13 @@ func run() -> void:
 	var textures: Dictionary = {}
 	for name: String in paths:
 		if not name.ends_with(".gltf"): continue
+		var requested := ""
+		for argument in OS.get_cmdline_user_args():
+			if argument.begins_with("--tile="): requested = argument.trim_prefix("--tile=")
+		if not requested.is_empty() and name!=requested: continue
 		var path := source_root+name
 		var target := path.trim_suffix(".gltf")+".scn"
-		if FileAccess.file_exists(target): continue
+		if FileAccess.file_exists(target) and "--force" not in OS.get_cmdline_user_args(): continue
 		var doc := GLTFDocument.new(); var state := GLTFState.new()
 		var error := doc.append_from_file(path,state)
 		if error!=OK: printerr("FAILED ",path," ",error); quit(1); return
@@ -21,6 +25,7 @@ func run() -> void:
 				var mat: StandardMaterial3D = mesh.mesh.surface_get_material(surface)
 				if mat==null: continue
 				var texture_path := source_root+"textures/"+mat.resource_name+".png"
+				if FileAccess.file_exists(source_root+"aerial/"+mat.resource_name+".jpg"): texture_path = source_root+"aerial/"+mat.resource_name+".jpg"
 				if FileAccess.file_exists(texture_path):
 					if not textures.has(texture_path):
 						if ResourceLoader.exists(texture_path): textures[texture_path] = load(texture_path)

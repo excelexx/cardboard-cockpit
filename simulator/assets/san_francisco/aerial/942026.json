@@ -1,0 +1,20 @@
+{
+  "href": "https://imagery.nationalmap.gov/arcgis/rest/directories/imagery_output/USGSNAIPPlus_ImageServer/_ags_387d4519_d4a6_4974_b9bd_6ebc1507aa99.jpg",
+  "width": 4000,
+  "height": 2000,
+  "extent": {
+    "xmin": -122.5,
+    "ymin": 37.125,
+    "xmax": -122.25,
+    "ymax": 37.25,
+    "spatialReference": {
+      "wkid": 4326,
+      "latestWkid": 4326
+    }
+  },
+  "scale": 0,
+  "request": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=json&bbox=-122.5%2C37.125%2C-122.25%2C37.25&bboxSR=4326&imageSR=4326&size=4000%2C2000&format=jpg&pixelType=U8&interpolation=RSP_BilinearInterpolation&compressionQuality=92",
+  "copyright": "USGS, USDA, The National Map: Orthoimagery",
+  "license": "Public domain",
+  "sha256": "6a839d93e401d6e0131b5dce2481584fcae486752de3b9f4acf922993ac11fe8"
+}
