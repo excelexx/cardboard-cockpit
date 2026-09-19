@@ -31,7 +31,7 @@ codesign --force --deep --sign - "$app_bundle"
 codesign --verify --deep --strict "$app_bundle"
 # Include source and original licensed aircraft assets with the distributable.
 # Explicit paths exclude credentials, environments, downloads and local builds.
-tar -C "$project_dir" --exclude='simulator/.godot' --exclude='__pycache__' --exclude='vision/calibration.local.json' --exclude='vision/recordings' --exclude='.private' --exclude='.venv' --exclude='*.log' -cf - simulator vision hardware tools docs shared README.md THIRD_PARTY_ASSETS.md | tar -C "$release_dir/Source" -xf -
+tar -C "$project_dir" --exclude='simulator/.godot' --exclude='__pycache__' --exclude='vision/calibration.local.json' --exclude='vision/recordings' --exclude='.private' --exclude='.venv' --exclude='*.log' -cf - simulator vision hardware tools docs shared README.md THIRD_PARTY_ASSETS.md "Launch Cardboard Cockpit.command" "Launch Cardboard Tracker.command" | tar -C "$release_dir/Source" -xf -
 ditto --norsrc "$app_bundle" "$output_dir/Cardboard Cockpit.app"
 ditto -c -k --norsrc --keepParent "$release_dir" "$output_dir/Cardboard Cockpit Mac.zip"
 echo "Built: $output_dir/Cardboard Cockpit.app"
