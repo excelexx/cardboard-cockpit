@@ -87,15 +87,21 @@ func _draw() -> void:
 		_nav()
 		draw_set_transform(Vector2.ZERO)
 	elif display_mode == "panorama":
-		_panel_transform(Vector2(12,12), 0.73)
+		_panel_transform(Vector2(12,12), 0.78)
 		_pfd()
-		_panel_transform(Vector2(575,12), 0.73)
-		_nav()
-		_panel_transform(Vector2(1138,12), 0.60)
-		_engines()
 		draw_set_transform(Vector2.ZERO)
-		_text("TACTICAL FLIGHT SYSTEM  /  X–26", Vector2(40,620), 21, MUTED)
-		_text("X–26   •   SYSTEMS NORMAL", Vector2(1140,620), 21, GREEN)
+		# Large, readable essentials instead of three miniaturized avionics pages.
+		_text("SPEED / KNOTS",Vector2(680,78),32,CYAN)
+		_text("%03d" % int(speed),Vector2(675,215),124,WHITE)
+		_text("ALTITUDE / FEET",Vector2(1120,78),32,CYAN)
+		_text("%d" % int(altitude),Vector2(1110,215),112,WHITE)
+		_text("HEADING",Vector2(680,305),30,MUTED)
+		_text("%03d°" % int(heading),Vector2(675,405),82,WHITE)
+		_text("THRUST",Vector2(1120,305),30,MUTED)
+		_text("%d%%" % int(throttle*100),Vector2(1115,405),82,GREEN)
+		_text("GEAR "+("DOWN" if gear else "UP"),Vector2(680,540),34,AMBER if gear else MUTED)
+		_text("FLAPS %d" % flaps,Vector2(1120,540),34,MUTED)
+		_text("STALL — LOWER NOSE" if stall else "SPECTRE  /  FLIGHT SYSTEM",Vector2(680,615),30,AMBER if stall else CYAN)
 	else:
 		_panel_transform(Vector2.ZERO, size.x / 768.0)
 		match display_mode:

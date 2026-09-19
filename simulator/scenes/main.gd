@@ -35,6 +35,7 @@ var audio: EngineAudio
 var hud: CockpitHUD
 var cockpit := true
 var copilot := false
+var paper_test := false
 var used_copilot := false
 var demo_auto_fire := true
 var help_visible := false
@@ -98,11 +99,23 @@ func _ready() -> void:
 		elif arg=="--combat": flight_kind = "combat"; start = true
 		elif arg=="--demo": flight_kind = "demo"; start = true
 		elif arg=="--cockpit": cockpit = true
+		elif arg=="--stickers":
+			vision.enabled = true
+			mouse_yoke = false
+			calibration_visible = true
+		elif arg=="--paper-test":
+			paper_test = true
+			vision.enabled = true
+			mouse_yoke = false
+			cockpit = false
+			flight_kind = "paper"
+			start = true
 		elif arg.begins_with("--capture="): capture_file = arg.trim_prefix("--capture="); capture_at = 4
 		elif arg.begins_with("--capture-at="): capture_at = maxf(1,arg.trim_prefix("--capture-at=").to_float())
 	if start:
 		start_flight(flight_kind)
 		copilot = guide; used_copilot = guide
+		if paper_test: print("PAPER FLIGHT: enabled=",vision.enabled," endpoint=",vision.endpoint)
 	else:
 		world.visible = false; aircraft.visible = false; fighter_fx.visible = false
 
@@ -119,6 +132,9 @@ func start_flight(kind: String = "demo") -> void:
 		flight.gear = true; flight.flaps = 2; flight.pitch = -atan(Approach.GLIDESLOPE)
 		flight.throttle = 0.3; flight.engine = 0.3
 	elif kind=="combat": flight.spawn_airborne(Vector3(0,220,-3500),185)
+	elif kind=="paper":
+		flight.spawn_airborne(Vector3(0,650,-2300),135)
+		flight.throttle = .7; flight.engine = .7
 	combat.reset(kind in ["combat","demo"])
 	combat.managed_mission = kind=="demo"
 	combat.engagement_enabled = kind=="combat"
@@ -134,7 +150,7 @@ func start_flight(kind: String = "demo") -> void:
 
 func overlay_visible() -> bool: return help_visible or calibration_visible or credits_visible
 func _notification(what: int) -> void:
-	if what==NOTIFICATION_APPLICATION_FOCUS_OUT and mode in ["flight","rollout","ejected"] and not test_mode and capture_file.is_empty():
+	if what==NOTIFICATION_APPLICATION_FOCUS_OUT and mode in ["flight","rollout","ejected"] and not test_mode and not paper_test and capture_file.is_empty():
 		resume_mode = mode; mode = "paused"
 func _input(event: InputEvent) -> void:
 	if test_mode: return
@@ -156,7 +172,8 @@ func _input(event: InputEvent) -> void:
 				if mode in ["title","results"]: on_action("fly")
 			KEY_R:
 				if mode in ["flight","rollout","paused","results"]:
-					if flight_kind=="demo": on_action("guided" if demo_auto_fire else "fly")
+					if paper_test: on_action("restart")
+					elif flight_kind=="demo": on_action("guided" if demo_auto_fire else "fly")
 					else: start_flight(flight_kind)
 			KEY_V:
 				if mode in ["flight","rollout","paused","results"]: cockpit = not cockpit; camera_rig.reset()
@@ -200,8 +217,14 @@ func take_manual_control(steering: bool) -> void:
 func on_action(action: String) -> void:
 	match action:
 		"route": select_route("alpine" if route_id=="coast" else "coast")
-		"fly": start_flight(); copilot = true; used_copilot = true; demo_auto_fire = false
-		"restart": start_flight(); copilot = true; used_copilot = true
+		"fly": start_flight(); copilot = not vision.enabled; used_copilot = copilot; demo_auto_fire = false
+		"restart":
+			if paper_test:
+				vision.enabled=true
+				start_flight("paper")
+				copilot=false
+			else:
+				start_flight(); copilot = true; used_copilot = true
 		"approach": start_flight("approach")
 		"runway": start_flight("runway")
 		"guided": start_flight(); copilot = true; used_copilot = true; demo_auto_fire = true
@@ -209,7 +232,11 @@ func on_action(action: String) -> void:
 		"help": help_visible = not help_visible; calibration_visible = false; credits_visible = false
 		"camera": calibration_visible = not calibration_visible; help_visible = false; credits_visible = false
 		"credits": credits_visible = not credits_visible
-		"vision": vision.enabled = not vision.enabled
+		"vision":
+			vision.enabled = not vision.enabled
+			if vision.enabled:
+				mouse_yoke = false
+				copilot = false
 		"mute": audio.muted = not audio.muted; save_settings()
 		"quality": set_quality(not high_quality)
 		"title":
@@ -253,6 +280,10 @@ func capture_frame() -> void:
 	if not test_mode: get_tree().call_deferred("quit")
 
 func _physics_process(dt: float) -> void:
+	# Paper testing must not fly away while centering or while the card is hidden.
+	if paper_test and vision.enabled and not vision.tracking:
+		control = Vector3.ZERO
+		return
 	if overlay_visible() or mode=="paused": return
 	if mode=="ejected":
 		fighter_fx.tick_ejection(dt)
@@ -309,10 +340,12 @@ func _physics_process(dt: float) -> void:
 				if flight.forward().angle_to(lead.normalized())<(deg_to_rad(25) if combat.assist else atan2(10.0,maxf(lead.length(),100))): combat.fire_gun()
 			combat.fire_missile()
 	else:
-		if mouse_yoke and not Input.is_key_pressed(KEY_ALT):
+		if mouse_yoke and not vision.enabled and not Input.is_key_pressed(KEY_ALT):
 			var mouse: Vector2 = (get_viewport().get_mouse_position()-Vector2(800,470))/Tune.MOUSE_RANGE
 			input.x = clampf(mouse.x,-1,1); input.y = clampf(-mouse.y,-1,1)
 		if vision.enabled and vision.throttle_confidence>0.4: flight.throttle = move_toward(flight.throttle,vision.throttle,dt*0.8)
+		if paper_test and vision.enabled:
+			flight.throttle = clampf(.45+(135-flight.speed)*.035,0,1)
 		flight.throttle = clampf(flight.throttle+power*dt*Tune.THROTTLE_RATE,0,1)
 		flight.power_input = power
 		flight.afterburner = Input.is_physical_key_pressed(KEY_SHIFT) and flight.airborne
