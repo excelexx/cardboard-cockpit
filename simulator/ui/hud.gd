@@ -25,7 +25,7 @@ func _ready() -> void:
 func _process(dt: float) -> void:
 	clock += dt; queue_redraw()
 func text(at: Vector2, value: String, size: int = 18, color: Color = WHITE, technical: bool = false) -> void:
-	draw_string_outline(mono if technical else font,at,value,HORIZONTAL_ALIGNMENT_LEFT,-1,maxi(size,12),3,Color(0.005,0.015,0.025,color.a*.95))
+	draw_string(mono if technical else font,at+Vector2(0,1),value,HORIZONTAL_ALIGNMENT_LEFT,-1,maxi(size,12),Color(0.005,0.015,0.025,color.a*.85))
 	draw_string(mono if technical else font,at,value,HORIZONTAL_ALIGNMENT_LEFT,-1,maxi(size,12),color)
 func line(a: Vector2,b: Vector2,color: Color=MUTED,width: float=1) -> void:
 	draw_line(a,b,Color(0.005,0.015,0.025,color.a*0.48),width+1.8,true)
