@@ -25,9 +25,5 @@ func run() -> void:
 	wrong=wrong or result.success or result.code!="ejected"
 	state.ejected=false;state.cause="sector";result=assess.assess(state,true,"")
 	wrong=wrong or result.success or result.code!="sector"
-	state={"tutorial":true,"training_ready":true,"contact":"landed","stopped":true}
-	result=assess.assess(state,true,"");wrong=wrong or not result.success or result.code!="training_complete"
-	state.training_ready=false;result=assess.assess(state,true,"")
-	wrong=wrong or result.success or result.code!="training_incomplete"
 	print("MISSION OUTCOMES: ","FAIL" if wrong else "PASS")
 	app.queue_free();await process_frame;quit(1 if wrong else 0)

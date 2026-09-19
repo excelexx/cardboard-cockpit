@@ -57,10 +57,8 @@ Final wireless recheck: after restarting the signed release, its own child `Badg
 
 Badge B, keyboard L and the on-screen LAND AT SFO button now start one assisted landing action: safe weapons, deploy gear/flaps, transfer through a brief visual transition to SFO final, approach, touchdown and automatic braking. Score is retained and repeated presses do not restart the approach. The ending begins landing automatically after its seven-second prompt. Guided full run: 125.72 seconds; no-fire full run: 140.20 seconds, both landed and stopped. The no-fire run still reports an incomplete intercept. The explicit return transition is exempt from the continuous-flight displacement test.
 
-## 0.12.0 — tutorial and accurate mission assessment
+## 0.12.0 — in-mission coaching and accurate outcomes
 
-Added a self-paced instructor with system speech and captions, explicit cardboard/badge/keyboard mapping, player-demonstrated primary/salvo/target exercises and assisted landing. Introductory briefings hold the aircraft; practice has no combat timer. The initial voice is local OS synthesis, with a captions-only fallback; physical headphone output remains unverified.
+Latest user direction supersedes the separate-training prototype: Play now coaches during the first three real goose kills, without freezing gameplay or opening a separate training mode. The third kill triggers a handoff while preserving the current sortie. SF crashes recover the aircraft to stable flight; landing mishaps retry final approach, retaining score/progress. Normal mission success still requires boss defeat and landing.
 
-Reproduced the prior bug with a failing regression: landing without defeating the boss queued the `landed` recording, whose words said “Mission completed.” A central assessment now drives both the visible outcome and radio cue, with cause-specific advice. Tests distinguish full success, safe landing with missing boss, missing recovery, crash, runway excursion, ejection, sector exit and training completion.
-
-Verification completed: full `tools/verify.sh` passes with the tutorial and outcome regressions. The native macOS speech probe selected **Daniel** and confirmed start, pause, resume and stop through the actual OS speech API. This validates narration control, not the user's physical headphone connection or subjective voice quality.
+Reproduced and fixed a failing regression where safe landing without the boss announced “Mission completed.” The shared result assessment now drives headline, advice, score and radio consistently. Native Daniel speech start/pause/resume/stop was verified. Physical headphone routing remains unverified.

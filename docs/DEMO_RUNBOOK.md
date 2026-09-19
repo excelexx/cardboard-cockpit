@@ -13,4 +13,4 @@ Prepare the physical props and calibration before showing the camera mode. Real 
 
 Use one SF map throughout the presentation. Landing practice remains an optional mode. The timed boss demo now includes landing: about 126 seconds for the guided win and 140 seconds with no firing.
 
-Choose **Tutorial** for self-paced spoken/captioned training. Enter or badge START continues; Repeat voice repeats the lesson. Safe landing without the boss is explicitly an incomplete objective, not a mission-complete announcement. See [tutorial guide](TUTORIAL.md).
+Play includes spoken coaching during the first three goose kills, followed by an instructor handoff. There is no separate training mode or Continue button. Crashes recover to stable flight; a landing mishap retries final approach. Score and mission progress remain intact. Safe landing without the boss remains an incomplete objective.
