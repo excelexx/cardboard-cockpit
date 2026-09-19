@@ -14,12 +14,14 @@ const Hud = preload("res://ui/hud.gd")
 const Manual = preload("res://systems/arcade_controls.gd")
 const Mission = preload("res://systems/demo_mission.gd")
 const Approach = preload("res://systems/approach_guidance.gd")
+const Badge = preload("res://systems/badge_link.gd")
 var mode := "title"
 var resume_mode := "flight"
 var flight_kind := "demo"
 var mission: DemoMission = Mission.new()
 var flight: FlightDynamics = Dynamics.new()
 var vision: VisionClient = Vision.new()
+var badge: BadgeLink = Badge.new()
 var world: FlightWorld
 var aircraft: Node3D
 var aircraft_visuals: AircraftVisuals
@@ -248,6 +250,7 @@ func capture_frame() -> void:
 	if not test_mode: get_tree().call_deferred("quit")
 
 func _physics_process(dt: float) -> void:
+	badge.tick(self,dt)
 	if overlay_visible() or mode=="paused": return
 	if mode=="ejected":
 		fighter_fx.tick_ejection(dt)
