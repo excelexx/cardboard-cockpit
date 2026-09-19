@@ -1,0 +1,32 @@
+test_invalid_inputs (test_controls.ButtonCalibrationTests) ... ok
+test_recorded_physical_sequence (test_controls.ButtonCalibrationTests) ... ok
+test_simultaneous_buttons (test_controls.ButtonCalibrationTests) ... ok
+test_unused_parallel_input_is_filtered (test_controls.ButtonCalibrationTests) ... ok
+test_standard_crc_a_vector (test_controls.CRCTests) ... ok
+test_all_instructions_decode_and_branches_stay_in_helper (test_controls.MachineCodeTests) ... ok
+test_cycle_counter_matches_esp32c3 (test_controls.MachineCodeTests) ... ok
+test_already_halted_target_stays_halted (test_controls.RecoveryTests) ... ok
+test_exclusive_local_device_lock (test_controls.RecoveryTests) ... ok
+test_failed_ram_recovery_does_not_resume (test_controls.RecoveryTests) ... ok
+test_halted_scope_resumes_after_exception (test_controls.RecoveryTests) ... ok
+test_interrupt_waits_for_rpc_reply_before_cleanup (test_controls.RecoveryTests) ... ok
+test_memory_validation_happens_before_transport (test_controls.RecoveryTests) ... ok
+test_pin_configuration_is_restored_after_failure (test_controls.RecoveryTests) ... ok
+test_reserved_usb_and_flash_pins_are_rejected (test_controls.RecoveryTests) ... ok
+test_unknown_firmware_is_rejected_before_ram_write (test_controls.RecoveryTests) ... ok
+test_locked_assets_cover_supported_hosts (test_controls.ToolchainTests) ... ok
+test_native_host_selection (test_controls.ToolchainTests) ... ok
+test_blank_image_is_not_formatted (test_filesystem.FilesystemTests) ... ok
+test_explicit_extraction_and_no_overwrite (test_filesystem.FilesystemTests) ... ok
+test_summary_does_not_export_paths_or_values (test_filesystem.FilesystemTests) ... ok
+test_recorded_firmware_image_fits_new_slot (test_filesystem.PartitionLayoutTests) ... ok
+test_recovered_filesystem_extent_is_preserved (test_filesystem.PartitionLayoutTests) ... ok
+test_fragmented_frame_and_non_json_banner (test_serial.SerialFramingTests) ... ok
+test_oversized_command_rejected_before_write (test_serial.SerialFramingTests) ... ok
+test_request_matches_result_identifier (test_serial.SerialFramingTests) ... ok
+test_timeout (test_serial.SerialFramingTests) ... ok
+
+----------------------------------------------------------------------
+Ran 27 tests in 0.050s
+
+OK
