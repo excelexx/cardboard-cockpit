@@ -3,6 +3,9 @@ class_name DemoMission
 const Tune = preload("res://data/balance.gd")
 ## A continuous departure, valley engagement, recovery and landing.
 const CoastalRoute = preload("res://systems/scenic_route.gd")
+const SFRoute = preload("res://systems/san_francisco_route.gd")
+func route_points() -> Array[Vector3]: return SFRoute.POINTS if app.route_id=="sf" else CoastalRoute.POINTS
+func route_names() -> Array[String]: return SFRoute.NAMES if app.route_id=="sf" else CoastalRoute.NAMES
 var route_index := 0
 var visited_route: Array[int] = []
 var app: Node
@@ -30,22 +33,22 @@ func tick(dt: float) -> void:
 	var f: FlightDynamics = app.flight
 	if phase=="takeoff" and f.airborne and f.position.y-app.world.ground_height(f.position.x,f.position.z)>45:
 		transition("combat")
-	elif app.route_id!="coast" and phase=="combat" and (f.position.z<-9000 or phase_clock>Tune.ALPINE_COMBAT_LIMIT):
+	elif app.route_id not in ["coast","sf"] and phase=="combat" and (f.position.z<-9000 or phase_clock>Tune.ALPINE_COMBAT_LIMIT):
 		transition("return")
-	elif app.route_id!="coast" and phase=="return" and f.position.z<-10300 and f.position.z>-13200 and absf(f.position.x)<350 and absf(f.heading)<.45:
+	elif app.route_id not in ["coast","sf"] and phase=="return" and f.position.z<-10300 and f.position.z>-13200 and absf(f.position.x)<350 and absf(f.heading)<.45:
 		transition("approach")
-	if app.route_id=="coast" and phase in ["combat","return"]:
+	if app.route_id in ["coast","sf"] and phase in ["combat","return"]:
 		var delta: Vector3 = route_target()-f.position
 		if Vector2(delta.x,delta.z).length()<Tune.WAYPOINT_RADIUS and absf(delta.y)<Tune.WAYPOINT_HEIGHT_TOLERANCE:
 			visited_route.append(route_index); route_index += 1
-			if route_index>=CoastalRoute.POINTS.size(): transition("approach")
+			if route_index>=route_points().size(): transition("approach")
 			elif route_index>=8 and phase=="combat": transition("return")
 	if f.contact=="landed": transition("rollout")
 	app.combat.engagement_enabled = phase=="combat"
 func label() -> String:
 	return {"takeoff":"01 / DEPARTURE","combat":"02 / INTERCEPT","return":"03 / RECOVERY","approach":"03 / FINAL APPROACH","rollout":"03 / ROLLOUT"}.get(phase,"")
 func instruction() -> String:
-	if app.route_id=="coast" and phase in ["combat","return"]: return CoastalRoute.NAMES[mini(route_index,CoastalRoute.NAMES.size()-1)]+"  •  FOLLOW THE BLUE DIAMOND"
+	if app.route_id in ["coast","sf"] and phase in ["combat","return"]: return route_names()[mini(route_index,route_names().size()-1)]+"  •  FOLLOW THE BLUE DIAMOND"
 	if phase=="takeoff": return "W  FULL POWER  •  ↑ ROTATE AT 105 KT" if not app.flight.airborne else "POSITIVE CLIMB  •  G GEAR UP"
 	if phase=="combat": return "W ACCELERATE  /  S AIRBRAKE  •  ALIGN THE ACQUISITION RING"
 	if phase=="return": return "NORTH FIELD / RWY 36  •  REDUCE POWER"
@@ -60,7 +63,7 @@ func controls() -> Vector3:
 	if phase=="approach":
 		f.afterburner = false
 		return app.approach_controls()
-	if app.route_id=="coast": return coastal_controls()
+	if app.route_id in ["coast","sf"]: return coastal_controls()
 	var desired := Vector3(0,240,-11000)
 	var speed := Tune.ALPINE_RETURN_SPEED
 	if phase=="combat":
@@ -93,7 +96,7 @@ func controls() -> Vector3:
 	return Vector3(clampf((bank-f.roll)*1.6-f.roll_velocity*.3,-1,1),clampf((pitch-f.pitch)*3.0-f.pitch_velocity*.25,-1,1),clampf(error*.8,-1,1))
 
 func route_target() -> Vector3:
-	return CoastalRoute.POINTS[mini(route_index,CoastalRoute.POINTS.size()-1)]
+	return route_points()[mini(route_index,route_points().size()-1)]
 
 func coastal_controls() -> Vector3:
 	var f: FlightDynamics = app.flight
@@ -103,6 +106,7 @@ func coastal_controls() -> Vector3:
 	var desired_pitch: float = clampf(atan2(delta.y,maxf(Vector2(delta.x,delta.z).length(),250)),-.36,.40)
 	var desired_speed: float = Tune.COAST_EARLY_SPEED if route_index<4 else Tune.COAST_CRUISE_SPEED
 	if route_index>=8: desired_speed = Tune.COAST_RETURN_SPEED
+	if app.route_id=="sf": desired_speed = 200 if route_index<11 else 135 if route_index<13 else 100
 	f.gear = false; f.flaps = 0; f.afterburner = false
 	f.throttle = clampf(.24+(desired_speed-f.speed)*.065,0,1)
 	return Vector3(clampf((desired_roll-f.roll)*5,-1,1),clampf((desired_pitch-f.pitch)*6,-1,1),clampf(error*1.4,-1,1))

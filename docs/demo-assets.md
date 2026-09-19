@@ -1,3 +1,5 @@
+> Version 0.10 supersedes the earlier custom airframe/weapon/sky descriptions below. Active default-world sources are listed in [San Francisco credits](san-francisco.md). The custom CG-26/M-26 and generated airframe/forest assets are historical artwork.
+
 # SPECTRE asset credits
 
 - **SPECTRE airframe:** FlightGear F-35B, GPL-3.0. The base mesh and source textures are included with license and pinned SHA-256 manifest. This project adds swept fore-chines, widened proportions, game-tuned materials, animation and the SPECTRE graphite/amber livery. The generated livery adapts the original UV texture and retains its GPL licensing obligations. [Aircraft notices](../THIRD_PARTY_ASSETS.md).
