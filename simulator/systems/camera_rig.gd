@@ -18,7 +18,7 @@ var pip_texture: Texture2D
 func _ready() -> void:
 	camera = Camera3D.new()
 	camera.near = 0.06
-	camera.far = 38000
+	camera.far = 90000 if app.route_id=="sf" else 38000
 	camera.current = true
 	add_child(camera)
 	pip_viewport = SubViewport.new()
@@ -61,13 +61,13 @@ func update(dt: float) -> void:
 		camera.look_at(target)
 		return
 	if app.cockpit:
-		camera.near = 0.04
+		camera.near = 0.12
 		camera.position = f.position+plane_basis*Vector3(0,2.6,-5.0)
 		var look_basis := Basis.from_euler(Vector3(app.look.y,app.look.x,0))
 		camera.basis = plane_basis*look_basis*Basis.from_euler(angular)
 		app.cockpit_frame.basis = look_basis.inverse()
 	else:
-		camera.near = 0.3
+		camera.near = 1.0
 		if not initialized:
 			yaw = f.heading; bank = 0; initialized = true
 		yaw = lerp_angle(yaw,f.heading,1-exp(-dt*8))
