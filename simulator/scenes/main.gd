@@ -12,6 +12,8 @@ const Visuals = preload("res://systems/aircraft_visuals.gd")
 const Approach = preload("res://systems/approach_guidance.gd")
 const CHECKPOINTS: Array[Vector3] = [Vector3(0,180,-2000),Vector3(-450,420,-4200),Vector3(450,650,-6500),Vector3(150,420,-9000),Vector3(0,200,-11800)]
 const RING_RADIUS: float = 280.0
+const CAMERA_VIEWS: Array[String] = ["cockpit","chase","tail","top","left","right","front"]
+const CAMERA_VIEW_NAMES: Array[String] = ["Cockpit","Chase","Tail","Top down","Left side","Right side","Nose"]
 
 var mode := "hangar"
 var resume_mode := "flight"
@@ -35,7 +37,15 @@ var ring_nodes: Array[Node3D] = []
 var ring_index: int = 0
 var copilot := false
 var used_copilot := false
-var cockpit := true
+var camera_view := "cockpit"
+var camera_menu_open := false
+var camera_snap := true
+# Keep the legacy boolean API for cockpit-only instruments and existing integrations.
+var cockpit: bool:
+	get:
+		return camera_view == "cockpit"
+	set(value):
+		set_camera_view("cockpit" if value else "chase")
 var spectator := false
 var help_visible := false
 var calibration_visible := false
@@ -129,8 +139,10 @@ func _ready() -> void:
 			start_flight()
 			copilot = true
 			used_copilot = true
+		if arg.begins_with("--view="):
+			set_camera_view(arg.trim_prefix("--view="))
 		if arg == "--chase":
-			cockpit = false
+			set_camera_view("chase")
 		if arg == "--airborne":
 			start_flight()
 			flight.position = Vector3(0,350,-4000)
@@ -211,6 +223,8 @@ func update_rings() -> void:
 		mat.emission_energy_multiplier = 2.2 if i == ring_index else 0.6
 
 func start_flight() -> void:
+	camera_menu_open = false
+	camera_snap = true
 	for child: Node in aircraft.get_children():
 		child.queue_free()
 	var model: Node3D = load_plane()
@@ -263,12 +277,14 @@ func _input(event: InputEvent) -> void:
 				if credits_visible: credits_visible = false
 				elif help_visible: help_visible = false
 				elif calibration_visible: calibration_visible = false
+				elif camera_menu_open: camera_menu_open = false
 				elif mode in ["flight","rollout"]:
 					resume_mode = mode
 					mode = "paused"
 				elif mode == "paused": mode = resume_mode
 				elif mode == "briefing": mode = "hangar"
-			KEY_V: cockpit = not cockpit
+			KEY_V:
+				if camera_controls_available(): cycle_camera_view(-1 if event.shift_pressed else 1)
 			KEY_TAB: spectator = not spectator
 			KEY_C: on_action("calibration")
 			KEY_Q: set_quality(not high_quality)
@@ -286,12 +302,15 @@ func _input(event: InputEvent) -> void:
 					copilot = not copilot
 					used_copilot = used_copilot or copilot
 					show_toast("Training copilot engaged" if copilot else "You have control")
-			KEY_1,KEY_2,KEY_3,KEY_4,KEY_5:
-				if mode == "hangar": select_plane(event.keycode-KEY_1)
+			KEY_1,KEY_2,KEY_3,KEY_4,KEY_5,KEY_6,KEY_7:
+				if mode == "hangar" and event.keycode <= KEY_5 and not (help_visible or calibration_visible or credits_visible):
+					select_plane(event.keycode-KEY_1)
+				elif camera_controls_available():
+					set_camera_view(CAMERA_VIEWS[event.keycode-KEY_1])
 	if event is InputEventMouseMotion:
 		if mode == "hangar" and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and event.position.y<735:
 			hangar_angle += event.relative.x*0.006
-		if mode in ["flight","rollout"] and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		if camera_controls_available() and not camera_menu_open and camera_view != "top" and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 			look.x = clampf(look.x-event.relative.x*0.003,-1.5,1.5)
 			look.y = clampf(look.y-event.relative.y*0.003,-0.8,0.8)
 	if event is InputEventMouseButton and mode == "hangar":
@@ -299,6 +318,12 @@ func _input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN: hangar_zoom = minf(1.45,hangar_zoom+0.06)
 
 func on_action(action: String) -> void:
+	if action.begins_with("view_"):
+		if camera_controls_available(): set_camera_view(action.trim_prefix("view_"))
+		return
+	if action == "views":
+		if camera_controls_available(): camera_menu_open = not camera_menu_open
+		return
 	if action.begins_with("weather_"):
 		conditions = action.trim_prefix("weather_")
 		world.set_conditions(conditions)
@@ -312,13 +337,21 @@ func on_action(action: String) -> void:
 		"fly", "restart": start_flight()
 		"hangar":
 			mode = "hangar"
+			camera_menu_open = false
+			camera_snap = true
 			help_visible = false
 			calibration_visible = false
 			update_rings()
 		"resume": mode = resume_mode
-		"help": help_visible = not help_visible
-		"credits": credits_visible = not credits_visible
-		"calibration": calibration_visible = not calibration_visible
+		"help":
+			camera_menu_open = false
+			help_visible = not help_visible
+		"credits":
+			camera_menu_open = false
+			credits_visible = not credits_visible
+		"calibration":
+			camera_menu_open = false
+			calibration_visible = not calibration_visible
 		"vision":
 			vision.enabled = not vision.enabled
 			if not vision.enabled: vision.status = "KEYBOARD / MOUSE"
@@ -378,7 +411,7 @@ func _physics_process(dt: float) -> void:
 		control = pilot_controls()
 	else:
 		var target_control: Vector3 = keyboard
-		if mouse_yoke and not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		if mouse_yoke and not camera_menu_open and not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 			var mouse: Vector2 = (get_viewport().get_mouse_position()-Vector2(800,435))/Vector2(450,300)
 			target_control.x = clampf(mouse.x,-1,1)
 			target_control.y = clampf(-mouse.y,-1,1)
@@ -502,10 +535,34 @@ func show_toast(message: String) -> void:
 	toast = message
 	toast_time = 4.0
 
+func camera_view_label() -> String:
+	var index: int = CAMERA_VIEWS.find(camera_view)
+	return CAMERA_VIEW_NAMES[index] if index >= 0 else CAMERA_VIEW_NAMES[0]
+
+func camera_controls_available() -> bool:
+	return mode in ["flight","rollout","paused","results"] and not (help_visible or calibration_visible or credits_visible)
+
+func set_camera_view(view_id: String) -> void:
+	if view_id not in CAMERA_VIEWS:
+		return
+	camera_view = view_id
+	camera_menu_open = false
+	camera_snap = true
+	look = Vector2.ZERO
+
+func cycle_camera_view(direction: int = 1) -> void:
+	var index: int = CAMERA_VIEWS.find(camera_view)
+	set_camera_view(CAMERA_VIEWS[posmod(index+direction,CAMERA_VIEWS.size())])
+
+func camera_framing_size() -> float:
+	# The B-2 is much wider than it is long; length alone crops its wingtips.
+	return maxf(maxf(float(profile().span),float(profile().length)),22.0)
+
 func update_camera(dt: float) -> void:
 	if mode in ["hangar","briefing"]:
 		camera.environment = hangar_environment
 		camera.near = 0.5
+		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 		aircraft.visible = false
 		hangar.visible = true
 		cockpit_frame.visible = false
@@ -514,6 +571,7 @@ func update_camera(dt: float) -> void:
 		var screen_right := Vector3(cos(hangar_angle),0,-sin(hangar_angle))
 		camera.look_at(hangar.position+Vector3(0,7,0)-screen_right*19.0)
 		camera.fov = 58
+		camera_snap = true
 	else:
 		camera.environment = null
 		aircraft.visible = not cockpit
@@ -521,6 +579,7 @@ func update_camera(dt: float) -> void:
 		cockpit_frame.visible = cockpit
 		var plane_basis := Basis.from_euler(Vector3(flight.pitch,-flight.heading,-flight.roll))
 		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT): look = look.lerp(Vector2.ZERO,1-exp(-dt*2.0))
+		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 		if cockpit:
 			camera.near = 0.05
 			camera.position = flight.position+plane_basis*Vector3(0,3.0,-float(profile().length)*0.29)
@@ -529,12 +588,31 @@ func update_camera(dt: float) -> void:
 			camera.fov = 77
 		else:
 			camera.near = 0.5
-			var length: float = maxf(float(profile().length),30.0)
-			var offset := Vector3(sin(look.x)*length*1.15,length*0.22+6.0+look.y*15.0,cos(look.x)*length*1.05)
-			var wanted: Vector3 = flight.position+Basis(Vector3.UP,-flight.heading)*offset
-			camera.position = camera.position.lerp(wanted,1-exp(-dt*5)) if camera.position.distance_to(wanted)<1000 else wanted
-			camera.look_at(flight.position+plane_basis*Vector3(0,3,-length*0.30))
+			var frame: float = camera_framing_size()
+			var length: float = float(profile().length)
+			var span: float = float(profile().span)
+			var heading_basis := Basis(Vector3.UP,-flight.heading)
+			var target: Vector3 = flight.position+plane_basis*Vector3(0,2.0,0 if camera_view == "top" else -length*0.08)
+			var offset: Vector3
+			match camera_view:
+				"tail": offset = Vector3(0,frame*0.13+3.0,length*0.5+frame*0.66)
+				"top": offset = Vector3(0,frame*1.65,0)
+				"left": offset = Vector3(-(span*0.5+frame*0.88),frame*0.17+3.0,0)
+				"right": offset = Vector3(span*0.5+frame*0.88,frame*0.17+3.0,0)
+				"front": offset = Vector3(0,frame*0.16+3.0,-(length*0.5+frame*0.88))
+				_: offset = Vector3(0,frame*0.40+5.0,length*0.5+frame*0.96)
+			if camera_view != "top":
+				offset = Basis(Vector3.UP,look.x)*offset
+				offset.y += look.y*frame*0.65
+			var wanted: Vector3 = target+heading_basis*offset
+			# Terrain clearance applies after smoothing too, including fast turns near hills.
+			wanted.y = maxf(wanted.y,world.ground_height(wanted.x,wanted.z)+4.0)
+			camera.position = wanted if camera_snap or camera.position.distance_to(wanted)>1000 else camera.position.lerp(wanted,1-exp(-dt*5.0))
+			camera.position.y = maxf(camera.position.y,world.ground_height(camera.position.x,camera.position.z)+4.0)
+			# Heading-forward is a nonparallel up axis when looking straight down.
+			camera.look_at(target,heading_basis*Vector3.FORWARD if camera_view == "top" else Vector3.UP)
 			camera.fov = 65
+		camera_snap = false
 
 func create_cockpit() -> void:
 	cockpit_frame = Cockpit.new()
