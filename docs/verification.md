@@ -1,7 +1,9 @@
 # Version 0.10 San Francisco verification
 
 - Full `tools/verify.sh`: PASS (flight, assisted controls, scene, audio, both legacy routes, SF route, ballistics, combat feel, balance, city grounding, vision validation and reconnect).
-- SF round trip: 459.85 simulated seconds, 14/14 waypoints, safe SFO 28R stop, no terrain-recovery position corrections; 89.93 seconds in the city/bridge corridor.
+- SF round trip: 459.85 simulated seconds, 14/14 waypoints, safe SFO 28R stop, no terrain-recovery position corrections; 1180 cannon rounds, 23 missiles, 23 geese cleared; 89.93 seconds in the city/bridge corridor.
+- Native packaged flight, observed with Computer Use: **Aircraft secured**, 23 geese, best streak 4, score 2700; continuous takeoff/intercept/landing complete.
+- Live cockpit city sample was 27 FPS during streaming in Balanced mode; final Balanced mode shortens distant building/tree draw ranges.
 - Native visual checks: Golden Gate 70 FPS, downtown 56 FPS, SFO 65 FPS, cockpit 42 FPS on this Mac. These are observed samples, not a constant-framerate guarantee.
 - New source cockpit uses live 2D flight instruments, correct SF compass offset and SFO navigation labels. Final scene check: 27/27 PASS.
 - Original source archives and SHA-256 manifests are included; no runtime map service is required.
