@@ -1,3 +1,5 @@
+> Historical planning / release notes. Current gameplay and controls are documented in [README](../README.md) and [SPECTRE runbook](DEMO_RUNBOOK.md).
+
 # Phase 0 — environment and implementation path
 
 Checked September 18, 2026.

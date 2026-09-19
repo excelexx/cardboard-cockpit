@@ -1,194 +1,74 @@
-# Goose Protocol · Cardboard Cockpit
+# Goose Protocol — SPECTRE X-26
 
-**Version 0.5 — a three-minute, cardboard-controlled arcade demo.** Waterloo geese have taken over the skies. Start with a tiny trainer and a worn gatling, upgrade through six aircraft and six single-weapon loadouts, and finish in a Millennium Falcon-style freighter firing continuous twin plasma beams.
+Version 0.6 is a native Mac aerial-combat game with **one fictional fighter, a permanent cannon and guided-missile loadout, and Waterloo Canada geese as enemies**. There are no aircraft choices, weapon upgrades, progression stages or plasma weapons.
 
-Double-click **Launch Cardboard Cockpit.command**, then press **Enter** or **Start the 3-minute demo**. Each stage lasts 30 seconds. Low-strength aim assistance gives a small directional nudge and fires when a target is locked; poor aim can still miss. J toggles assistance; **Space / left click** fires manually. **H** hands the guided demonstration over to the pilot. Tracked cardboard controls take control automatically. **C** opens camera setup before launch.
+Open **Launch Cardboard Cockpit.command** or **build/Cardboard Cockpit.app**, then press **Enter**. A sortie lasts three minutes; survive incoming missiles, intercept geese and manage ammunition, cannon heat and countermeasures. The flight deck also offers guided flight and landing practice.
 
-**Developer mode:** press **F9**, then **1–6** to jump to any stage or **N** for the next stage. F9 disables the shortcuts again. The HUD clearly marks developer mode and the showcase's training shield. The guided showcase advances on time; it does not claim to be an unassisted campaign victory.
+![SPECTRE in the valley](docs/screenshots/spectre-flight.png)
 
-See [the three-minute judge runbook](docs/DEMO_RUNBOOK.md), [asset credits](docs/demo-assets.md), and [verification](docs/verification.md).
-
-The six upgrades are Kestrel trainer / worn gatling, F-35 / guided missile, B-2 / heavy autocannon, An-225 / missile battery, VX-9 / pulse plasma, and Millennium Falcon-style freighter / twin plasma. Enemies always remain Canada geese; flock sizes rise from 3 to 16. No dimension switching or reality-warping systems are included.
-
-The merged flight lab below remains accessible from **Aircraft hangar**. It preserves the upstream cockpits, weather presets and landing rollout, alongside the earlier verified fixes.
-
----
-
-A native Mac flight game with six real aircraft models, a cinematic mountain valley, and optional cardboard controls.
-
-**Version 0.3 — native keyboard/mouse flight prototype.** Choose a valley mission, landing practice, or free flight. Fly from detailed cockpits with live instruments, animated aircraft controls, selectable sky conditions, and a landing rollout. This is a standalone Godot application; it does not run in a browser or require an internet connection to fly.
-
-![The aircraft hangar](docs/screenshots/hangar.png)
-
-## Play on this Mac
-
-Double-click **Launch Cardboard Cockpit.command** in this folder, or open **build/Cardboard Cockpit.app** directly. The packaged app needs neither Godot nor Python installed. The local build is ad-hoc signed, not Apple-notarized for public distribution.
-
-1. Choose the A380, F-35, B-2, 737, 747, or An-225 in the hangar.
-2. Click **Prepare flight**. Choose **Valley mission**, **Landing practice**, or **Free flight**, and select **Golden hour**, **Clear midday**, or **High overcast** conditions. Start the flight. Enter also advances these screens.
-3. Hold **W** for power. At the indicated rotation speed, gently hold **↑** to lift off.
-4. Follow the amber rings. Use **V** to cycle camera views or click **View** at the top right.
-5. After the fifth ring, reduce power with **S**, lower gear with **G**, and press **F** to select approach flaps. Follow the approach diamonds toward runway 36 at North Field, using the aircraft's indicated speed target. Keep the wings level and descend gently.
-6. After touchdown, hold **Space** to brake to a stop and use **A / D** to stay on the runway. Results appear after stopping. Landing score reflects descent rate, speed, bank and distance from the centerline; a runway overrun fails the landing.
-
-**Landing practice** starts airborne on the North Field approach with gear and approach flaps selected. **Free flight** removes the checkpoint requirement and lets you explore the fictional valley and land at either airport. The numbered instructions above describe the valley mission.
-
-**H** engages an optional training copilot that can fly the route and brake after landing. Steering or changing power with the keyboard immediately returns control to you. Results disclose when the copilot was used. **R** restarts the selected flight mode; **Escape** pauses.
-
-Switching to another app pauses the flight automatically. Help and camera setup block flight shortcuts until closed. Arrow-key or rudder input takes over from the mouse yoke. Missed checkpoints can be collected by turning back through the ring in either direction.
-
-## Controls
+## Fly
 
 | Input | Action |
 | --- | --- |
-| W / S | Increase / decrease throttle |
-| ↑ / ↓ | Nose up / nose down |
-| ← / → | Bank left / right |
-| A / D | Rudder and ground steering |
-| Space | Wheel brakes |
-| G | Command landing gear; visible wheels/struts animate over two seconds |
-| F | Cycle assisted flap settings: up / takeoff 15° / approach 30° |
-| V / Shift+V | Next / previous camera view |
-| 1–7 in flight | Cockpit, chase, tail, top down, left side, right side, nose |
-| View menu | Click the current view at the top right to choose a camera |
-| Right mouse + drag | Look around; returns forward when released |
-| B | Toggle mouse yoke; cursor displacement controls pitch/roll |
-| H | Training copilot on/off |
-| R | Restart the selected flight mode |
-| Escape | Pause, resume, or close the current overlay |
-| F1 | Controls and credits |
-| F2 | Compact / expanded instrument overlay |
-| M | Mute/unmute |
-| Q | Balanced/high graphics quality |
-| Tab | Spectator information panel |
-| C | Optional camera setup panel; calibration itself runs in tracker preview |
-| 1–5 | Select aircraft in the hangar |
-| Left drag / scroll | Orbit / zoom in the hangar |
+| Arrow keys | Pitch / roll |
+| A / D | Rudder; steer during rollout |
+| W / S | Increase / decrease power |
+| Hold Shift | Afterburner |
+| Space / left mouse | Cannon; Space brakes on the ground |
+| T / right mouse | Guided missile; requires a stable lock |
+| Z | Countermeasure burst |
+| Q | Quick barrel roll, when altitude permits |
+| V | Cockpit / chase camera |
+| Hold X | Missile datalink inset while your missile is flying |
+| Alt + mouse / middle drag | Look around |
+| G / F | Gear / flap detent |
+| B / J | Mouse yoke / weak aim assistance |
+| H | Guided pilot on/off |
+| Hold E | Eject |
+| C / F1 | Cardboard setup / controls |
+| Escape / R / M | Pause / restart / mute |
+| F9 / F10 | Telemetry / graphics quality |
 
-## Camera views
+A teal bracket identifies the tracked contact. Keep it within the forward acquisition cone until the circle fills and the missile count turns green. The small diamond estimates the cannon lead point. Aim assistance only nudges the shot direction; it can miss. Red edge arrows show incoming missile bearings. Use countermeasures, acceleration and turns to defend.
 
-Fly from the cockpit or inspect the aircraft from a chase, tail, top-down, left-side, right-side or nose camera. Press **V** to move through the views and **Shift+V** to go back. During flight, **1–7** select these views directly; in the hangar, **1–5** still select aircraft. The **View** menu is at the top right and also available while paused.
+Keyboard steering or power input immediately takes over from guided flight and cardboard input. Switching applications pauses flight. Help and setup overlays freeze the simulation. Guided use is recorded in the debrief; it receives no shield or special damage rules.
 
-Exterior cameras adapt to each aircraft’s wingspan and length. The top-down view keeps the aircraft’s heading toward the top of the screen. Changing views preserves your flight and selected view survives a restart.
+Landing practice begins on approach with gear and flaps selected. Reduce descent near the runway, keep the wings level, then hold Space to brake and A/D to maintain the centerline. Touchdown preserves position and attitude, followed by gradual settling and a physical rollout.
 
-![Top-down view and camera selector](docs/screenshots/view-picker.png)
+## Presentation and handling
 
-## What is included
+SPECTRE adapts a detailed licensed FlightGear airframe with a graphite livery, widened silhouette, swept fore-chines, reflective canopy, animated control surfaces, folding gear and four weapon-bay doors. Cannon rounds use swept collision checks; missiles launch after the bay-opening interval and have limited turn rates. External stores disappear as they are used.
 
-- Five externally sourced FlightGear aircraft, with original geometry, textures, source files, attribution, licenses, and reproducible conversion tools.
-- A native hangar, aircraft selection, three flight modes, briefing, seven camera views, pause/reset/help/credits and synthesized engine audio.
-- Original cockpit interiors tailored to the aircraft, including a panoramic fighter display, flight/navigation/engine displays, moving yokes or sticks, and throttle levers. Instruments show airspeed, altitude, attitude, heading, climb, gear, flaps and engine power.
-- Animated landing gear and control surfaces, navigation lights, strobes, beacons and an F-35 exhaust effect. Original imported aircraft source geometry remains included.
-- Two detailed airports with runway markings, approach lighting, terminals, hangars and control towers; a mountain corridor, river, forests, village, photographic materials and sky.
-- Three visual environment presets: warm golden hour, clear midday and hazy high overcast. Selection changes sky, cloud cover, sun direction, exposure and fog; the scenery and flight model stay the same.
-- Gradual engine power, airspeed-dependent takeoff, pitch/roll/yaw, banking turns, flap-assisted lift and drag, stalls, low-altitude warnings, geometric approach guidance, forgiving touchdown checks, braking rollout and landing scores.
-- Terrain contact and collision with major airport buildings, including hangars, terminals, tower structures and jet bridges.
-- Optional Python/OpenCV ArUco tracking, seven-step calibration, local WebSocket connection, smoothing, separate yoke/throttle confidence, safe tracking loss and keyboard takeover.
-- Printable markers, a cardboard build guide, a spectator panel and a short demo pitch.
+The flight model combines filtered angular rates, flight-path inertia, thrust spool, drag, stall behavior and afterburner acceleration. The camera adds speed-dependent FOV, local position lag, subtle recoil and near-ground movement. Missile view is a held inset that preserves the main flight view.
 
-![Live cockpit instruments on approach](docs/screenshots/cockpit.png)
+The mountain valley uses photographic terrain materials, a river, forests, airport buildings, cloud and mist volumes, nearby tree shadows, ambient occlusion and reflections. High quality is the default; F10 selects Balanced. Wing vapor, fading trails, heat distortion, afterburner exhaust and debris respond to flight and combat.
 
-![Choose a flight and sky conditions](docs/screenshots/briefing.png)
+Audio combines licensed jet, wind, cannon, missile, impact, gear, tire and afterburner sounds with cockpit ambience and music. Fifteen licensed voice cues use radio filtering, queue priorities, cooldowns, subtitles and mix ducking. These are Kenney recordings, not ElevenLabs generations.
 
-## Scope and known limits
+## Cardboard controls
 
-This is an arcade flight prototype inspired by the presentation of larger flight simulators. It does not include global streamed scenery, real navigation databases, full airliner procedures, clickable aircraft-specific cockpit systems, weapons, or certified aerodynamics. The original cockpit designs are aircraft-inspired interpretations with simplified instruments, rather than faithful system replicas. Engine displays share a single simulated power state. All aircraft use the same assisted flight model with different handling profiles.
+Use [vision setup](docs/vision-setup.md) and the [construction guide](docs/cardboard-build-guide.md). Print the [build-guide PDF](docs/Cardboard%20Cockpit%20Build%20Guide.pdf) and [markers PDF](vision/Cardboard%20Cockpit%20Markers.pdf) at **100% / actual size**. The yoke uses ArUco ID 7 (70 mm), throttle ID 23 (50 mm), dictionary `DICT_4X4_50`.
 
-Weather presets are visual only: there is no wind, turbulence, precipitation, real weather feed or advancing day/night cycle. The approach diamonds follow a geometric three-degree path to North Field; they are training aids, not a simulated radio navigation system. Flap angles and their handling effects are generic training settings. Gear folding and control-surface motion are approximate visual animations; touchdown checks use the commanded gear state rather than a full hydraulic or gear-lock simulation.
+```sh
+./tools/setup_vision.sh
+./tools/tracker.sh --simulate --loss-demo
+# Explicitly open a webcam and calibrate when the props are ready:
+./tools/tracker.sh --camera 0 --calibrate
+```
 
-Collision uses the rendered terrain and simple bounds for major airport buildings. Trees, poles and small furniture remain forgiving, and aircraft-wide wing collision is not modeled. Landing limits are deliberately generous and do not represent real operating speeds or limits for these aircraft. Free flight remains within the same bounded fictional valley.
+Press C in the game and enable tracking. Capture the seven calibration poses in the separate tracker preview. The service stays on `127.0.0.1`; images are not uploaded or recorded. The native game works without Python or a camera. Physical cardboard/webcam operation remains unverified; synthetic tracking and the live local connection are tested.
 
-The optional tracker has passed synthetic detection and live local connection tests. **Real webcam tracking with physical cardboard props has not been validated.** The game starts in keyboard mode and never opens a webcam. The tracker opens a camera only when explicitly launched with `--camera`.
+## Develop and verify
 
-## Develop from source
-
-The engine is pinned to **Godot 4.7.2**, standard edition. The Mac setup script downloads the official prebuilt editor into the ignored `.tools/` folder.
+The project pins Godot 4.7.2. Mac exports include Apple Silicon and Intel binaries; runtime verification is on Apple Silicon with Metal.
 
 ```sh
 ./tools/setup.sh
 ./tools/run.sh
-```
-
-For the standalone Mac app:
-
-```sh
+./tools/verify.sh
 ./tools/package_mac.sh
 ```
 
-The first export downloads the official export-template archive (about 1.2 GB) and extracts its Mac template. The output is `build/Cardboard Cockpit.app`. Both Apple Silicon and Intel code are included; this build has only been exercised on Apple Silicon with Metal. The code does not require Xcode compilation.
+Packaging creates `build/Cardboard Cockpit.app` and `build/Cardboard Cockpit Mac.zip`, including source and asset notices. The build is locally signed and is not Apple-notarized. See [verification](docs/verification.md), [demo runbook](docs/DEMO_RUNBOOK.md), and [asset credits](docs/demo-assets.md).
 
-Packaging also creates `build/Cardboard Cockpit Mac.zip`, containing the app and its source, including the original licensed aircraft files. The signature is verified before archiving outside the synced Documents folder; Finder metadata in a synced folder can otherwise interfere with strict signature checks.
-
-Other platforms can open `simulator/project.godot` in Godot 4.7.2 and create an appropriate export preset; they have not been tested. A lower-feature renderer can be tested with `./tools/run.sh --rendering-method gl_compatibility`.
-
-## Optional cardboard controls
-
-Read [vision setup and calibration](docs/vision-setup.md) and the [construction guide](docs/cardboard-build-guide.md). The printed yoke uses **ArUco ID 7**, and the throttle **ID 23**, both in `DICT_4X4_50`.
-
-Print the [one-page construction PDF](docs/Cardboard%20Cockpit%20Build%20Guide.pdf) and [marker/keyboard-panel PDF](vision/Cardboard%20Cockpit%20Markers.pdf) on A4 at **100% / actual size**. The black yoke marker is 70 mm and the throttle marker is 50 mm; both were measured and detected in the rendered PDF.
-
-From a fresh clone, run `./tools/setup_vision.sh` to create the local `.venv` and install the pinned camera dependencies. It uses Python 3.9–3.12 or an installed `uv`. Setup never opens a camera.
-
-```sh
-# Test the native connection without a webcam:
-./tools/tracker.sh --simulate --loss-demo
-
-# When real controls are ready, explicitly choose a camera and calibrate:
-./tools/tracker.sh --camera 0 --calibrate
-```
-
-In the game press **C**, enable vision, and return to flight. Calibration poses are captured with Space in the separate tracker preview. Press C in that preview to recalibrate. The client uses `ws://127.0.0.1:8765`; images are neither uploaded nor recorded.
-
-The setup panel shows live roll, pitch, throttle and independent marker status. Closing the tracker preview stops the service and releases the camera, just like Q or Escape.
-
-## Verification
-
-[Verification notes](docs/verification.md) distinguish automated software checks from physical testing still outstanding.
-
-```sh
-# Run every automated check, including full keyboard AND copilot missions
-# for all five aircraft. No webcam is opened:
-./tools/verify.sh
-
-# Flight behavior checks for all five profiles:
-.tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script res://tests/test_flight.gd
-
-# Weather, rendered terrain contact, and airport building collision:
-.tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script res://tests/test_weather.gd
-
-# Aircraft animations, reset and imported-geometry preservation:
-.tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script res://tests/test_aircraft_visuals.gd
-
-# Camera framing, keyboard selection and flight-state preservation:
-.tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script res://tests/test_camera.gd
-
-# Landing, flaps, runway rollout and approach guidance:
-.tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script res://tests/test_landing.gd
-
-# Full mission driven through keyboard events, copilot disabled:
-.tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --fixed-fps 60 --script res://tests/test_keyboard_mission.gd
-
-# Complete-route checks for any aircraft index, 0–4:
-.tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --fixed-fps 60 -- --plane=0 --autotest
-
-# Tracker and native WebSocket integration:
-.venv/bin/python -m unittest discover -s vision/tests -v
-.tools/Godot.app/Contents/MacOS/Godot --headless --path simulator --script ../tools/test_vision_client.gd
-```
-
-The same software suite runs in GitHub Actions on pushes and pull requests. Test logs distinguish deterministic keyboard-event input from physical OS interaction and synthetic marker images from real webcam testing.
-
-## Files and credits
-
-```text
-simulator/          Native Godot project, UI, flight systems, scenery, models, tests
-vision/             Optional tracker, calibration, printed markers and Python tests
-shared/             Versioned control message contract
-tools/              Setup, run, package, asset download/conversion and integration tests
-docs/               Build guide, setup, verification, screenshots and planning history
-build/              Local standalone app (not committed)
-```
-
-[Third-party assets](THIRD_PARTY_ASSETS.md) records aircraft authors and licensing. [Environment credits](simulator/assets/environment/README.md) records the CC0 Poly Haven materials and sky. Godot's MIT notice is bundled in the client. Original aircraft sources and their licenses remain in this repository, and should accompany redistribution of the converted models.
-
-Repository: [excelexx/cardboard-cockpit](https://github.com/excelexx/cardboard-cockpit) (private).
+This remains a compact, game-tuned flight project. It does not provide certified aerodynamics, global scenery, a clickable avionics simulation or commercial AAA production assets. Terrain and major buildings collide; trees and small scenery are forgiving. Historical licensed aircraft files remain as source provenance and are excluded from the playable export.

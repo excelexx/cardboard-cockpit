@@ -9,7 +9,7 @@ func check(ok: bool, label: String) -> void:
 func run_tests() -> void:
 	var radio = Radio.new()
 	root.add_child(radio)
-	check(radio.cues.size()==20,"Twenty licensed radio cues available")
+	check(radio.cues.size()==15,"Fifteen licensed radio cues available")
 	check(radio.say("target_down"),"First cue accepted")
 	check(not radio.say("target_down"),"Duplicate queued callout rejected")
 	radio.tick(.01,false,false)
@@ -20,7 +20,7 @@ func run_tests() -> void:
 	check(radio.say("warning"),"Urgent warning accepted")
 	radio.tick(.1,false,false)
 	check(radio.active_id=="warning","Urgent warning replaces low-priority chatter")
-	for id in ["stage_2","stage_3","stage_4","stage_5","stage_6"]: radio.say(id)
+	for id in ["cleared","checkpoint","approach","touchdown","landed"]: radio.say(id)
 	check(radio.queue.size()<=3,"Radio queue remains bounded")
 	radio.tick(.1,false,true)
 	check(radio.caption.is_empty() and radio.queue.is_empty() and radio.duck_db()==0,"Mute clears voice, subtitles and ducking")

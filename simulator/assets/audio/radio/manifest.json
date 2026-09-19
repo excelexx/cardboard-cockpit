@@ -16,75 +16,6 @@
         "Male/go.ogg"
       ]
     },
-    "stage_2": {
-      "speaker": "CONTROL",
-      "text": "Level two. Power up!",
-      "file": "stage_2.wav",
-      "duration": 2.756235827664399,
-      "priority": 2,
-      "cooldown": 10,
-      "sha256": "602fe49c5d82058a1cc6e899d23e5a6a6b911c31b46e83c898d6939e21681dbe",
-      "source_files": [
-        "Male/level.ogg",
-        "Male/2.ogg",
-        "Male/power_up.ogg"
-      ]
-    },
-    "stage_3": {
-      "speaker": "CONTROL",
-      "text": "Level three. Target engaged.",
-      "file": "stage_3.wav",
-      "duration": 3.220362811791383,
-      "priority": 2,
-      "cooldown": 10,
-      "sha256": "4a9b03cb800d63afadde4815b6e3af91d93c25158a73e35503427a5c8752cd3c",
-      "source_files": [
-        "Male/level.ogg",
-        "Male/3.ogg",
-        "Male/war_target_engaged.ogg"
-      ]
-    },
-    "stage_4": {
-      "speaker": "CONTROL",
-      "text": "Level four. Call for backup!",
-      "file": "stage_4.wav",
-      "duration": 3.1076190476190475,
-      "priority": 2,
-      "cooldown": 10,
-      "sha256": "277b0893c45f7fd6d312b5fef743376c69ed5471ee847975298c36efcfccdd30",
-      "source_files": [
-        "Male/level.ogg",
-        "Male/4.ogg",
-        "Male/war_call_for_backup.ogg"
-      ]
-    },
-    "stage_5": {
-      "speaker": "CONTROL",
-      "text": "Level five. Power up!",
-      "file": "stage_5.wav",
-      "duration": 2.8872108843537414,
-      "priority": 2,
-      "cooldown": 10,
-      "sha256": "64a9ebe9613e65d96a703bd4d3f6dcb2a81b7af128a4413b3f316194e8082748",
-      "source_files": [
-        "Male/level.ogg",
-        "Male/5.ogg",
-        "Male/power_up.ogg"
-      ]
-    },
-    "stage_6": {
-      "speaker": "CONTROL",
-      "text": "Final round. Go!",
-      "file": "stage_6.wav",
-      "duration": 2.1945124716553286,
-      "priority": 2,
-      "cooldown": 10,
-      "sha256": "94823f61f2adf37dbc472714d22a0a2eed25b05c90bb4713167b4aedff098aa4",
-      "source_files": [
-        "Male/final_round.ogg",
-        "Male/go.ogg"
-      ]
-    },
     "target_locked": {
       "speaker": "PILOT",
       "text": "Target engaged.",
@@ -92,7 +23,7 @@
       "duration": 1.4202267573696146,
       "priority": 0,
       "cooldown": 16,
-      "sha256": "0e4101cd07df22f2afb3f554122633159834e64575338d76abd097d90d9a6d33",
+      "sha256": "991de8f98bf8b10e056cc6beb43be425fafb31cfd10ef3c7ea7c4db6838f9aff",
       "source_files": [
         "Female/war_target_engaged.ogg"
       ]
@@ -104,7 +35,7 @@
       "duration": 1.631156462585034,
       "priority": 0,
       "cooldown": 10,
-      "sha256": "dcd82f1b7987e12ed611da25f54a19599b676c9026d89cfed2fae460382d68e2",
+      "sha256": "7e9277e11b711304c4cf3994b8cc4aabba56ba03401da3de7911bb0ce117908c",
       "source_files": [
         "Female/war_target_destroyed.ogg"
       ]
@@ -116,7 +47,7 @@
       "duration": 1.6864399092970521,
       "priority": 0,
       "cooldown": 10,
-      "sha256": "954d1c85976c33b1627824fdfbe5270c94a02f7d1149dbba2ca978aac3f1e6a5",
+      "sha256": "a97250fd459f0a358a6faf8cb5e91f8c3e2ed20c3434c5cb718f522d2973c6c9",
       "source_files": [
         "Male/war_target_destroyed.ogg"
       ]
@@ -128,7 +59,7 @@
       "duration": 0.952562358276644,
       "priority": 3,
       "cooldown": 8,
-      "sha256": "6c4dfcced604db3164b8d62665a648f2c7dbf67adda20b8d7aa5e0bc24a64e4c",
+      "sha256": "9f5ae084277c0ec5ab3f1f4732d6af03fb5db74b49f61ed9dcb86b4dd7b41248",
       "source_files": [
         "Male/war_look_out.ogg"
       ]
@@ -140,7 +71,7 @@
       "duration": 1.056734693877551,
       "priority": 1,
       "cooldown": 12,
-      "sha256": "eb1866e651606d115d0170730e7518b7abc4ce6eb660b8fc9e42d45f8e85b29f",
+      "sha256": "8ce00409e3ace66d95e3520de22330b92b5e81d3f7c2e366df2e7c963478e4f2",
       "source_files": [
         "Female/war_reloading.ogg"
       ]
@@ -152,7 +83,7 @@
       "duration": 1.8035374149659864,
       "priority": 1,
       "cooldown": 15,
-      "sha256": "9f1862fb7b5ef8437d368a28461d273e2538c1dac73255aba094db0a11a7747a",
+      "sha256": "b2f19109ed8bf00943165a2802527a5c1ab09830c3262eaa4781fee661899379",
       "source_files": [
         "Male/ready.ogg",
         "Male/go.ogg"
@@ -165,7 +96,7 @@
       "duration": 1.7695691609977324,
       "priority": 0,
       "cooldown": 14,
-      "sha256": "71cea29b8893d9f090664457c3be22f429b30e680c89286e9abbc843fa05616a",
+      "sha256": "ef1089a824a2901546f1df8be42029379ea24864c625b1c4c9cb03257b7ccb35",
       "source_files": [
         "Male/objective_achieved.ogg"
       ]
@@ -177,7 +108,7 @@
       "duration": 1.039546485260771,
       "priority": 1,
       "cooldown": 25,
-      "sha256": "bb86b27ad957f29365a9dd8b02990f610f7d7f3ca2892f31d9af386a325b29cb",
+      "sha256": "8010f70cd15208901816301e09c9faa847d40c748b3ff43816d7c28fa0fa5b01",
       "source_files": [
         "Male/hold.ogg"
       ]
@@ -189,7 +120,7 @@
       "duration": 1.596235827664399,
       "priority": 2,
       "cooldown": 15,
-      "sha256": "91da68fe688251982e08eb2a20bd8af74376141185b3e57006a192ecb0f0a5bf",
+      "sha256": "66ef6499c576f91e86061bff009cd68e73d8abadb0ab0db672dfacee4a82d745",
       "source_files": [
         "Female/objective_achieved.ogg"
       ]
@@ -201,7 +132,7 @@
       "duration": 1.879092970521542,
       "priority": 2,
       "cooldown": 15,
-      "sha256": "aa7a721bd16fb681c7b8729eed7475a1d2bbdd281f17dfe774c4f87ac87b85da",
+      "sha256": "4b4371339384ab48a44b94ce24fe698410cc198b2f46d0405b2d270bd01ecbcd",
       "source_files": [
         "Male/congratulations.ogg"
       ]
@@ -213,7 +144,7 @@
       "duration": 3.2616780045351472,
       "priority": 3,
       "cooldown": 15,
-      "sha256": "185c8185e576093afa311b7f8015d697b7660e77e18b6a81fc841d17055498d8",
+      "sha256": "19f1933d8532c35cadc98b2b55da1cee096c1c261d8a3a7fb82136901054a6e4",
       "source_files": [
         "Male/mission_completed.ogg",
         "Male/congratulations.ogg"
@@ -226,7 +157,7 @@
       "duration": 1.452108843537415,
       "priority": 3,
       "cooldown": 15,
-      "sha256": "92b344c345189c42ac7e39b5a5b696eb973de04ba8848dbfe00902f27c2905a5",
+      "sha256": "9cdd6ecab0d212554daf4a3e2fd48f2e6c07d5f10dbaa2de24537169f7e9ebfc",
       "source_files": [
         "Male/mission_failed.ogg"
       ]
@@ -238,7 +169,7 @@
       "duration": 0.9924263038548753,
       "priority": 3,
       "cooldown": 15,
-      "sha256": "6cc0ad29fc3efa17fe7eaff43fef8f4a4fbf4b9b6594cdb2adf85e1d6326429b",
+      "sha256": "12ffbaeb4f4b47b0d4eaed9a4b22162b2a2a21bd913d44b0c701b97a4f316e55",
       "source_files": [
         "Female/war_look_out.ogg"
       ]
@@ -250,7 +181,7 @@
       "duration": 2.6387755102040815,
       "priority": 2,
       "cooldown": 30,
-      "sha256": "afca57841f10dd7ed47e24345fc84e630a658bd7f9b5d99085904c5161717043",
+      "sha256": "a766e0a3aaca6096d989758d824fcff2cc0ad0c15878c36d3bb947dc2fc7a4be",
       "source_files": [
         "Male/3.ogg",
         "Male/2.ogg",

@@ -13,7 +13,7 @@ class RadioAssetTests(unittest.TestCase):
         manifest = json.loads((RADIO / 'manifest.json').read_text())
         self.assertEqual(manifest['license'], 'CC0')
         self.assertIn('licensed', manifest['provider'])
-        self.assertEqual(len(manifest['cues']), 20)
+        self.assertEqual(len(manifest['cues']), 15)
         for name, cue in manifest['cues'].items():
             with self.subTest(cue=name):
                 path = RADIO / cue['file']

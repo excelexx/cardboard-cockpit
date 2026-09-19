@@ -16,9 +16,11 @@ vec3 triplanar(sampler2D source, vec3 point, vec3 weights) {
 void fragment() {
 	vec3 weights = pow(abs(world_normal), vec3(4.0));
 	weights /= max(dot(weights, vec3(1.0)), 0.0001);
-	vec3 grass_detail = texture(grass_texture, world_position.xz / 84.0).rgb;
+	vec3 grass_a = texture(grass_texture, world_position.xz / 38.0).rgb;
+	vec3 grass_b = texture(grass_texture, mat2(vec2(0.8,-0.6),vec2(0.6,0.8))*world_position.xz / 57.0 + vec2(0.37,0.21)).rgb;
+	vec3 grass_detail = mix(grass_a,grass_b,0.45+sin(world_position.x*0.002+world_position.z*0.003)*0.25);
 	vec3 grass_macro = texture(grass_texture, world_position.xz / 1100.0 + vec2(0.4)).rgb;
-	vec3 grass = mix(grass_detail, grass_macro, 0.42) * vec3(0.80, 1.02, 0.80);
+	vec3 grass = mix(grass_detail, grass_macro, 0.28) * vec3(0.70, 0.92, 0.72);
 	vec3 rock = triplanar(rock_texture, world_position / 180.0, weights);
 	vec3 rock_macro = triplanar(rock_texture, world_position / 920.0 + vec3(0.3), weights);
 	rock = mix(rock, rock_macro, 0.3) * vec3(0.9, 0.92, 0.90);
@@ -29,5 +31,8 @@ void fragment() {
 	float snow = smoothstep(snowline - 150.0, snowline + 120.0, world_position.y) * (1.0 - smoothstep(0.30, 0.62, slope));
 	vec3 snow_color = vec3(0.78, 0.83, 0.84) * (0.88 + rock_macro.r * 0.3);
 	ALBEDO = mix(terrain, snow_color, snow);
-	ROUGHNESS = 0.96;
+	ROUGHNESS = 0.90;
+	float detail_height = dot(grass_detail,vec3(0.33));
+	NORMAL_MAP = normalize(vec3(dFdx(detail_height)*0.18,dFdy(detail_height)*0.18,1.0))*0.5+0.5;
+	NORMAL_MAP_DEPTH = 0.45;
 }
