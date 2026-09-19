@@ -17,11 +17,13 @@ if [ ! -x .venv/bin/python ]; then ./tools/setup_vision.sh; fi
 "$engine" --headless --path simulator --script res://tests/test_combat_feel.gd
 "$engine" --headless --path simulator --script res://tests/test_balance_profile.gd
 "$engine" --headless --path simulator --script res://tests/test_scenic_route.gd
+"$engine" --headless --path simulator --script res://tests/test_sf_route.gd
+"$engine" --headless --path simulator --script res://tests/test_sf_assets.gd
 "$engine" --headless --path simulator --script res://tests/test_city.gd
 "$engine" --headless --path simulator --script res://tests/test_grounding.gd
 "$engine" --headless --path simulator --script res://tests/test_urban_expansion.gd
-"$engine" --headless --path simulator --fixed-fps 60 -- --combat --autotest
-"$engine" --headless --path simulator --fixed-fps 60 -- --approach --autotest
+"$engine" --headless --path simulator --fixed-fps 60 -- --combat --autotest --route=alpine
+"$engine" --headless --path simulator --fixed-fps 60 -- --approach --autotest --route=alpine
 .venv/bin/python -m unittest discover -s vision/tests -v
 "$engine" --headless --path simulator --script ../tools/test_vision_client.gd
 printf '%s\n' 'PASS: SPECTRE flight, combat, camera, landing, audio and cardboard integration.'

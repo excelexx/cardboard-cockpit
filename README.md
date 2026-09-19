@@ -1,6 +1,6 @@
 # Goose Protocol — SPECTRE X-26
 
-Version 0.9.1 is a relaxed native Mac arcade flight game: **one SPECTRE fighter, unlimited Gatling fire and guided missiles, and large Waterloo geese to clear from the valley**. The geese do not attack. There are no upgrades, reloads, heat limits or steady-lock requirements.
+Version 0.10.1 is a relaxed native Mac arcade flight game: **one SPECTRE fighter, unlimited Gatling fire and guided missiles, and large Waterloo geese to intercept over San Francisco Bay**. The geese do not attack. There are no upgrades, reloads, heat limits or steady-lock requirements.
 
 Open **Launch Cardboard Cockpit.command** or **build/Cardboard Cockpit.app**. Choose **Play** (or Enter): flight assistance handles takeoff and the route so you can concentrate on shooting. Hold **Space + T**, or both mouse buttons, to fire both weapons together. **Watch demo** runs the entire takeoff → interception → landing sequence automatically. The default **Azure Coast** tour takes about three minutes; the preserved **Alpine Valley** sortie takes about 2 minutes 18 seconds. The ROUTE button switches between them.
 
@@ -80,3 +80,7 @@ The project pins Godot 4.7.2. Mac exports include Apple Silicon and Intel binari
 Packaging creates `build/Cardboard Cockpit.app` and `build/Cardboard Cockpit Mac.zip`, including source and asset notices. The build is locally signed and is not Apple-notarized. See [verification](docs/verification.md), [demo runbook](docs/DEMO_RUNBOOK.md), and [asset credits](docs/demo-assets.md).
 
 This remains a compact, game-tuned flight project. It does not provide certified aerodynamics, global scenery, a clickable avionics simulation or commercial AAA production assets. Terrain and major buildings collide; trees and small scenery are forgiving. Historical licensed aircraft files remain as source provenance and are excluded from the playable export. Large geese, generous aim assistance and unlimited weapons are intentional arcade choices.
+
+## San Francisco world
+
+The default map is now a complete sourced San Francisco regional tile with the city, SFO, Golden Gate Bridge, Bay Bridge, Alcatraz, terrain, roads and residential neighborhoods. Its continuous SFO round trip takes about eight minutes. The route selector also retains the two legacy maps. See [coverage, licenses and conversion details](docs/san-francisco.md).

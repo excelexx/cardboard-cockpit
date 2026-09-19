@@ -4,6 +4,7 @@ const Catalog = preload("res://data/aircraft.gd")
 const Dynamics = preload("res://systems/flight_dynamics.gd")
 const World = preload("res://scenes/world.gd")
 const Coast = preload("res://scenes/coastal_world.gd")
+const SanFrancisco = preload("res://scenes/san_francisco_world.gd")
 const Model = preload("res://systems/fighter_model.gd")
 const Visuals = preload("res://systems/aircraft_visuals.gd")
 const Effects = preload("res://systems/fighter_effects.gd")
@@ -23,7 +24,7 @@ var mission: DemoMission = Mission.new()
 var flight: FlightDynamics = Dynamics.new()
 var vision: VisionClient = Vision.new()
 var world: Node3D
-var route_id := "coast"
+var route_id := "sf"
 var aircraft: Node3D
 var aircraft_visuals: AircraftVisuals
 var fighter_fx: FighterEffects
@@ -67,10 +68,13 @@ func _ready() -> void:
 	get_window().title = "Goose Protocol — SPECTRE X-26"
 	mission.app = self
 	load_settings()
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--route="): route_id = argument.trim_prefix("--route=")
 	route_id = str(get_meta("route_override",route_id))
-	world = Coast.new() if route_id=="coast" else World.new(); add_child(world)
+	world = SanFrancisco.new() if route_id=="sf" else Coast.new() if route_id=="coast" else World.new(); add_child(world)
 	world.set_conditions("golden")
 	flight.reset(profile())
+	if route_id=="sf": flight.position.y += world.ground_height(flight.position.x,flight.position.z)
 	aircraft = Node3D.new(); add_child(aircraft)
 	var model: Node3D = Model.create(); aircraft.add_child(model)
 	aircraft_visuals = Visuals.new(); add_child(aircraft_visuals)
@@ -127,8 +131,9 @@ func start_flight(kind: String = "demo") -> void:
 	pilot_ejected = false; record_broken = false; eject_hold = 0; crash_clock = 0; fire_guard = 0.3
 	control = Vector3.ZERO; look = Vector2.ZERO
 	flight.reset(profile())
+	if route_id=="sf": flight.position.y += world.ground_height(flight.position.x,flight.position.z)
 	if kind=="approach":
-		flight.spawn_airborne(Vector3(0,155,-11200),75)
+		flight.spawn_airborne(Vector3(0,160,4200) if route_id=="sf" else Vector3(0,155,-11200),75)
 		flight.gear = true; flight.flaps = 2; flight.pitch = -atan(Approach.GLIDESLOPE)
 		flight.throttle = 0.3; flight.engine = 0.3
 	elif kind=="combat": flight.spawn_airborne(Vector3(0,220,-3500),185)
@@ -216,7 +221,7 @@ func take_manual_control(steering: bool) -> void:
 	vision.enabled = false; vision.status = "KEYBOARD / MOUSE"
 func on_action(action: String) -> void:
 	match action:
-		"route": select_route("alpine" if route_id=="coast" else "coast")
+		"route": select_route("coast" if route_id=="sf" else "alpine" if route_id=="coast" else "sf")
 		"fly": start_flight(); copilot = not vision.enabled; used_copilot = copilot; demo_auto_fire = false
 		"restart":
 			if paper_test:
@@ -262,7 +267,7 @@ func _process(dt: float) -> void:
 			world.update_local_shadows(flight.position,dt)
 		if cockpit:
 			cockpit_frame.update_instruments(flight,control,dt if active else 0)
-			cockpit_frame.set_navigation("free",0)
+			cockpit_frame.set_navigation("sf" if route_id=="sf" else "free",mission.route_index)
 	audio.gun_wanted = active and combat.active and combat.gun_firing_time>0
 	audio.burner_wanted = flight.afterburner and active
 	audio.set_context(mode,cockpit,flight.contact,paused)
@@ -271,7 +276,7 @@ func _process(dt: float) -> void:
 	audio.set_music_active(flight_kind in ["combat","demo"] and mode in ["flight","results"])
 	if capture_at>0 and runtime>=capture_at and not pending_capture:
 		pending_capture = true; capture_frame()
-	if test_mode and flight.elapsed>420 and not test_finished:
+	if test_mode and flight.elapsed>(1200 if route_id=="sf" else 420) and not test_finished:
 		test_finished = true; printerr("SORTIE TIMEOUT"); get_tree().quit(2)
 func capture_frame() -> void:
 	await RenderingServer.frame_post_draw
@@ -370,7 +375,7 @@ func _physics_process(dt: float) -> void:
 		if mission.active: mission.transition("rollout")
 		audio.play_effect("touchdown_tires",-17); audio.play_effect("touchdown_thump",-16); audio.radio.say("touchdown")
 	elif flight.contact!="": begin_crash()
-	if absf(flight.position.x)>14500 or flight.position.z < -24500 or flight.position.z>8500:
+	if (absf(flight.position.x)>60000 or absf(flight.position.z)>60000) if route_id=="sf" else (absf(flight.position.x)>14500 or flight.position.z < -24500 or flight.position.z>8500):
 		finish_sortie(false,"Operational sector exited. Turn back earlier.")
 	if flight.airborne and not flight.gear and flight.position.y-world.ground_height(flight.position.x,flight.position.z)<50: audio.radio.say("warning")
 	if flight.stall_time>1: audio.radio.say("warning")
@@ -397,16 +402,17 @@ func approach_controls() -> Vector3:
 	if not flight.airborne:
 		flight.throttle = 1
 		return Vector3(0,0.5 if flight.speed>flight.effective_rotation_speed() else 0,0)
-	var guidance: Dictionary = Approach.solution(flight.position)
+	var approach_position := flight.position - Vector3(0,4,15400) if route_id=="sf" else flight.position
+	var guidance: Dictionary = Approach.solution(approach_position)
 	var heading: float = atan2(-flight.position.x,900)
 	var error: float = wrapf(heading-flight.heading,-PI,PI)
-	var wanted_pitch: float = clampf(-atan(Approach.GLIDESLOPE)+(float(guidance.ideal_height)-flight.position.y)*0.002,-0.15,0.08)
+	var wanted_pitch: float = clampf(-atan(Approach.GLIDESLOPE)+(float(guidance.ideal_height)-approach_position.y)*0.002,-0.15,0.08)
 	if flight.position.y<14: wanted_pitch = -0.022 if flight.position.y>5 else -0.012
 	flight.gear = true; flight.flaps = 2
 	flight.throttle = clampf(0.22+(Tune.APPROACH_SPEED-flight.speed)*0.055,0,1)
 	return Vector3(clampf((error*1.5-flight.roll)*1.8-flight.roll_velocity*0.3,-1,1),clampf((wanted_pitch-flight.pitch)*2.5-flight.pitch_velocity*0.3,-1,1),0)
 func is_on_runway(at: Vector3) -> bool: return world.is_runway(at.x,at.z)
-func approach_data() -> Dictionary: return Approach.solution(flight.position)
+func approach_data() -> Dictionary: return Approach.solution(flight.position-Vector3(0,4,15400) if route_id=="sf" else flight.position)
 func set_quality(high: bool) -> void:
 	high_quality = high
 	_apply_render_scale()
@@ -423,7 +429,7 @@ func load_settings() -> void:
 	var config := ConfigFile.new()
 	if config.load("user://settings.cfg")==OK:
 		high_quality = bool(config.get_value("video","spectre_quality",true))
-		route_id = str(config.get_value("world","spectre_route","coast"))
+		route_id = str(config.get_value("world","spectre_route_v10","sf"))
 		best_score = int(config.get_value("arcade","best_score_v09",0))
 func save_settings() -> void:
 	if DisplayServer.get_name()=="headless": return
@@ -431,7 +437,7 @@ func save_settings() -> void:
 	config.load("user://settings.cfg")
 	config.set_value("video","spectre_quality",high_quality)
 	config.set_value("arcade","best_score_v09",best_score)
-	config.set_value("world","spectre_route",route_id)
+	config.set_value("world","spectre_route_v10",route_id)
 	if is_instance_valid(audio): config.set_value("audio","muted",audio.muted)
 	config.save("user://settings.cfg")
 
@@ -439,7 +445,7 @@ func select_route(value: String) -> void:
 	if value==route_id: return
 	route_id = value
 	if is_instance_valid(world): remove_child(world); world.queue_free()
-	world = Coast.new() if route_id=="coast" else World.new()
+	world = SanFrancisco.new() if route_id=="sf" else Coast.new() if route_id=="coast" else World.new()
 	add_child(world); world.set_conditions("golden"); world.apply_quality(high_quality)
 	world.visible = mode!="title"
 	save_settings()

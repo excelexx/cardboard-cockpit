@@ -1,0 +1,20 @@
+{
+  "href": "https://imagery.nationalmap.gov/arcgis/rest/directories/imagery_output/USGSNAIPPlus_ImageServer/_ags_decff5ce_c11e_46c7_84a1_b97b1ed21e79.jpg",
+  "width": 4000,
+  "height": 2000,
+  "extent": {
+    "xmin": -122.5,
+    "ymin": 37.75,
+    "xmax": -122.25,
+    "ymax": 37.875,
+    "spatialReference": {
+      "wkid": 4326,
+      "latestWkid": 4326
+    }
+  },
+  "scale": 0,
+  "request": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?bbox=-122.5,37.75,-122.25,37.875&bboxSR=4326&imageSR=4326&size=4000,2000&format=jpg&f=json",
+  "copyright": "USGS, USDA, The National Map",
+  "license": "Public domain",
+  "sha256": "6ecfaf4a6d4dac622a353ede84389caee9ddcc41f3da00909bc9f54c5a7374dd"
+}
