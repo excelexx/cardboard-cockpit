@@ -13,6 +13,7 @@ if [ ! -x .venv/bin/python ]; then ./tools/setup_vision.sh; fi
 "$engine" --headless --path simulator --script res://tests/test_radio.gd
 "$engine" --headless --path simulator --script res://tests/test_demo_mission.gd
 "$engine" --headless --path simulator --script res://tests/test_ballistics.gd
+"$engine" --headless --path simulator --script res://tests/test_combat_feel.gd
 "$engine" --headless --path simulator --fixed-fps 60 -- --combat --autotest
 "$engine" --headless --path simulator --fixed-fps 60 -- --approach --autotest
 .venv/bin/python -m unittest discover -s vision/tests -v

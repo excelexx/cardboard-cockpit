@@ -8,6 +8,8 @@ var speed := 0.0
 var throttle := 0.0
 var engine := 0.0
 var afterburner := false
+var power_input := 0.0
+var airbrake := 0.0
 var wind := Vector3.ZERO
 var pitch := 0.0
 var roll := 0.0
@@ -42,7 +44,7 @@ func reset(aircraft: Dictionary) -> void:
 	profile = aircraft.duplicate(true)
 	position = Vector3(0,float(profile.clearance),1100)
 	velocity = Vector3.ZERO; wind = Vector3.ZERO
-	speed = 0; throttle = 0; engine = 0
+	speed = 0; throttle = 0; engine = 0; power_input = 0; airbrake = 0
 	pitch = 0; roll = 0; heading = 0
 	pitch_velocity = 0; roll_velocity = 0; yaw_velocity = 0
 	vertical_speed = 0; g_load = 1
@@ -75,12 +77,16 @@ func step(dt: float, controls: Vector3, brakes: bool, ground: float, runway: boo
 
 func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> void:
 	elapsed += dt
-	engine = move_toward(engine,throttle,dt*(0.52 if throttle>engine else 0.7))
+	engine = move_toward(engine,throttle,dt*((3.8 if throttle>engine else 5.0) if absf(power_input)>.01 else (0.52 if throttle>engine else 0.7)))
 	var thrust: float = float(profile.acceleration)*engine*(1.58 if afterburner and not gear else 1.0)
+	airbrake = move_toward(airbrake,1.0 if power_input<-.1 and airborne else 0.0,dt*6)
+	if airborne and power_input>0: thrust += power_input*65
 	var drag: float = float(profile.acceleration)*pow(speed/float(profile.max_speed),2)
 	drag += (0.70 if gear else 0.15)+flaps*(0.35+speed*0.007)
+	if airborne: drag += airbrake*95*clampf((speed-78)/35,0,1)
 	if not airborne: drag += 0.45+(19 if brakes else 0)
 	speed = clampf(speed+(thrust-drag-sin(pitch)*5.0)*dt,0,float(profile.max_speed)*(1.19 if afterburner else 1.03))
+	if airborne and not gear and power_input<-.1: speed = maxf(speed,80)
 	var previous_velocity: Vector3 = velocity
 	if airborne:
 		var authority: float = clampf(speed/effective_rotation_speed(),0.15,1.25)

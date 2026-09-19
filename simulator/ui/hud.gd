@@ -109,25 +109,42 @@ func draw_flight() -> void:
 		text(Vector2(44,518),"%.1f G" % f.g_load,12,CYAN,true)
 		text(Vector2(1430,518),"%+d" % int(f.vertical_speed*196.85),12,CYAN,true)
 	var nose: Vector2 = app.camera.unproject_position(f.position+c.forward()*2000)
-	draw_circle(nose,2,Color(.65,.85,.87,.45))
-	var center: Vector2 = app.camera.unproject_position(f.position+c.assisted_direction()*2000)
-	line(center+Vector2(-17,0),center+Vector2(-5,0),WHITE,1.4)
-	line(center+Vector2(5,0),center+Vector2(17,0),WHITE,1.4)
-	line(center+Vector2(0,-14),center+Vector2(0,-5),WHITE,1.4)
-	draw_circle(center,1.3,WHITE)
+	var ring_edge: Vector3 = c.forward().rotated(app.camera.global_basis.x,deg_to_rad(c.ACQUIRE_ANGLE))
+	var ring_radius: float = clampf(nose.distance_to(app.camera.unproject_position(f.position+ring_edge*1200)),38,115)
+	var tracking: bool = c.target_id>=0 and c.assist
+	var sight_color: Color = GREEN if tracking and c.lock_progress>=1 else AMBER if tracking else WHITE
+	for i in range(4):
+		var angle: float = i*PI/2
+		draw_arc(nose,ring_radius,angle+.12,angle+PI/2-.12,20,Color(.48,.78,.82,.35),1,true)
+		var direction := Vector2(cos(angle),sin(angle))
+		line(nose+direction*(ring_radius-4),nose+direction*(ring_radius+4),Color(.55,.83,.85,.6),1)
+	draw_circle(nose,2,Color(.65,.85,.87,.6))
+	var center: Vector2 = app.camera.unproject_position(c.reticle_point())
+	line(center+Vector2(-16,0),center+Vector2(-6,0),sight_color,1.8)
+	line(center+Vector2(6,0),center+Vector2(16,0),sight_color,1.8)
+	line(center+Vector2(0,-16),center+Vector2(0,-6),sight_color,1.8)
+	line(center+Vector2(0,6),center+Vector2(0,12),sight_color,1.8)
+	draw_circle(center,1.3,sight_color)
+	if c.active and c.engagement_enabled:
+		text(nose+Vector2(-50,ring_radius+22),"SEEKER / 6°",11,MUTED,true)
+		if not tracking: text(nose+Vector2(-62,ring_radius+40),"ALIGN TO ACQUIRE",10,MUTED,true)
 	for enemy: Dictionary in c.enemies:
 		if app.camera.is_position_behind(enemy.position): continue
 		var point: Vector2 = app.camera.unproject_position(enemy.position)
 		if point.x<25 or point.x>1575 or point.y<115 or point.y>810: continue
 		if enemy.id==c.target_id:
-			var radius: float = clampf(24000/maxf(f.position.distance_to(enemy.position),1),38,88)
-			brackets(point,radius,GREEN if c.lock_progress>=1 else CYAN)
-			text(point+Vector2(radius+12,-3),"GOOSE %02d" % (enemy.id+1),14,WHITE,true)
-			text(point+Vector2(radius+12,19),"%d M" % int(f.position.distance_to(enemy.position)),14,CYAN,true)
-			draw_arc(point,radius+7,-PI/2,-PI/2+maxf(.01,c.lock_progress)*TAU,48,Color(0.35,0.88,0.82,0.65),1.4,true)
-			var lead: Vector3 = c.lead_point(enemy)
-			var pip: Vector2 = app.camera.unproject_position(lead)
-			draw_polyline(PackedVector2Array([pip+Vector2(0,-4),pip+Vector2(4,0),pip+Vector2(0,4),pip+Vector2(-4,0),pip+Vector2(0,-4)]),CYAN,1,true)
+			var radius: float = clampf(12000/maxf(f.position.distance_to(enemy.position),1),22,40)
+			var track_color: Color = GREEN if c.lock_progress>=1 else AMBER
+			brackets(point,radius,track_color)
+			text(point+Vector2(radius+10,-15),"TRK %02d" % (enemy.id+1),12,WHITE,true)
+			text(point+Vector2(radius+10,2),"RNG %d M" % int(f.position.distance_to(enemy.position)),11,CYAN,true)
+			text(point+Vector2(radius+10,20),"LOCK" if c.lock_progress>=1 else "ACQUIRING",11,track_color,true)
+			line(point+Vector2(-radius,radius+7),point+Vector2(-radius+radius*2*c.lock_progress,radius+7),track_color,2)
+			var distance: float = f.position.distance_to(enemy.position)
+			var pip: Vector2 = app.camera.unproject_position(f.position+c.assisted_direction()*distance)
+			if pip.distance_to(center)>7:
+				line(center,pip,Color(.4,.85,.9,.35),1)
+				draw_polyline(PackedVector2Array([pip+Vector2(0,-4),pip+Vector2(4,0),pip+Vector2(0,4),pip+Vector2(-4,0),pip+Vector2(0,-4)]),CYAN,1,true)
 		else:
 			line(point+Vector2(-4,-12),point+Vector2(0,-8),Color(0.91,0.7,0.48,0.5))
 			line(point+Vector2(0,-8),point+Vector2(4,-12),Color(0.91,0.7,0.48,0.5))
@@ -154,6 +171,13 @@ func draw_flight() -> void:
 		text(Vector2(x,886),["GATLING","MISSILES","KEEP IT GOING"][i],14,CYAN,true)
 		text(Vector2(x,927),"∞" if i<2 else "×%d" % c.combo,36,GREEN if i==1 and c.lock_progress>=1 else WHITE)
 		if i<2: text(Vector2(x+51,920),"INFINITE",11,MUTED,true)
+	var seeker: String = "M-26 / LOCK" if c.lock_progress>=1 else "M-26 / ACQUIRING" if c.target_id>=0 else "M-26 / UNGUIDED"
+	text(Vector2(45,813),seeker,12,GREEN if c.lock_progress>=1 else MUTED,true)
+	var ready: float = 1-clampf(c.missile_cooldown/.85,0,1)
+	line(Vector2(218,937),Vector2(218+128*ready,937),GREEN if ready>=.99 else AMBER,2)
+	if f.airborne:
+		text(Vector2(44,550),"AIRBRAKE" if f.airbrake>.1 else "ACCEL" if f.power_input>.1 else "CRUISE",12,AMBER if f.airbrake>.1 else CYAN,true)
+		text(Vector2(44,571),"W / S  SPEED",10,MUTED,true)
 	if f.afterburner: text(Vector2(575,972),"AFTERBURNER",13,AMBER,true)
 	else: text(Vector2(575,972),"POWER %03d%%" % int(f.throttle*100),13,MUTED,true)
 	if f.gear or f.flaps>0: text(Vector2(42,967),"GEAR %s / FLAPS %d" % ["DOWN" if f.gear else "UP",f.flaps],12,AMBER,true)
@@ -247,7 +271,7 @@ func draw_help() -> void:
 	zones.clear(); dim(); panel(Rect2(365,136,870,738),.97)
 	text(Vector2(419,196),"FLIGHT CONTROLS",13,CYAN,true)
 	text(Vector2(417,244),"Precision starts with small inputs.",30,WHITE)
-	var rows: Array[Array] = [["ARROWS / A D","Pitch and roll / rudder"],["W S / SHIFT","Power / hold afterburner"],["SPACE / LEFT MOUSE","Hold for Gatling fire; unlimited ammunition"],["T / RIGHT MOUSE","Hold for missiles; fire together with Gatling"],["Z / Q","Countermeasures / barrel roll"],["V / X","Cockpit or chase / missile datalink"],["ALT + MOUSE","Look around without steering"],["G / F","Landing gear / flap detent"],["B / J","Mouse flight / magnetic aim assistance"],["H / HOLD E","Flight assist / eject"],["C / ESC / M","Cardboard setup / pause / mute"]]
+	var rows: Array[Array] = [["ARROWS / A D","Pitch and roll / rudder"],["W S / SHIFT","Accelerate / airbrake / hold afterburner"],["SPACE / LEFT MOUSE","Hold for Gatling fire; unlimited ammunition"],["T / RIGHT MOUSE","Hold for missiles; fire together with Gatling"],["Z / Q","Countermeasures / barrel roll"],["V / X","Cockpit or chase / missile datalink"],["ALT + MOUSE","Look around without steering"],["G / F","Landing gear / flap detent"],["B / J","Mouse flight / close-range aim assistance"],["H / HOLD E","Flight assist / eject"],["C / ESC / M","Cardboard setup / pause / mute"]]
 	for i in range(rows.size()):
 		text(Vector2(421,293+i*40),rows[i][0],13,WHITE,true)
 		text(Vector2(707,293+i*40),rows[i][1],16,MUTED)

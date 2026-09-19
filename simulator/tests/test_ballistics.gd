@@ -62,7 +62,7 @@ func run():
 	check(app.combat.rounds_fired>1200 and app.combat.missiles_fired>8,"Holding both fire keys sustains both weapons beyond former ammunition limits")
 	check(app.combat.ammo==-1 and app.combat.missiles==-1,"Unlimited ammunition never depletes")
 	app.start_flight("combat"); app.combat.spawn_contact(); enemy = app.combat.enemies[0]
-	enemy.position = app.flight.position+Vector3(200,0,-500); app.combat.target_id = enemy.id
+	enemy.position = app.flight.position+Vector3(35,0,-500); app.combat.target_id = enemy.id
 	var initial: Vector3 = app.combat.assisted_direction()
 	app.combat.update_aim(1.0/60)
 	check(initial.angle_to(app.combat.assisted_direction())<deg_to_rad(6),"Magnetic aim moves smoothly instead of snapping instantly")
