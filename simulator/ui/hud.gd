@@ -77,7 +77,7 @@ func draw_title() -> void:
 	text(Vector2(74,421),"Clear the flock. Enjoy the flight.",26,WHITE)
 	text(Vector2(74,468),"Take off. Own the valley. Bring it home.",18,MUTED)
 	button("fly",Rect2(74,571,394,69),"PLAY   →",true)
-	button("route",Rect2(490,582,260,48),"ROUTE: "+("AZURE COAST" if app.route_id=="coast" else "ALPINE VALLEY"))
+	button("route",Rect2(490,582,260,48),"ROUTE: "+("SAN FRANCISCO" if app.route_id=="sf" else "AZURE COAST" if app.route_id=="coast" else "ALPINE VALLEY"))
 	button("guided",Rect2(74,659,187,48),"Watch demo")
 	button("approach",Rect2(279,659,189,48),"Landing practice")
 	button("camera",Rect2(74,737,187,43),"Cardboard setup")
@@ -90,9 +90,9 @@ func draw_flight() -> void:
 	var c: CombatDirector = app.combat
 	text(Vector2(42,49),"SPECTRE / X–26",14,WHITE,true)
 	text(Vector2(42,75),app.mission.label() if app.mission.active else "FCS NOMINAL" if c.hull>65 else "AIRFRAME CAUTION",12,CYAN if c.hull>65 else AMBER,true)
-	text(Vector2(1376,49),"%02d:%02d" % [int(app.mission.clock)/60,int(app.mission.clock)%60] if app.mission.active else "%02d:%02d" % [maxi(0,int(ceil(c.duration-c.elapsed)))/60,maxi(0,int(ceil(c.duration-c.elapsed)))%60] if app.flight_kind=="combat" else "RWY 36",19,WHITE,true)
+	text(Vector2(1376,49),"%02d:%02d" % [int(app.mission.clock)/60,int(app.mission.clock)%60] if app.mission.active else "%02d:%02d" % [maxi(0,int(ceil(c.duration-c.elapsed)))/60,maxi(0,int(ceil(c.duration-c.elapsed)))%60] if app.flight_kind=="combat" else ("SFO 28R" if app.route_id=="sf" else "RWY 36"),19,WHITE,true)
 	text(Vector2(1376,73),"FLIGHT ASSIST" if app.copilot else "CARDBOARD" if app.vision.tracking else "LEVEL ASSIST",10,CYAN,true)
-	var heading: float = f.get_heading_degrees()
+	var heading: float = fposmod(f.get_heading_degrees()+(298 if app.route_id=="sf" else 0),360)
 	for index in range(-3,4):
 		var x: float = 800+index*65
 		text(Vector2(x-14,64),"%03d" % int(fposmod(heading+index*10,360)),11,CYAN if index==0 else MUTED,true)
@@ -110,7 +110,7 @@ func draw_flight() -> void:
 			line(Vector2(1370,439+i*22),Vector2(1384 if i%2 else 1390,439+i*22),Color(0.45,0.7,0.72,0.38))
 		text(Vector2(44,518),"%.1f G" % f.g_load,12,CYAN,true)
 		text(Vector2(1430,518),"%+d" % int(f.vertical_speed*196.85),12,CYAN,true)
-	if app.route_id=="coast" and app.mission.active and app.mission.phase in ["combat","return"]:
+	if app.route_id in ["coast","sf"] and app.mission.active and app.mission.phase in ["combat","return"]:
 		var waypoint: Vector3 = app.mission.route_target()
 		if not app.camera.is_position_behind(waypoint):
 			var nav: Vector2 = app.camera.unproject_position(waypoint)
@@ -198,7 +198,7 @@ func draw_flight() -> void:
 		line(cross-Vector2(90,0),cross+Vector2(90,0),Color(0.5,0.75,0.73,0.4))
 		line(cross-Vector2(0,35),cross+Vector2(0,35),Color(0.5,0.75,0.73,0.4))
 		draw_circle(cross+Vector2(guidance.localizer*80,-guidance.glideslope*30),3,CYAN)
-		text(Vector2(717,760),"RWY 36 / APPROACH",11,CYAN,true)
+		text(Vector2(717,760),"SFO 28R / APPROACH" if app.route_id=="sf" else "RWY 36 / APPROACH",11,CYAN,true)
 	if app.mission.active and app.mode in ["flight","rollout"]:
 		var instruction: String = app.mission.instruction()
 		if app.copilot and app.mission.phase!="combat": instruction = "FLIGHT ASSIST ON  /  ENJOY THE RIDE — STEERING IS OPTIONAL"

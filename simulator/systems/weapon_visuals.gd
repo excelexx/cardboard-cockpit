@@ -16,7 +16,7 @@ static func cylinder(parent: Node3D, radius: float, length: float, material: Mat
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(node); return node
 static func missile(in_flight: bool = false) -> Node3D:
-	var root: Node3D = load("res://assets/weapons/m26.glb").instantiate()
+	var root: Node3D = load("res://assets/sourced_flight/missile.gltf").instantiate()
 	root.name = "MICA26"
 	root.scale = Vector3.ONE*(1.7 if in_flight else 1.2)
 	if in_flight:

@@ -18,9 +18,6 @@ static func create() -> Node3D:
 			if not source is StandardMaterial3D: continue
 			var material: StandardMaterial3D = source.duplicate()
 			var part: String = str(node.name).to_lower()
-			if material.albedo_texture!=null and "Default" in material.albedo_texture.resource_path:
-				material.albedo_texture = load("res://assets/fighter/spectre-satin.png")
-				material.albedo_color = Color(0.92,0.97,1.0)
 			material.roughness = 0.60
 			material.metallic = 0.12
 			material.clearcoat_enabled = true
@@ -41,9 +38,12 @@ static func create() -> Node3D:
 				material.albedo_color = Color(0.24,0.27,0.29)
 				material.roughness = 0.52
 			node.set_surface_override_material(surface,material)
-	var gun: Node3D = load("res://assets/weapons/cg26.glb").instantiate()
-	gun.name = "CG26"
+	var gun := Node3D.new(); gun.name = "CG26"
 	gun.position = Vector3(-1.5,.27,-3.10)
+	var gimbal := Node3D.new(); gimbal.name = "GunGimbal"; gun.add_child(gimbal)
+	var rotor: Node3D = load("res://assets/sourced_flight/cannon.gltf").instantiate()
+	rotor.name = "GatlingRotor"; gimbal.add_child(rotor)
+	var muzzle := Marker3D.new(); muzzle.name = "GunMuzzle"; muzzle.position.z = -.51; gimbal.add_child(muzzle)
 	for geometry: Node in gun.find_children("*","GeometryInstance3D",true,false): geometry.layers = 2
 	model.add_child(gun)
 	return model

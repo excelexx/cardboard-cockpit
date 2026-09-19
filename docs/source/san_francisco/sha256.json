@@ -1,0 +1,128 @@
+[
+  {
+    "file": "global.xml",
+    "sha256": "88eac0d3896c75f074cc25aaa26f25995606e483072b9c065dabd41ed6a4a164",
+    "bytes": 20439
+  },
+  {
+    "file": "trees-w123n37.txz",
+    "sha256": "5514d324d22df3d3cfbcd3129ec4dec741e98470a71952dbb7b44cb6f9f642b1",
+    "bytes": 10338856
+  },
+  {
+    "file": "GPL-2.0.txt",
+    "sha256": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa",
+    "bytes": 18007
+  },
+  {
+    "file": "TreeBin.cxx",
+    "sha256": "956e06bc9b2a2d515cf66f2ee97fb0d449f0d154628edcc8ca0f5e5f87715cd1",
+    "bytes": 10512
+  },
+  {
+    "file": "global-summer.xml",
+    "sha256": "2add80495256cb4dc90dc5b55318488fa791042226c8a8a95b8af5dfd5dd9212",
+    "bytes": 18580
+  },
+  {
+    "file": "textures.tar.gz",
+    "sha256": "b01ed8b2ad242a23458e43ebe00c6795623aebec3ada53d2b13cbb1890292326",
+    "bytes": 24964560
+  },
+  {
+    "file": "SGBuildingBin.cxx",
+    "sha256": "9f00223631091351944f0674b451fd804b1ed2b9a269bd0ecd7be802fc7aec8d",
+    "bytes": 42189
+  },
+  {
+    "file": "tree.vert",
+    "sha256": "9a48e01715bd8c61af7b37fde56d9aebe7a2c72ea9b494372c2fa8a3974c038b",
+    "bytes": 2056
+  },
+  {
+    "file": "deciduous.png",
+    "sha256": "24309ffadf1e8c393d7772322c305d6f2810f056b506573ea49122f82884e44a",
+    "bytes": 234429
+  },
+  {
+    "file": "objects.tar.gz",
+    "sha256": "1302a94780091721c01c13e5513006b351ff76b744257b4cd2c91406ed55cbd1",
+    "bytes": 4489176
+  },
+  {
+    "file": "mixed.png",
+    "sha256": "3e1ff13b07dd1b2f17d22f666cda26dfee093e0b27cafe3721537ed6815a377e",
+    "bytes": 287674
+  },
+  {
+    "file": "terrain.tar.gz",
+    "sha256": "fb58e3c89d4bbbc8f2046b2b4e0956e3b5fe65e0dfab8caf74ef906d17c2ae20",
+    "bytes": 38793310
+  },
+  {
+    "file": "atlas_facades.png",
+    "sha256": "e1da2b5ede415b3a991f2ca9c8fc080e8000d7263c1bf1db68dd4ad49125ac72",
+    "bytes": 5754084
+  },
+  {
+    "file": "roads.png",
+    "sha256": "327e5c1ece2ef731a594018416c13964c1bec8b72d6d2372f7225379099f767c",
+    "bytes": 866158
+  },
+  {
+    "file": "roads-w123n37.txz",
+    "sha256": "02c991de421080369f7f823a75e6b53b48da34b00435d44bc2a8accd0077d305",
+    "bytes": 69505668
+  },
+  {
+    "file": "buildings-atlas.png",
+    "sha256": "0e25631351e039508242a64d36105d6f9378f512a944d8ff5357a7223d9bb89e",
+    "bytes": 2837144
+  },
+  {
+    "file": "Objects_w130n30_w123n37.txt",
+    "sha256": "34b37c70bada9d630b1ec4474a0d721269f93af856e9fc498b8936867978a4d9",
+    "bytes": 22032
+  },
+  {
+    "file": "materials.xml",
+    "sha256": "580c8aa476c9d4fc5581c7e8e307e3ba7abebbeffd4e62e600d8af1cc26ed6ed",
+    "bytes": 367
+  },
+  {
+    "file": "ReaderWriterSTG.cxx",
+    "sha256": "3c625bfecc3be8b30b4bff0b7e548858cbc4b018a89643c30da3a1cf1a76267e",
+    "bytes": 47242
+  },
+  {
+    "file": "materials-base.xml",
+    "sha256": "7a9ad100c650d4da28d79f4bbeccfd1092fe06e9dd9baeb1a40bb8d1b735e64a",
+    "bytes": 17903
+  },
+  {
+    "file": "OsgMath.hxx",
+    "sha256": "04b297a5c1ad981c5030246ee129981499ee1774a482160b1995770526e0c309",
+    "bytes": 3439
+  },
+  {
+    "file": "building-default.vert",
+    "sha256": "d868c23d3b60e377605bce36f6073ee38fc5c871d16ca51576ec72d30d0bc124",
+    "bytes": 5410
+  },
+  {
+    "file": "Terrain_w130n30_w123n37.txt",
+    "sha256": "a46a9f0a8cab8919b80eb68d6523bc194023b6a6d9949e723ce69711053df654",
+    "bytes": 4703
+  },
+  {
+    "file": "buildings-w123n37.txz",
+    "sha256": "7c809346c132a98529d875b85bc947bc82432911c39c6b5dec619c676d011481",
+    "bytes": 84891584
+  },
+  {
+    "file": "../../../simulator/assets/san_francisco/water_normal.png",
+    "source": "https://gitlab.com/flightgear/fgdata/-/raw/release/2020.3/Textures/Water/perlin-noise-nm.png",
+    "sha256": "f7572ea14f2fe6c1ca95b31c5129167824b7ca21fba99bd184e9080963659fa2",
+    "bytes": 854551
+  }
+]
