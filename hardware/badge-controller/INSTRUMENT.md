@@ -5,11 +5,11 @@ The existing 320×240 ST7789 now renders a flight instrument locally. Bluetooth 
 ## Display states
 
 - **Ready:** pilot/callsign, rotating wireframe jet, READY FOR TAKEOFF and START hint.
-- **Flight:** interpolated bank/pitch artificial horizon, airspeed in knots, altitude in feet, true SF heading and a heading-up 3 km radar. Geese are green, the boss amber, friendly missiles white and hostile missiles red. The selected contact has a ring. Contacts outside the scale stay at the edge.
+- **Flight:** interpolated bank/pitch artificial horizon, airspeed in knots, altitude in feet, true SF heading and a heading-up 3 km radar. Geese are green, the boss amber, friendly missiles white and hostile missiles red. The selected contact has a square bracket. Bank scale markings and numeric bank/pitch support precise reading. Contacts outside the scale stay at the edge.
 - **Action:** brief TARGET LOCKED cue, actual hostile-missile warning, weapon status, B - LAND AT SFO, and landing-assistance status. A warning is never invented just for decoration.
 - **Paused:** frozen flight data with FLIGHT PAUSED.
 - **Results:** score, geese cleared and actual landing/mission result. Safe landing without the boss remains MISSION INCOMPLETE.
-- **Link loss:** WAITING FOR COCKPIT after stale telemetry or disconnect. Buttons and BLE reconnect remain available.
+- **Link loss:** retain the last valid page with LINK LOST - DATA HELD after stale telemetry or disconnect; WAITING FOR COCKPIT appears only before the first valid state. Buttons and BLE reconnect remain available.
 
 Buttons retain their existing eight-bit physical mapping (`0x17f`, code 7 unused). Button sampling runs in a separate 5 ms task so screen transfers do not block debouncing. UART0 stays unused because GPIO20/21 are the shift-register load/clock. The LED level stays low (14 peak): idle button rainbow, red departure/landing sweep, blue flight indication. No NFC or accelerometer behavior is changed.
 
@@ -24,13 +24,15 @@ Existing service `5f1d0000-9c2b-4e7a-a3d6-0b8e1c4f2a71`:
 | 0003 | Instrument fragments, write with or without response |
 | 0004 | Read-only firmware/render/protocol health JSON |
 
+Headless tests never send telemetry. When launched by the game, the relay accepts only snapshots carrying that parent process ID, including their phase; unrelated test/game instances and legacy anonymous phase messages cannot override the live page. Standalone relay mode retains legacy compatibility.
+
 Game sends validated snapshots to localhost UDP 8770 at up to 20 Hz. The relay sends the newest snapshot to BLE and continues delivering buttons to UDP 8771. Older badge firmware without 0003 retains button and phase support.
 
 Binary version 1 has a 44-byte little-endian header, zero to twelve 6-byte contacts, and a CRC-16/CCITT (initial `0xffff`). Maximum frame: 118 bytes. Header layout is defined in `host/instrument_protocol.py`: magic `SI`, version, mode, flags, contact count, sequence; roll/pitch in hundredths of a degree; heading, knots, feet, score, kills, pilot number, landing result, 12-byte ASCII pilot name, selected range and reserved byte. Contacts contain right/forward metres, kind and selection flag.
 
 Each GATT write starts with `a7`, frame ID, offset and total size, then payload. The relay fragments to the negotiated write size, including 20-byte payload compatibility. The receiver rejects malformed lengths, CRC, value ranges, out-of-order fragments and expired assemblies. An 118-byte snapshot at 20 Hz is **18.9 kbit/s before fragment/link overhead**. This is a design payload rate, not a measured radio maximum.
 
-The display targets 25 FPS at 40 MHz SPI, using a 76,800-byte indexed framebuffer plus a 5,120-byte RGB565 transfer stripe. Attitude is interpolated independently from telemetry updates. Actual rate is exposed as `fps10` in 0004; do not infer physical frame rate from the target alone.
+The display targets a steady 15 FPS at 40 MHz SPI, using a 76,800-byte indexed framebuffer plus a 5,120-byte RGB565 transfer stripe. Attitude is interpolated independently from telemetry updates. Changed 32×8 tiles select bounded stripe spans for bulk SPI writes, with no intermediate display clear. A continuous opaque navy/cobalt bezel and cyan corner marks frame the instruments. Actual rate is exposed as `fps10` in 0004; do not infer physical frame rate from the target alone.
 
 ## Reproduce the build
 

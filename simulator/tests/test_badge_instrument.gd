@@ -3,6 +3,7 @@ func _initialize() -> void:call_deferred("run")
 func run() -> void:
 	var app=load("res://scenes/main.tscn").instantiate();root.add_child(app)
 	app.set_process(false);app.set_physics_process(false);app.audio.muted=true
+	assert(not app.badge._open,"Headless tests must never transmit to physical hardware")
 	var s: Dictionary=app.badge.instrument_snapshot(app)
 	assert(s.mode==0 and s.name=="PILOT" and s.pilot==1)
 	app.on_action("next_pilot");s=app.badge.instrument_snapshot(app);assert(s.pilot==2 and app.mode=="title")

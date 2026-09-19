@@ -1,8 +1,8 @@
 {
-  "firmware": "instrument-1",
+  "firmware": "instrument-2",
   "backup_sha256": "aa8bce2fc8bcbff9e43f9b4fe9b42d5d227b9b318e07f699ec2c10749032ab85",
-  "application_sha256": "28ddfc66e14be41b903e7f2b38d65b02bff32ef00c88d7905ca141461c853ff7",
-  "application_bytes": 648512,
+  "application_sha256": "a75515a2e1b9f1e05449fdbb60b8f4f6f56170a4b24e237b9543926de2741f4c",
+  "application_bytes": 650064,
   "write_offset": "0x10000",
   "flash_verified": true,
   "preserved": {
@@ -23,6 +23,20 @@
       "sha256": "72f93fa861818d387d954ee94b82d467c0757fbeb9dca8d07ae0aac4d834ea5f"
     }
   },
-  "physical_lcd_visual_confirmation": "pending",
-  "live_ble_acceptance": "pending; laptop Bluetooth was off"
+  "physical_lcd_visual_confirmation": "User confirmed moving horizon/radar and physical LEFT control on instrument-1; instrument-2 bezel refinement awaiting final visual feedback",
+  "live_ble_acceptance": {
+    "firmware": "instrument-2",
+    "duration_seconds": 25,
+    "packets_sent": 490,
+    "packets_accepted": 490,
+    "bad_packets": 0,
+    "fps": 15.0,
+    "free_heap_bytes": 93440,
+    "payload_bits_per_second": 9388,
+    "legacy_phase_readbacks": "all four passed"
+  },
+  "software_acceptance": {
+    "original_game_full_suite": "passed, including 63 Python tests",
+    "competing_source_regression": "passed; unrelated results/phase cannot override the owning game"
+  }
 }

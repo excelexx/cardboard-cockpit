@@ -24,3 +24,20 @@ class BadgeRelayTests(unittest.TestCase):
                 sink.sendto(b'invalid',r.socket.getsockname());select.select([r.socket],[],[],.2);self.assertEqual(r.game_phase(),0)
                 with self.assertRaises(OSError):relay_module.Relay(r.socket.getsockname()[1])
             finally:r.socket.close()
+
+    def test_owned_game_rejects_competing_results_and_legacy_phase(self):
+        r=relay_module.Relay(0,8771,parent_pid=1234)
+        with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as sender:
+            def send(packet):
+                sender.sendto(json.dumps(packet).encode() if isinstance(packet,dict) else packet,r.socket.getsockname())
+                select.select([r.socket],[],[],.2)
+                return r.game_phase()
+            try:
+                frame=relay_module.disconnected();frame.update(mode=1,sender_pid=1234,phase='sky')
+                self.assertEqual(send(frame),2);self.assertEqual(r.telemetry['mode'],1)
+                frame.update(mode=2,sender_pid=9999,phase='idle')
+                self.assertEqual(send(frame),2);self.assertEqual(r.telemetry['mode'],1)
+                self.assertEqual(send(b'idle'),2)
+                frame['sender_pid']=1234
+                self.assertEqual(send(frame),0);self.assertEqual(r.telemetry['mode'],2)
+            finally:r.socket.close()
