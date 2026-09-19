@@ -6,8 +6,10 @@ const CoastalRoute = preload("res://systems/scenic_route.gd")
 const SFRoute = preload("res://systems/san_francisco_route.gd")
 func route_points() -> Array[Vector3]: return SHOWCASE_POINTS if cinematic else SFRoute.POINTS if app.route_id=="sf" else CoastalRoute.POINTS
 func route_names() -> Array[String]: return SHOWCASE_NAMES if cinematic else SFRoute.NAMES if app.route_id=="sf" else CoastalRoute.NAMES
-const SHOWCASE_POINTS: Array[Vector3]=[Vector3(4000,350,-3500),Vector3(10000,470,-6500),Vector3(15500,430,-10500),Vector3(18000,380,-13500),Vector3(15700,420,-17800),Vector3(15000,480,-15800)]
-const SHOWCASE_NAMES: Array[String]=["BAY DEPARTURE","CITY RUSH","DOWNTOWN","ALCATRAZ CHANNEL","GOLDEN GATE","OPEN SKY"]
+# Scenic showcase: over the coast range to the Pacific cliffs, up Ocean Beach with the
+# city as a hazy backdrop, through the Golden Gate and into the Marin Headlands.
+const SHOWCASE_POINTS: Array[Vector3]=[Vector3(2600,420,-3200),Vector3(-3400,680,-6800),Vector3(-3600,340,-9600),Vector3(0,300,-11700),Vector3(4500,270,-15100),Vector3(10300,300,-18700),Vector3(16000,390,-19200),Vector3(17600,720,-25500)]
+const SHOWCASE_NAMES: Array[String]=["SFO DEPARTURE","COAST RANGE","PACIFIC CLIFFS","DALY CITY CLIFFS","OCEAN BEACH","LANDS END","GOLDEN GATE","MARIN HEADLANDS"]
 var cinematic := false
 var act := 0
 var boss_dead_at := -1.0
@@ -57,7 +59,7 @@ func tick(dt: float) -> void:
 	if f.contact=="landed": transition("rollout")
 	app.combat.engagement_enabled = phase=="combat"
 func label() -> String:
-	if cinematic:return {"opening":"01 / SKYWARD","combat":"02 / CITY RUSH","anticipation":"03 / ANOMALOUS CONTACT","boss":"04 / THE FINAL HONK","aftermath":"05 / RETURN TO SFO","approach":"06 / SFO FINAL APPROACH","rollout":"07 / BRAKING"}.get(phase,"SF / FREE FLIGHT")
+	if cinematic:return {"opening":"01 / SKYWARD","combat":"02 / PACIFIC COAST","anticipation":"03 / ANOMALOUS CONTACT","boss":"04 / THE FINAL HONK","aftermath":"05 / RETURN TO SFO","approach":"06 / SFO FINAL APPROACH","rollout":"07 / BRAKING"}.get(phase,"SF / FREE FLIGHT")
 	return {"takeoff":"01 / DEPARTURE","combat":"02 / INTERCEPT","return":"03 / RECOVERY","approach":"03 / FINAL APPROACH","rollout":"03 / ROLLOUT"}.get(phase,"")
 func instruction() -> String:
 	if cinematic:

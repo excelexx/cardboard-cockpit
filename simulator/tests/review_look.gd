@@ -14,14 +14,16 @@ func run() -> void:
 	if wanted.is_empty() or "title" in wanted:
 		for i in 40:await process_frame
 		await shot(folder,"title")
-	for view in ["chase","cockpit","boss","bay"]:
+	for view in ["chase","cockpit","boss","bay","cliffs","beach","gate","marin"]:
 		if not wanted.is_empty() and view not in wanted:continue
 		app.set_process(false);app.set_physics_process(false)
 		app.start_flight("combat");app.copilot=false;app.cockpit=view=="cockpit";app.text_hud=true
+		var scenic:={"cliffs":[Vector3(-4200,360,-8300),0.7],"beach":[Vector3(2300,280,-13400),0.9],"gate":[Vector3(12000,300,-19300),1.45],"marin":[Vector3(16600,520,-21500),0.25]}
 		var start:=Vector3(15400,430,-10500) if view!="bay" else Vector3(9000,260,-6000)
+		if scenic.has(view):start=scenic[view][0]
 		app.flight.spawn_airborne(start,330);app.flight.gear=false;app.flight.throttle=.65
-		app.flight.heading=-.35 if view!="bay" else 1.2;app.apply_aircraft_pose();app.combat.spawn_clock=999
-		if view!="bay":
+		app.flight.heading=scenic[view][1] if scenic.has(view) else -.35 if view!="bay" else 1.2;app.apply_aircraft_pose();app.combat.spawn_clock=999
+		if view!="bay" and not scenic.has(view):
 			app.combat.spawn_contact("boss" if view=="boss" else "normal")
 			var enemy: Dictionary=app.combat.enemies[0]
 			enemy.position=app.flight.position+app.flight.forward()*(420 if view=="boss" else 260)+Vector3.UP*30

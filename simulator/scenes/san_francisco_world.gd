@@ -18,6 +18,9 @@ const SUN_ENERGY := 3.2
 const EXPOSURE := 1.0
 var terrain_detail: NoiseTexture2D
 const TERRAIN_SHADER := preload("res://assets/look/sf_terrain.gdshader")
+const WATER_SHADER := preload("res://assets/look/sf_water.gdshader")
+var relief: Texture2D
+var water_material: ShaderMaterial
 
 func _ready() -> void: build()
 func build() -> void:
@@ -59,11 +62,22 @@ func build() -> void:
 	environment = WorldEnvironment.new(); environment.environment = env; add_child(environment)
 	sun = DirectionalLight3D.new(); sun.rotation_degrees = Vector3(-16,-110,0)
 	sun.light_color = Color(1.0,0.74,0.50); sun.light_energy = SUN_ENERGY
-	sun.shadow_enabled = true; sun.directional_shadow_max_distance = 4200
+	sun.shadow_enabled = true; sun.directional_shadow_max_distance = 1400
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.directional_shadow_blend_splits = true
 	sun.directional_shadow_split_1 = 0.04; sun.directional_shadow_split_2 = 0.12; sun.directional_shadow_split_3 = 0.35
 	sun.shadow_bias = 0.03; sun.shadow_normal_bias = 1.2; sun.shadow_blur = 1.4; add_child(sun)
+	# Shared by the ground and water shaders: cellular noise for surface breakup
+	# and the baked relief map (smooth normals + shore proximity).
+	var noise := FastNoiseLite.new(); noise.noise_type = FastNoiseLite.TYPE_CELLULAR
+	noise.frequency = 0.045; noise.fractal_octaves = 3
+	terrain_detail = NoiseTexture2D.new(); terrain_detail.width = 512; terrain_detail.height = 512
+	terrain_detail.seamless = true; terrain_detail.generate_mipmaps = true; terrain_detail.noise = noise
+	relief = load("res://assets/look/sf_relief.png")
+	water_material = ShaderMaterial.new(); water_material.shader = WATER_SHADER
+	water_material.set_shader_parameter("waves",load(ROOT+"water_normal.png"))
+	water_material.set_shader_parameter("relief",relief)
+	water_material.set_shader_parameter("detail",terrain_detail)
 	for item: Dictionary in region.chunks:
 		var lo: Array = item.bounds[0]; var hi: Array = item.bounds[1]
 		var box := AABB(Vector3(lo[0],lo[1],lo[2]),Vector3(hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2]))
@@ -95,13 +109,12 @@ func _mount(chunk: Dictionary,scene: PackedScene) -> void:
 					var ground := ShaderMaterial.new(); ground.shader = TERRAIN_SHADER
 					ground.set_shader_parameter("aerial",mat.albedo_texture)
 					ground.set_shader_parameter("detail",terrain_detail)
+					ground.set_shader_parameter("relief",relief)
 					mesh.set_surface_override_material(surface,ground)
+				elif mat is StandardMaterial3D and chunk.kind=="terrain" and mat.roughness<0.4:
+					mesh.set_surface_override_material(surface,water_material)
 				elif mat is StandardMaterial3D:
 					mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-					if chunk.kind=="terrain" and mat.roughness<0.4:
-						mat.normal_enabled = true; mat.normal_texture = load(ROOT+"water_normal.png")
-						mat.normal_scale = 0.12; mat.roughness = 0.32
-						mat.uv1_triplanar = true; mat.uv1_world_triplanar = true; mat.uv1_scale = Vector3.ONE*0.003
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if chunk.kind=="terrain" else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		mesh.visibility_range_end = _visual_range(chunk.kind)
 		if chunk.kind=="city":
@@ -118,7 +131,7 @@ func _stream() -> void:
 			loading += 1
 			if mounted<3 and ResourceLoader.load_threaded_get_status(chunk.path)==ResourceLoader.THREAD_LOAD_LOADED:
 				_mount(chunk,ResourceLoader.load_threaded_get(chunk.path)); mounted += 1
-		elif chunk.box.grow(6500 if chunk.kind=="city" else 28000).has_point(focus):
+		elif chunk.box.grow(4200 if chunk.kind=="city" else 9000 if chunk.kind=="road" else 28000).has_point(focus):
 			wanted.append(chunk)
 	if wanted.is_empty(): return
 	wanted.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return a.box.get_center().distance_squared_to(focus)<b.box.get_center().distance_squared_to(focus))
@@ -133,10 +146,11 @@ func update_local_shadows(at: Vector3,dt: float) -> void:
 	if elapsed>0.05: elapsed = 0; _stream()
 func set_conditions(_id: String) -> void: pass
 func _visual_range(kind: String) -> float:
+	# The haze takes everything by ~6 km; drawing city blocks past that only costs frames.
 	if kind=="terrain": return 90000
 	if kind=="landmark": return 22000
-	if kind=="road": return 12000 if detailed else 8000
-	return 5200 if detailed else 4000
+	if kind=="road": return 6000 if detailed else 4500
+	return 3800 if detailed else 3000
 func apply_quality(high: bool) -> void:
 	detailed = high
 	if environment==null: return
