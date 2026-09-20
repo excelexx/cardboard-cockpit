@@ -97,14 +97,14 @@ func reset() -> void:
 	results_clock = 0; rollout_clock = 0; inhale = 0; burner_latch = false
 	ground_motion=0;steady_ready=false
 	if is_instance_valid(camera): camera.attributes = null
-func update(dt: float) -> void:
+func update(dt: float, visual_flight: FlightDynamics = null) -> void:
 	if app.mode=="paused": return
 	clock += dt
 	# Two-rate decay: a thump lets go quickly, a rumble lingers.
 	trauma = maxf(0,trauma-dt*(1.4+trauma*2.2))
 	settle *= exp(-dt*4.0)
 	settle_clock += dt
-	var f: FlightDynamics = app.flight
+	var f: FlightDynamics = app.flight if visual_flight==null else visual_flight
 	acceleration = lerpf(acceleration,(f.speed-last_speed)/maxf(dt,0.001),1-exp(-dt*5))
 	last_speed = f.speed
 	var plane_basis: Basis = Basis.from_euler(Vector3(f.pitch,-f.heading,-f.roll))

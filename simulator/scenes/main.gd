@@ -2,6 +2,8 @@ extends Node3D
 const Tune = preload("res://data/balance.gd")
 const Catalog = preload("res://data/aircraft.gd")
 const Dynamics = preload("res://systems/flight_dynamics.gd")
+const RenderState = preload("res://systems/flight_render_state.gd")
+var render_state: RefCounted = RenderState.new()
 const World = preload("res://scenes/world.gd")
 const Coast = preload("res://scenes/coastal_world.gd")
 const SanFrancisco = preload("res://scenes/san_francisco_world.gd")
@@ -435,17 +437,21 @@ func _process(dt: float) -> void:
 	update_control_setup(dt)
 	var paused: bool = mode=="paused" or overlay_visible() or yoke_recovery_visible()
 	var active: bool = mode in ["flight","rollout"] and not paused
+	var render_flight: bool=mode in ["flight","rollout"]
+	var visual_flight: FlightDynamics=render_state.sample(flight,Engine.get_physics_interpolation_fraction()) if render_flight else flight
 	if mode not in ["title"]:
 		if not Input.is_key_pressed(KEY_ALT) and not Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE): look = look.lerp(Vector2.ZERO,1-exp(-dt*3))
-		if not paused: camera_rig.update(dt)
+		if not paused:
+			if render_flight:apply_aircraft_pose(visual_flight)
+			camera_rig.update(dt,visual_flight)
 		aircraft.visible = not cockpit or mode in ["ejected","crashed","results"]
-		aircraft_visuals.update_visuals(dt if active else 0,flight,control)
+		aircraft_visuals.update_visuals(dt if active else 0,visual_flight,control)
 		if aircraft_visuals._engine_glow!=null:
 			aircraft_visuals._engine_glow.visible = flight.engine>0.15
 			aircraft_visuals._engine_material.emission_energy_multiplier = flight.engine*(2.0 if flight.afterburner else 0.35)
 		if not paused and DisplayServer.get_name()!="headless":
-			fighter_fx.update(dt)
-			world.update_local_shadows(flight.position,dt)
+			fighter_fx.update(dt,visual_flight)
+			world.update_local_shadows(visual_flight.position,dt)
 		# Render from the current aircraft pose, after the physics step moved it.
 		if is_instance_valid(combat.visuals):combat.visuals.draw_plasma()
 		if cockpit:
@@ -475,6 +481,12 @@ func capture_frame() -> void:
 	if not test_mode: get_tree().call_deferred("quit")
 
 func _physics_process(dt: float) -> void:
+	# Restore the authoritative pose before physics reads weapon mount transforms.
+	if mode in ["flight","rollout"] and not overlay_visible():apply_aircraft_pose()
+	_advance_physics(dt)
+	render_state.record(flight)
+
+func _advance_physics(dt: float) -> void:
 	badge.poll();badge.tick(self,dt)
 	near_obstacle_cooldown=maxf(0,near_obstacle_cooldown-dt)
 	if mode=="control_setup":
@@ -636,14 +648,15 @@ func _physics_process(dt: float) -> void:
 	if flight.airborne and not flight.gear and flight.position.y-surface_height(flight.position.x,flight.position.z)<50: audio.radio.say("warning")
 	if flight.stall_time>1: audio.radio.say("warning")
 	apply_aircraft_pose()
-func apply_aircraft_pose() -> void:
-	if camera_rig.shake_suppressed():flight.pose_offset=Vector3.ZERO
-	aircraft.position = flight.position
-	if not flight.airborne:aircraft.position.y+=flight.gear_drop()-float(profile().clearance)
+func apply_aircraft_pose(visual_flight: FlightDynamics = null) -> void:
+	var pose: FlightDynamics=flight if visual_flight==null else visual_flight
+	if camera_rig.shake_suppressed():pose.pose_offset=Vector3.ZERO
+	aircraft.position = pose.position
+	if not pose.airborne:aircraft.position.y+=pose.gear_drop()-float(profile().clearance)
 	# Drawn attitude, not flown attitude: alpha, sideslip and the gust wobble ride
 	# on the mesh only. The gun still fires along the true forward vector.
-	if flight.has_method("pose_pitch"): aircraft.rotation = Vector3(flight.pose_pitch(),-flight.pose_heading(),-flight.pose_roll())
-	else: aircraft.rotation = Vector3(flight.pitch,-flight.heading,-flight.roll)
+	if pose.has_method("pose_pitch"): aircraft.rotation = Vector3(pose.pose_pitch(),-pose.pose_heading(),-pose.pose_roll())
+	else: aircraft.rotation = Vector3(pose.pitch,-pose.heading,-pose.roll)
 func begin_crash() -> void:
 	if landing_started:settle_demo_touchdown();return
 	if route_id=="sf":recover_flight();return

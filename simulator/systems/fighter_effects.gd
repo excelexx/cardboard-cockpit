@@ -319,7 +319,7 @@ func missile_launch(_side: float, index: int = -1) -> void:
 		store_timers[index] = Tune.MISSILE_INTERVAL
 		stores[index].visible = false
 
-func update(dt: float) -> void:
+func update(dt: float, visual_flight: FlightDynamics = null) -> void:
 	_update_tyre_smoke(dt)
 	clock += dt
 	update_plasma(dt)
@@ -327,11 +327,11 @@ func update(dt: float) -> void:
 		store_timers[i] = maxf(0,store_timers[i]-dt)
 		stores[i].visible = store_timers[i]<.22
 		for geometry: Node in stores[i].find_children("*","GeometryInstance3D",true,false): geometry.transparency = clampf(store_timers[i]/.22,0,1)
-	var f: FlightDynamics = app.flight
+	var f: FlightDynamics = app.flight if visual_flight==null else visual_flight
 	var basis := Basis.from_euler(Vector3(f.pitch,-f.heading,-f.roll))
 	airframe_fill.position = f.position+basis*Vector3(0,7,5)
 	airframe_fill.visible = not app.cockpit
-	update_wind(dt,basis)
+	update_wind(dt,basis,f)
 	update_burner(dt,f,basis)
 	update_vapour(dt,f,basis)
 	# A supersonic crew outruns its own pressure wave: the boom is a distant muffled
@@ -601,22 +601,22 @@ func reset() -> void:
 	parachute = null
 	for trail: MeshInstance3D in trails: trail.mesh.clear_surfaces()
 
-func update_wind(dt: float, basis: Basis) -> void:
+func update_wind(dt: float, basis: Basis, f: FlightDynamics) -> void:
 	if not is_instance_valid(wind_field): return
 	var mesh: ImmediateMesh = wind_field.mesh
 	mesh.clear_surfaces()
-	var strength: float = clampf((app.flight.speed-125)/250,0,.85)
-	if strength<.01 or not app.flight.airborne: return
+	var strength: float = clampf((f.speed-125)/250,0,.85)
+	if strength<.01 or not f.airborne: return
 	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
 	for i in range(wind_points.size()):
 		var local: Vector3 = wind_points[i]
-		local.z += app.flight.speed*dt*.55
+		local.z += f.speed*dt*.55
 		if local.z>25:
 			local = Vector3(wind_rng.randf_range(-24,24),wind_rng.randf_range(-18,18),-45)
 		wind_points[i] = local
 		if absf(local.x)<6 and absf(local.y)<7: continue
-		var a: Vector3 = app.flight.position+basis*local
-		var b: Vector3 = a+basis.z*clampf(app.flight.speed*.011,1.6,4.5)
+		var a: Vector3 = f.position+basis*local
+		var b: Vector3 = a+basis.z*clampf(f.speed*.011,1.6,4.5)
 		var view: Vector3 = app.camera.global_position-a
 		if view.length()<4: continue
 		var side: Vector3 = (b-a).normalized().cross(view.normalized()).normalized()*.11
