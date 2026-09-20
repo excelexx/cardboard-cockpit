@@ -16,7 +16,7 @@ const SCALE := SPECTRE_SCALE if USE_SPECTRE_AIRFRAME else F35_SCALE
 const NOZZLE := Vector3(0, -0.30, 7.28) if USE_SPECTRE_AIRFRAME else Vector3(0, -0.782, 7.32)
 # Matching plasma accelerators sit clear of both forward chines.
 const PLASMA_SCALE := 1.65
-const PLASMA_MOUNT := Vector3(1.72, 0.30, -3.65) if USE_SPECTRE_AIRFRAME else Vector3(1.25, 0.30, -3.70)
+const PLASMA_MOUNT := Vector3(1.72, 0.30, -7.10) if USE_SPECTRE_AIRFRAME else Vector3(1.25, 0.30, -6.80)
 const PLASMA_LEFT_MOUNT := Vector3(-PLASMA_MOUNT.x, PLASMA_MOUNT.y, PLASMA_MOUNT.z)
 const PLASMA_MUZZLE := PLASMA_LEFT_MOUNT + Vector3(0, 0, -0.52 * PLASMA_SCALE)
 const PLASMA_RIGHT_MUZZLE := PLASMA_MOUNT + Vector3(0, 0, -0.52 * PLASMA_SCALE)

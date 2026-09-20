@@ -1,6 +1,6 @@
 # Goose Protocol — SPECTRE X-26
 
-Version **0.21.0** is one continuous San Francisco judge demo: take off, fly, shoot adaptive dual plasma and keep clearing new flocks for as long as you like. Coaching stays visible throughout. Press **B** or **badge B** when you want to land, then fly the approach yourself.
+Version **0.22.0** is one continuous San Francisco judge demo: take off, fly, shoot adaptive dual plasma and keep clearing new flocks for as long as you like. The HUD keeps the aiming area clear. Press **B** or **badge B** when you want to land, then fly the approach yourself.
 
 Open **Launch Cardboard Cockpit.command** or the packaged **Cardboard Cockpit.app**. The demo uses excelex's cardboard controls and settings with the current graphics and aircraft presentation. **Watch demo** flies and shoots automatically. [Judge demo flow](docs/JUDGE_DEMO.md).
 
@@ -26,9 +26,9 @@ Choose **Play / Enter / badge Start** for calibration only, or **Set Up Cardboar
 
 Two plasma beams are the manual weapon. They split across two targets or focus together on one, with **SPLIT**, **FOCUS** or **FIRING** shown on the HUD. Automatic missile support fires two missiles together every five seconds during large flocks, when two eligible targets are available. [Adaptive plasma controls and feedback](docs/ADAPTIVE_PLASMA.md).
 
-Flocks continue with a visible **WAVE N** counter and live kills for the current wave. There is no countdown or fixed kill quota before landing. Only actual kills count. Yoke loss pauses the flight; a steady return resumes it. Sound starts enabled each launch; **M** mutes the current session. The steady camera keeps recoil and chase movement subdued for comfort.
+Groups of **1–4 geese arrive every 200–500 metres of flight path**, with loose offsets and stable plasma target locks. Flocks continue with a visible **WAVE N** counter and live kills for the current wave. There is no countdown or fixed kill quota before landing. Only actual kills count. Yoke loss pauses the flight; a steady return resumes it. Sound starts enabled each launch; **M** mutes the current session. The steady camera keeps recoil and chase movement subdued for comfort.
 
-After takeoff, the coach prompts **BADGE A / G: RETRACT GEAR + FLAPS**. During landing, it shows live gear, flap and throttle state and reminds you to reduce power and steer/pitch your own approach. Touchdown stays planted instead of bouncing into another takeoff.
+After takeoff, **A / G** retracts gear and flaps. **B** starts or retries the manual landing approach. Touchdowns on dry airport ground are accepted; water or off-airport contact starts an automatic flight back to the runway.
 
 ## Cardboard and badge
 
@@ -44,7 +44,7 @@ The sourced SF region includes SFO, downtown, residential streets, hills, Golden
 
 Forward+ rendering retains streamed native meshes, LODs and filtered foliage. Local fog, selective glow, twin plasma beams and bounded pools of sprites, projectile meshes, lights and spatial sounds support combat. High and Balanced modes retain independent HUD resolution. The physical terrain guard and soft protection around compact tall landmarks keep low flight forgiving; SF buildings do not use solid mesh collision.
 
-Radio uses licensed human voices processed with military-style band-pass filtering, compression, saturation, RF hiss and push-to-talk squelch. Ground-base and pilot cues have priority, expiry, subtitles and music ducking. The music track adjusts with encounter intensity without restarting. These are processed Kenney recordings, not generated voice clones.
+Radio uses licensed human voices processed with military-style band-pass filtering, compression, saturation, RF hiss and push-to-talk squelch. Ground-base and pilot cues have priority, expiry, subtitles and music ducking. The supplied Free Bird solo cues at each runway start, beginning at source 0:12 with a five-second fade. The bundled cut is 15 minutes and continues through landing until the main menu. These are processed Kenney recordings, not generated voice clones.
 
 ## Develop and verify
 

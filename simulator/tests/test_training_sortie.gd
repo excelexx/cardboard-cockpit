@@ -22,7 +22,7 @@ func run() -> void:
 		app._physics_process(1.0/60)
 		if app.mode=="results":break
 		if frame%120==0:await process_frame
-	check(departed and first_clear==6,"Common demo takes off and clears its real first wave")
+	check(departed and first_clear>=1 and first_clear<=6,"Common demo takes off and scores real hits in its first dispersed stream")
 	check(requested and manual,"D switches the ongoing demo to a pilot-controlled landing")
 	check(app.mode=="results" and app.mission_success and app.flight.contact=="landed" and app.flight.speed<=.1,"Legacy entry can land and stop without completing a fixed course")
 	check("opening" in phases and "skein" in phases and "approach" in phases,"Shared flight follows the SF encounter and the chosen landing")

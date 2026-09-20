@@ -102,6 +102,8 @@ var toast_time := 0.0
 var near_obstacle_cooldown:=0.0
 var landing_transition:=0.0
 var landing_started:=false
+var landing_recovery:=false
+var recovery_final:=false
 func profile() -> Dictionary: return Catalog.PROFILE
 func _ready() -> void:
 	get_window().title = "Goose Protocol — SPECTRE X-26"
@@ -185,7 +187,7 @@ func start_flight(kind: String = "demo") -> void:
 	copilot = false; used_copilot = false; mission_success = false; result_reason = ""
 	pilot_ejected = false; record_broken = false; eject_hold = 0; crash_clock = 0; fire_guard = 0.3
 	control = Vector3.ZERO; look = Vector2.ZERO
-	landing_started=false;landing_transition=0
+	landing_started=false;landing_recovery=false;recovery_final=false;landing_transition=0
 	gear_override=-1;flaps_override=-1;assisted_yoke_reference=vision.yoke
 	flight.reset(profile())
 	if route_id=="sf": flight.position.y += surface_height(flight.position.x,flight.position.z)
@@ -214,7 +216,7 @@ func start_flight(kind: String = "demo") -> void:
 
 func overlay_visible() -> bool: return mode=="control_setup" or help_visible or calibration_visible or credits_visible or settings_visible
 func yoke_required() -> bool:
-	return vision.enabled and vision.yoke_enabled and mode=="flight"
+	return vision.enabled and vision.yoke_enabled and mode=="flight" and not landing_recovery
 func yoke_recovery_visible() -> bool:
 	return yoke_required() and (yoke_recovery or not vision.tracking)
 func hold_for_yoke(dt: float) -> bool:
@@ -434,6 +436,8 @@ func _process(dt: float) -> void:
 		if not paused and DisplayServer.get_name()!="headless":
 			fighter_fx.update(dt)
 			world.update_local_shadows(flight.position,dt)
+		# Render from the current aircraft pose, after the physics step moved it.
+		if is_instance_valid(combat.visuals):combat.visuals.draw_plasma()
 		if cockpit:
 			cockpit_frame.update_instruments(flight,control,dt if active else 0)
 			if world.get("sun")!=null: cockpit_frame.set_sun(world.sun.global_basis.z,world.sun.light_energy/3.2)
@@ -448,7 +452,7 @@ func _process(dt: float) -> void:
 	audio.set_context(mode,cockpit,flight.contact,paused)
 	audio.observe_flight(flight)
 	audio.update(flight.engine,flight.speed,active,dt)
-	audio.set_music_active(flight_kind in ["combat","demo","training"] and mode in ["flight","results"])
+	audio.set_music_active(flight_kind in ["combat","demo","training"] and mode in ["flight","rollout","results","paused","crashed","ejected"])
 	if capture_at>0 and runtime>=capture_at and not pending_capture:
 		pending_capture = true; capture_frame()
 	if test_mode and flight.elapsed>(1200 if route_id=="sf" else 420) and not test_finished:
@@ -509,6 +513,7 @@ func _physics_process(dt: float) -> void:
 		var steer: float = float(Input.is_physical_key_pressed(KEY_PERIOD))-float(Input.is_physical_key_pressed(KEY_COMMA))
 		if vision.enabled and vision.tracking:steer=vision.steering().z
 		flight.rollout_step(dt,landing_started or copilot or Input.is_physical_key_pressed(KEY_SPACE),steer,landing_started or is_on_runway(flight.position))
+		if landing_started and not airport_touchdown_allowed(flight.position):start_runway_recovery();return
 		if landing_started:
 			flight.contact="landed";flight.airborne=false;flight.position.y=surface_height(flight.position.x,flight.position.z)+float(profile().clearance)
 			flight.vertical_speed=0;flight.velocity.y=0;flight.update_pose(dt,Vector3.ZERO,surface_height(flight.position.x,flight.position.z))
@@ -544,7 +549,9 @@ func _physics_process(dt: float) -> void:
 		input.x=steering.x;input.y=steering.y;input.z=steering.z
 	if vision.enabled and vision.throttle_confidence>.4:copilot=false
 	flight.power_input = 0
-	if copilot:
+	if landing_recovery:
+		copilot=true;used_copilot=true;input=runway_recovery_controls()
+	elif copilot:
 		input = mission.controls() if mission.active else combat.pilot_controls() if combat.active else approach_controls()
 		if demo_auto_fire and not vision.enabled and combat.active and combat.engagement_enabled and combat.lock_progress>=1:
 			var tracked: Dictionary = combat.target()
@@ -592,6 +599,7 @@ func _physics_process(dt: float) -> void:
 	if flaps_override>=0:flight.flaps=flaps_override
 	flight.step(dt,control,not mission.active and Input.is_physical_key_pressed(KEY_SPACE),surface_height(flight.position.x,flight.position.z),is_on_runway(flight.position),false)
 	flight.resolve_contact(surface_height(flight.position.x,flight.position.z),is_on_runway(flight.position))
+	if route_id=="sf" and flight.contact!="" and flight.ever_airborne and not airport_touchdown_allowed(flight.position):start_runway_recovery()
 	if landing_started and (flight.contact!="" or flight.position.y<=surface_height(flight.position.x,flight.position.z)+float(profile().clearance)+.05):
 		settle_demo_touchdown()
 	if flight.airborne and not was_airborne: audio.radio.say("cleared")
@@ -677,7 +685,7 @@ func begin_landing() -> void:
 	if mode not in ["flight","rollout"] or (mode=="rollout" and not landing_started):return
 	mode="flight";resume_mode="flight"
 	var prior_gear: bool=flight.gear;var prior_flaps: int=flight.flaps
-	landing_started=true;landing_transition=1.0;landed_early=false
+	landing_started=true;landing_recovery=false;recovery_final=false;landing_transition=1.0;landed_early=false
 	tutorial.landing_begun()
 	combat.active=false;combat.engagement_enabled=false;combat.launch_queue.clear()
 	combat.gun_firing_time=0;combat.beam_active=false;combat.beam_target_ids.assign([-1,-1]);combat.visuals.reset()
@@ -694,7 +702,46 @@ func begin_landing() -> void:
 	toast="REDUCE SPEED — THROTTLE BACK · A / G: GEAR + FLAPS DOWN · B: RETRY APPROACH";toast_time=7
 	audio.radio.say("approach",2)
 
+func airport_touchdown_allowed(at: Vector3) -> bool:
+	if route_id=="sf" and world.has_method("is_airport_surface"):return world.is_airport_surface(at.x,at.z)
+	return absf(at.x)<1050 and (absf(at.z)<1900 or absf(at.z+15000)<1900)
+
+func start_runway_recovery() -> void:
+	landing_started=true;landing_recovery=true;recovery_final=false;landing_transition=0
+	mode="flight";resume_mode="flight";copilot=true;used_copilot=true
+	combat.active=false;combat.engagement_enabled=false;combat.launch_queue.clear();combat.visuals.reset()
+	combat.beam_active=false;combat.gun_firing_time=0
+	flight.contact="";flight.airborne=true;flight.ever_airborne=true
+	flight.position.y=maxf(flight.position.y,surface_height(flight.position.x,flight.position.z)+30)
+	flight.speed=maxf(flight.speed,95);flight.pitch=.10;flight.roll=0
+	flight.pitch_velocity=0;flight.roll_velocity=0;flight.yaw_velocity=0;flight.vertical_speed=0;flight.stall_time=0
+	flight.velocity=flight.forward()*flight.speed;flight.throttle=.65;flight.engine=.65
+	flight.gear=false;flight.flaps=0;gear_override=0;flaps_override=0;control=Vector3.ZERO
+	if mission.active:mission.transition("approach")
+	toast="OFF AIRPORT — AUTOFLYING TO THE RUNWAY · B: RETRY APPROACH";toast_time=7
+	apply_aircraft_pose()
+
+func runway_recovery_controls() -> Vector3:
+	var join:=Vector3(0,200,3600) if route_id=="sf" else Vector3(0,200,-11200)
+	var delta: Vector3=join-flight.position
+	if not recovery_final and Vector2(delta.x,delta.z).length()<420:recovery_final=true
+	if recovery_final:
+		gear_override=1;flaps_override=2
+		return approach_controls()
+	gear_override=0;flaps_override=0;flight.afterburner=false
+	var target_height: float=join.y
+	for ahead in [0.0,400.0,900.0]:
+		var at: Vector3=flight.position+flight.forward()*ahead
+		target_height=maxf(target_height,surface_height(at.x,at.z)+130)
+	var error: float=wrapf(atan2(delta.x,-delta.z)-flight.heading,-PI,PI)
+	var bank: float=clampf(error*1.4,-.65,.65)
+	var pitch: float=clampf(atan2(target_height-flight.position.y,700),-.14,.25)
+	flight.throttle=clampf(.35+(125-flight.speed)*.045,0,1)
+	return Vector3(clampf((bank-flight.roll)*3.5-flight.roll_velocity*.3,-1,1),clampf((pitch-flight.pitch)*4-flight.pitch_velocity*.3,-1,1),clampf(error*.8,-.5,.5))
+
 func settle_demo_touchdown() -> void:
+	if not airport_touchdown_allowed(flight.position):start_runway_recovery();return
+	landing_recovery=false;recovery_final=false
 	# A demo landing captures the ground once; it never respawns or bounces airborne.
 	if flight.contact!="landed":
 		flight.touchdown_speed=flight.speed;flight.touchdown_sink=flight.vertical_speed
@@ -744,7 +791,7 @@ func approach_controls() -> Vector3:
 	# flare ever bleeds the jet toward the lift break: the landing cannot get harder.
 	if flaring and flight.speed>FLARE_MIN_SPEED: flight.throttle = lerpf(flight.throttle,0.02,flare)
 	else: flight.throttle = clampf(0.22+(Tune.APPROACH_SPEED-flight.speed)*0.055,0,1)
-	return Vector3(clampf((error*1.5-flight.roll)*1.8-flight.roll_velocity*0.3,-1,1),clampf((wanted_pitch-flight.pitch)*2.5-flight.pitch_velocity*0.3,-1,1),0)
+	return Vector3(clampf((clampf(error*1.5,-.55,.55)-flight.roll)*2.8-flight.roll_velocity*.3,-1,1),clampf((wanted_pitch-flight.pitch)*2.5-flight.pitch_velocity*.3,-1,1),clampf(error*.5,-.35,.35))
 ## The last wave is a big V of geese, not a boss. combat.gd is another package's
 ## file and is mid-rename, so every skein reading goes through a guard and falls
 ## back to the old single-contact fields while both halves exist.

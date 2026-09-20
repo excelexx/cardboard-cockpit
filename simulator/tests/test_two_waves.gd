@@ -8,6 +8,7 @@ func run() -> void:
 	check(app.mission.last_wave_cleared and not app.mission.skein_final,"A cleared introduction is not a sortie ending")
 	app.mission.tick(2.8)
 	check(app.mission.wave_number==1,"The short reward beat remains visible")
+	app.flight.position+=app.flight.forward()*(app.mission.stream_gap+1)
 	app.mission.tick(.21);fill_wave()
 	check(app.mission.wave_number==2 and app.mission.wave_size==8 and app.mission.skein_total()==14,"Second wave adds eight to the actual-arrival count")
 	kill_birds(8)
