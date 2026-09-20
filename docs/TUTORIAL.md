@@ -2,6 +2,8 @@
 
 **Play** is the single entry point. Older Tutorial actions open the same endless San Francisco demo. Complete the cardboard checks or choose **Use keyboard**; there is no separate sixteen-target route or sequence of guide rings.
 
+The setup gun check has exactly two actions: **uncover ID 4 to shoot, then cover it to stop**. Keep it covered afterward. Next, practice **badge A / keyboard A or G** for gear and flaps, then **badge B / keyboard D** for landing. These presses only confirm the controls; the aircraft stays paused.
+
 One contextual coaching card stays visible during flight. It changes with the aircraft's real state:
 
 - **On the ground:** increase power and pull up as speed builds.

@@ -1,5 +1,10 @@
 extends SceneTree
 const Tutorial = preload("res://systems/control_tutorial.gd")
+const Badge=preload("res://systems/badge_link.gd")
+class PracticeBadge extends Badge:
+	var next_press:=0
+	func poll()->void:
+		connected=true;pressed=next_press;mask=next_press;released=0;next_press=0
 const Vision = preload("res://systems/vision_client.gd")
 var now := 1000
 var checks := 0
@@ -56,7 +61,7 @@ func run() -> void:
 	check(lesson.index == 1, "Held throttle value with missing markers cannot pass")
 	v.throttle_confidence = 1; pass_step(lesson, v, 1)
 	v.throttle = 0; pass_step(lesson, v, 2)
-	check(lesson.step()[0]=="yoke_info" and Tutorial.STEPS.size()==7,"One short yoke overview replaces all six movement exercises and centering checks")
+	check(lesson.step()[0]=="yoke_info" and Tutorial.STEPS.size()==8,"One short yoke overview replaces all six movement exercises and centering checks")
 	v.yoke = Vector2.ZERO; v.yoke_yaw = 0
 	observe(lesson, v, 90)
 	check(lesson.index==3,"Overview remains visible long enough to read")
@@ -69,9 +74,15 @@ func run() -> void:
 	v.tracking = true; v.connected = false; observe(lesson, v, 90)
 	check(lesson.index == 5, "Disconnect cannot count as covering the gun tag")
 	v.connected = true; pass_step(lesson, v, 5)
-	v.gun_trigger = true; pass_step(lesson, v, 6)
+	check(lesson.step()[0]=="gear" and not v.gun_trigger,"Exactly uncover then cover leads directly to button checks without another uncover")
+	observe(lesson,v,200)
+	check(lesson.index==6 and not lesson.passed,"Button checks never advance from time or camera packets")
+	lesson.press("landing");check(not lesson.passed,"Wrong button cannot pass the gear check")
+	lesson.press("gear");pass_step(lesson,v,6)
+	lesson.press("gear");check(not lesson.passed,"Prior gear press cannot pass the landing check")
+	lesson.press("landing");pass_step(lesson,v,7)
 	check(lesson.complete() and not lesson.can_start, "Throttle checks, yoke overview and gun checks reach the automatic ready stage")
-	observe(lesson, v, 90)
+	v.gun_trigger=true;observe(lesson, v, 90)
 	check(not lesson.can_start, "Exposed gun cannot start flight")
 	v.gun_trigger = false; v.throttle = .9
 	observe(lesson, v, 90)
@@ -105,6 +116,19 @@ func run() -> void:
 	var press := InputEventKey.new(); press.pressed = true; press.keycode = KEY_SPACE
 	app._input(press)
 	check(app.flight.position == position and not app.combat.primary_used and not app.combat.beam_active and app.combat.shots.is_empty(), "Setup freezes flight and prevents plasma or automatic missile firing")
+	app.controls_lesson.calibrating=false;app.controls_lesson.index=6;app.controls_lesson.retry()
+	var gear: bool=app.flight.gear;var flaps: int=app.flight.flaps
+	press.keycode=KEY_D;app._input(press)
+	check(not app.controls_lesson.passed,"Keyboard landing cannot skip gear practice")
+	press.keycode=KEY_A;app._input(press)
+	check(app.controls_lesson.passed and app.flight.gear==gear and app.flight.flaps==flaps,"Keyboard A confirms gear practice without changing the aircraft")
+	app.controls_lesson.index=7;app.controls_lesson.retry();press.keycode=KEY_D;app._input(press)
+	check(app.controls_lesson.passed and not app.landing_started and app.mode=="control_setup","Keyboard D confirms landing practice without starting an approach")
+	var practice_badge=PracticeBadge.new();app.badge=practice_badge
+	app.controls_lesson.index=6;app.controls_lesson.retry();practice_badge.next_press=1;app._physics_process(.016)
+	check(app.controls_lesson.passed and app.flight.gear==gear,"Badge A confirms gear practice without actuating gear")
+	app.controls_lesson.index=7;app.controls_lesson.retry();practice_badge.next_press=2;app._physics_process(.016)
+	check(app.controls_lesson.passed and not app.landing_started and app.flight.position==position,"Badge B confirms landing practice while flight stays paused")
 	app.controls_lesson = lesson; app.vision = v
 	var frame := Image.create(20,20,false,Image.FORMAT_RGB8)
 	app.yoke_preview.texture = ImageTexture.create_from_image(frame)
