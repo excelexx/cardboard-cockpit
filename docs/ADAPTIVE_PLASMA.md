@@ -22,3 +22,5 @@ The unified judge demo keeps the San Francisco scenery and continues to offer ne
 Sound starts enabled each launch, with M available to mute. Camera movement and recoil stay subdued for comfort. Cardboard calibration, tracking recovery, throttle blending and the existing sensitivity/agility defaults remain available throughout the demo.
 
 Missile impacts deal area damage within120metres, with a falloff toward the edge. Nearby geese can be cleared by the same blast; each real death counts once. Missiles retarget unassigned living geese if a prior target dies. Impact visuals combine a hot core, expanding coloured pressure rings, fire/smoke, sparks and fragments, with bounded active effects and unchanged subdued camera motion.
+
+Weapon presentation adds a brief missile ignition flash, longer tapered motor exhaust, continuous turbulent smoke wakes and a hot exhaust core. Plasma streams carry travelling energy pulses with muzzle coronas and blooms at confirmed hit points. These effects preserve the existing automatic launch cadence, damage and kill-only shake.

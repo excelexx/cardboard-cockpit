@@ -9,6 +9,8 @@ var combat: Node
 var projectile_pool := {"missile":[]}
 var beams: Array[MeshInstance3D]=[]
 var beam_lights: Array[OmniLight3D] = []
+var plasma_muzzle_blooms: Array[MeshInstance3D]=[]
+var plasma_impact_blooms: Array[MeshInstance3D]=[]
 var sprites: Array[Dictionary] = []
 var sprite_pool: Array[Sprite3D] = []
 var lights: Array[Dictionary] = []
@@ -48,6 +50,8 @@ func _ready() -> void:
 		light.light_color = Color(.35,.55,1); light.omni_range = 12
 		light.shadow_enabled = false; light.visible = false
 		add_child(light); beam_lights.append(light)
+		plasma_muzzle_blooms.append(Art.beam_bloom(self,true))
+		plasma_impact_blooms.append(Art.beam_bloom(self,false))
 	for beam in beams: beam.visible = false
 	lead_mesh=MeshInstance3D.new();lead_mesh.mesh=ImmediateMesh.new();lead_mesh.material_override=Art.emissive(Color(.08,.55,.8),1.3,.15);lead_mesh.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;add_child(lead_mesh)
 	for i in range(96):
@@ -63,6 +67,11 @@ func _ready() -> void:
 		_equip_missile(node)
 		projectile_pool.missile.append(node)
 func _equip_missile(node: Node3D) -> void:
+	var flash:=Art.beam_bloom(node,true);flash.name="LaunchPulse";flash.position.z=1.5
+	var flash_material: ShaderMaterial=flash.material_override
+	flash_material.set_shader_parameter("mode",0);flash_material.set_shader_parameter("loop",0.0)
+	flash_material.set_shader_parameter("size",1.3);flash_material.set_shader_parameter("grow",2.6)
+	flash_material.set_shader_parameter("core_colour",Color(1,.96,.74));flash_material.set_shader_parameter("edge_colour",Color(1,.35,.06))
 	var flare:=Sprite3D.new();flare.name="EngineFlare";flare.texture=flash_texture;flare.billboard=BaseMaterial3D.BILLBOARD_ENABLED;flare.shaded=false;flare.position.z=1.65;flare.modulate=Color(4,2.8,1.6,.8);flare.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;node.add_child(flare)
 	# A solid motor throws a warm light, not a cold one. This used to be
 	# Color(.6,.82,1), which disagreed with its own flare sprite.
@@ -278,6 +287,9 @@ func take_projectile(kind: String) -> Node3D:
 		node = Art.projectile("missile"); node.set_meta("projectile_kind", "missile"); add_child(node)
 		_equip_missile(node)
 	node.visible = true; node.scale = Vector3.ONE * Tune.MISSILE_VISUAL_SCALE
+	for effect_name in ["Ignition","MotorFlame","EngineFlare","MotorLight","LaunchPulse"]:
+		var effect: Node3D=node.get_node_or_null(effect_name)
+		if effect!=null:effect.visible=false
 	return node
 
 func release_projectile(node: Node3D, kind: String) -> void:
@@ -320,6 +332,7 @@ func reset() -> void:
 	missile_blasts.clear()
 	for beam in beams:beam.visible=false
 	for light in beam_lights: light.visible = false
+	for bloom in plasma_muzzle_blooms+plasma_impact_blooms:bloom.visible=false
 	for effect in sprites:
 		effect.node.visible=false;sprite_pool.append(effect.node)
 	sprites.clear()
@@ -421,7 +434,7 @@ func update_projectile(shot: Dictionary,dt: float) -> void:
 	# Keyed off the real ignition check instead of a hardcoded 0.15/4.0 window
 	# that was already 0.03 s out of sync with the physics.
 	var burn_t: float=float(shot.age)-Tune.MISSILE_IGNITION_DELAY
-	var burning: bool=burn_t>=0.0 and burn_t<Tune.MISSILE_MOTOR_TIME
+	var burning: bool=burn_t>=0.0 and shot.age<Tune.MISSILE_MOTOR_TIME
 	# Boost then sustain: a short over-thrust spike at light-up, a steady lower
 	# output, then a quick tail-off at burnout.
 	var thrust: float=0.0
@@ -429,11 +442,15 @@ func update_projectile(shot: Dictionary,dt: float) -> void:
 		var boost: float=clampf(burn_t/maxf(Tune.MISSILE_ACCELERATION_TIME,.001),0,1)
 		thrust=lerpf(1.75,1.0,smoothstep(0.0,1.0,boost))
 		thrust*=clampf(burn_t/.05,0,1)
-		thrust*=clampf((Tune.MISSILE_MOTOR_TIME-burn_t)/.55,0,1)
+		thrust*=clampf((Tune.MISSILE_MOTOR_TIME-shot.age)/.55,0,1)
+	var flash: MeshInstance3D=shot.node.get_node_or_null("LaunchPulse")
+	if flash!=null:
+		flash.visible=burn_t>=0 and burn_t<.22
+		flash.material_override.set_shader_parameter("t",clampf(burn_t/.22,0,1))
 	var distance: float=combat.app.camera.global_position.distance_to(shot.position)
 	if flare!=null:
 		flare.visible=burning
-		flare.pixel_size=clampf(distance*.000020,.007,.05)*(.75+.35*thrust)
+		flare.pixel_size=clampf(distance*.000026,.008,.055)*(.75+.35*thrust)
 		flare.modulate=Color(4,3,1.8,clampf((.52+.30*thrust)+.10*sin(shot.age*91),0,1))
 	if motor!=null:
 		motor.visible=burning and distance<450;motor.light_energy=3.5*thrust
@@ -445,22 +462,31 @@ func update_projectile(shot: Dictionary,dt: float) -> void:
 		shot.node.set_meta("motor_materials",found)
 	for material: ShaderMaterial in shot.node.get_meta("motor_materials"):
 		material.set_shader_parameter("throttle",thrust)
-	if burning and shot.age-float(shot.get("ghost_at",0))>.09:
+	if burning and shot.age-float(shot.get("ghost_at",0))>.17:
 		shot.ghost_at=shot.age
 		# Aluminised propellant leaves dense white-grey alumina smoke, not the
 		# cyan puff that used to be here.
-		puff(shot.position,Color(.62,.63,.60,.30),clampf(distance*.014,2,12),.24)
+		puff(shot.position,Color(.67,.67,.64,.22),clampf(distance*.008,1.3,7),.28)
 func draw_plasma() -> void:
 	var live: bool = combat.beam_active and combat.app.mode == "flight" and not combat.app.overlay_visible() and not combat.app.yoke_recovery_visible()
 	for index in range(2):
 		var enabled: bool = live and index < combat.beam_ends.size()
 		for layer in range(3): beams[index * 3 + layer].visible = enabled
 		beam_lights[index].visible = enabled
+		plasma_muzzle_blooms[index].visible=enabled
+		plasma_impact_blooms[index].visible=false
 		if not enabled: continue
 		var start: Vector3 = combat.app.fighter_fx.plasma_muzzle_position(combat.app.flight.position, index)
 		for layer in range(3): Art.align_beam(beams[index * 3 + layer], start, combat.beam_ends[index])
 		beam_lights[index].global_position = start
 		beam_lights[index].light_energy = 1.2
+		plasma_muzzle_blooms[index].global_position=start
+		Art.drive_bloom(plasma_muzzle_blooms[index],.8,0,.72)
+		if combat.beam_target_ids[index]>=0:
+			var end: Vector3=combat.beam_ends[index]
+			plasma_impact_blooms[index].global_position=end
+			var size: float=clampf(combat.app.camera.global_position.distance_to(end)*.006,2.0,10.0)
+			Art.drive_bloom(plasma_impact_blooms[index],.85,start.distance_to(end),size)
 
 func tick(dt: float) -> void:
 	tick_missile_blasts(dt)

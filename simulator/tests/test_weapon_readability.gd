@@ -33,6 +33,7 @@ func run() -> void:
 	app.combat.gun_firing_time=0;app.combat.update_beam(.1);app.combat.visuals.draw_plasma()
 	for beam in app.combat.visuals.beams:check(not beam.visible,"Release hides every plasma layer")
 	check(not app.combat.beam_active,"Release clears plasma activity")
+	for bloom in app.combat.visuals.plasma_muzzle_blooms+app.combat.visuals.plasma_impact_blooms:check(not bloom.visible,"Releasing primary removes its muzzle and target blooms")
 	for i in range(8):
 		app.combat.spawn_contact();var enemy: Dictionary=app.combat.enemies.back()
 		enemy.position=app.flight.position+Vector3((i-3)*35,0,-800-i*50);enemy.fade=1;enemy.retiring=false
@@ -45,6 +46,15 @@ func run() -> void:
 	app.combat.update_launches(.1)
 	check(app.combat.missiles_fired==4 and app.combat.shots.size()==4,"All four automatic missiles leave their stores")
 	for shot: Dictionary in app.combat.shots:check(shot.kind=="missile" and shot.node.scale.x>=3,"Automatic missiles use enlarged, readable models")
+	var shot: Dictionary=app.combat.shots[0]
+	for effect_name in ["EngineFlare","MotorLight","LaunchPulse"]:check(not shot.node.get_node(effect_name).visible,"A missile leaves the rail with its motor effects off")
+	shot.age=Tune.MISSILE_IGNITION_DELAY+.05;app.combat.visuals.update_projectile(shot,.05)
+	check(shot.node.get_node("EngineFlare").visible and shot.node.get_node("LaunchPulse").visible,"Motor ignition has a brief visible flare and launch pulse")
+	shot.age=Tune.MISSILE_MOTOR_TIME+.01;app.combat.visuals.update_projectile(shot,.01)
+	check(not shot.node.get_node("MotorLight").visible and not shot.node.get_node("EngineFlare").visible and not shot.node.get_node("LaunchPulse").visible,"Visual motor and launch flash end with the actual motor burn")
+	app.combat.visuals.release_projectile(shot.node,"missile")
+	var reused=app.combat.visuals.take_projectile("missile")
+	check(not reused.get_node("EngineFlare").visible and not reused.get_node("LaunchPulse").visible,"Reused missile cannot inherit an old ignition flash")
 	check(not app.combat.has_method("fire_gun") and not app.combat.has_method("fire_missile"),"Only the plasma weapon has a manual firing API")
 	app.queue_free();await process_frame
 	print("WEAPON READABILITY: ",checks," checks / ",failures.size()," failures");quit(0 if failures.is_empty() else 1)

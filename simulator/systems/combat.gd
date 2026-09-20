@@ -671,15 +671,8 @@ func spawn_shot(at: Vector3, velocity: Vector3, kind: String, target_value: int,
 	if kind=="missile":
 		var trail := MeshInstance3D.new()
 		trail.mesh = ImmediateMesh.new()
-		var smoke := StandardMaterial3D.new()
-		smoke.albedo_color = Color.WHITE
-		smoke.albedo_texture = load("res://assets/sourced_flight/smoke.png")
-		if kind=="cannon":
-			smoke.emission_enabled = true; smoke.emission = Color(1,.55,.18); smoke.emission_energy_multiplier = 1.1
-		smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		smoke.vertex_color_use_as_albedo = true
-		smoke.cull_mode = BaseMaterial3D.CULL_DISABLED
+		var smoke := ShaderMaterial.new()
+		smoke.shader=load("res://assets/vfx/missile_wake.gdshader")
 		trail.set_meta("smoke_material",smoke)
 		trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(trail)
@@ -698,19 +691,24 @@ func update_trail(shot: Dictionary) -> void:
 	ribbon.clear_surfaces()
 	if points.size()<2: return
 	ribbon.surface_begin(Mesh.PRIMITIVE_TRIANGLES,shot.trail_node.get_meta("smoke_material"))
+	var distance_along:=0.0
+	shot.trail_node.get_meta("smoke_material").set_shader_parameter("motor",1.0 if shot.age<Tune.MISSILE_MOTOR_TIME else 0.0)
 	for i in range(points.size()-1):
-		var a: Vector3 = points[i]
-		var b: Vector3 = points[i+1]
-		var cannon: bool = shot.kind=="cannon"
-		var width: float = lerpf(.42,.13,float(i)/maxf(points.size()-1,1)) if cannon else lerpf(3.8,.32,float(i)/maxf(points.size()-1,1))
-		var side: Vector3 = (b-a).normalized().cross((app.camera.global_position-a).normalized()).normalized()
-		if side.length()<0.1: side = Vector3.RIGHT
-		side *= width
-		var alpha: float = float(i+1)/maxf(points.size(),1)*(.82 if cannon else .58)
-		for vertex: Array in [[a-side,Vector2(0,0)],[a+side,Vector2(1,0)],[b-side,Vector2(0,1)],[b-side,Vector2(0,1)],[a+side,Vector2(1,0)],[b+side,Vector2(1,1)]]:
-			ribbon.surface_set_color(Color(1,.72,.35,alpha) if cannon else Color(.32,.39,.43,alpha) if app.camera.global_position.y<shot.position.y else Color(.72,.82,.9,alpha))
-			ribbon.surface_set_uv(vertex[1])
+		var a: Vector3=points[i];var b: Vector3=points[i+1]
+		var p0: float=float(i)/maxf(points.size()-1,1);var p1: float=float(i+1)/maxf(points.size()-1,1)
+		var view_distance: float=app.camera.global_position.distance_to(a)
+		var width_a: float=maxf(lerpf(3.6,.32,p0),minf(view_distance*.0012,1.8))
+		var width_b: float=maxf(lerpf(3.6,.32,p1),minf(app.camera.global_position.distance_to(b)*.0012,1.8))
+		var side: Vector3=(b-a).normalized().cross((app.camera.global_position-a).normalized()).normalized()
+		if side.length()<.1:side=Vector3.RIGHT
+		var next_distance: float=distance_along+a.distance_to(b)
+		var tint: Color=Color(.48,.51,.54) if app.camera.global_position.y<shot.position.y else Color(.83,.87,.92)
+		for vertex: Array in [[a-side*width_a,Vector2(0,distance_along),p0],[a+side*width_a,Vector2(1,distance_along),p0],[b-side*width_b,Vector2(0,next_distance),p1],[b-side*width_b,Vector2(0,next_distance),p1],[a+side*width_a,Vector2(1,distance_along),p0],[b+side*width_b,Vector2(1,next_distance),p1]]:
+			var progress: float=vertex[2]
+			ribbon.surface_set_color(Color(tint,lerpf(.08,.60,progress)*smoothstep(0,.12,progress)))
+			ribbon.surface_set_uv(vertex[1]);ribbon.surface_set_uv2(Vector2(progress,0))
 			ribbon.surface_add_vertex(vertex[0])
+		distance_along=next_distance
 	ribbon.surface_end()
 func free_shot(shot: Dictionary) -> void:
 	if is_instance_valid(visuals):visuals.release_projectile(shot.node,shot.kind)
