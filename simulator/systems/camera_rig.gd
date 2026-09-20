@@ -37,7 +37,7 @@ var burner_latch := false
 var inhale := 0.0
 var attributes: CameraAttributesPractical
 
-const SHAKE_STRENGTH := 0.60 # Kill feedback only, 40% below the original amplitude.
+const SHAKE_STRENGTH := 0.90 # Brief, visible feedback on confirmed kills only.
 const HEAD_MOTION_STRENGTH := 0.0
 const FOV_PUNCH_STRENGTH := 0.0
 const SHAKE_ANGLE := 0.05585      # 3.2 deg of pitch/yaw rattle at full energy
@@ -70,7 +70,7 @@ func _ready() -> void:
 	noise.frequency = 1.0
 
 func impulse(_amount: float) -> void:pass # Recoil, terrain, boost and generic impacts do not shake the view.
-func kill_impulse(amount: float = .65) -> void:trauma=minf(1,trauma+maxf(amount,0))
+func kill_impulse(amount: float = .85) -> void:trauma=minf(1,trauma+maxf(amount,0))
 ## The one impact in the mission the player is meant to enjoy: mains on concrete.
 ## Clamped at both ends so a greaser still registers and a firm arrival never hurts.
 func touchdown(strength: float) -> void:

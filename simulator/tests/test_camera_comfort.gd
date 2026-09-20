@@ -21,7 +21,7 @@ func check(ok:bool,label:String)->void:
 	if not ok:failures.append(label);push_error(label)
 func _initialize()->void:call_deferred("run")
 func run()->void:
-	check(Rig.SHAKE_STRENGTH==.6,"Kill shake is40percent below original amplitude")
+	check(Rig.SHAKE_STRENGTH==.9,"Kill shake uses the requested visible amplitude")
 	for cockpit:bool in [false,true]:
 		var app=App.new();root.add_child(app);app.add_child(app.cockpit_frame);app.cockpit=cockpit
 		app.flight.position=Vector3(0,50,0);app.flight.speed=335;app.flight.mach=.98;app.flight.g_load=5;app.flight.afterburner=true

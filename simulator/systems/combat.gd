@@ -554,7 +554,7 @@ func hurt_enemy(enemy: Dictionary,damage: float,source: String,at: Vector3) -> v
 	score+=last_reward;reward_flash=1;intent.event("kill");app.audio.ping(1+minf(combo,10)*.035)
 	event("boss_death" if enemy.kind=="boss" else "kill",enemy.position,5 if enemy.kind=="boss" else enemy.size_factor)
 	app.fighter_fx.debris(enemy.position);app.audio.play_effect("explosion",-12 if enemy.kind=="boss" else -18,.7 if enemy.kind=="boss" else 1)
-	app.camera_rig.kill_impulse(.85 if enemy.kind=="boss" else .65)
+	app.camera_rig.kill_impulse(1.0 if enemy.kind=="boss" else .85)
 	if enemy.kind=="boss":boss_defeated=true
 	else:app.audio.radio.say("target_down" if kills%2 else "target_down_alt")
 
