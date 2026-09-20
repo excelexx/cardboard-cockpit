@@ -204,7 +204,7 @@ func _draw() -> void:
 		if app.camera_previews and app.vision.enabled and not app.settings_visible and not app.calibration_visible:draw_camera_previews()
 	if app.mode=="results": draw_results()
 	if app.toast_time>0 and app.mode=="flight": centered(176,app.toast.to_upper(),18,GREEN)
-	if app.mode=="flight" and app.flight.airborne and not app.landing_started and not app.overlay_visible():button("land",Rect2(1288,916,256,54),"LAND NOW",true,"B")
+	if app.mode=="flight" and app.flight.airborne and not app.landing_started and not app.overlay_visible():button("land",Rect2(600,706,352,48),"LAND NOW",true,"B")
 	if app.landing_transition>0:
 		draw_rect(Rect2(0,0,1600,1000),Color(0.01,.02,.03,clampf(app.landing_transition/1.2,0,1)))
 		centered(496,"YOUR LANDING APPROACH",40,WHITE,display_bold)
@@ -303,7 +303,7 @@ func clock_text() -> String:
 	var elapsed: int=maxi(0,int(app.mission.clock if app.mission.active else app.flight.elapsed))
 	return "%d:%02d" % [elapsed/60,elapsed%60]
 func draw_flight() -> void:
-	if app.paper_test or (app.cockpit and not app.combat.active):
+	if app.paper_test:
 		draw_clear_flight()
 		return
 	var f: FlightDynamics = app.flight
@@ -313,35 +313,17 @@ func draw_flight() -> void:
 	var objective: String = mission_line()
 	if not objective.is_empty():
 		text(Vector2(56,58),"MISSION",18,GREEN,true)
-		text(Vector2(56,86),objective,20,WHITE)
+		var objective_lines: PackedStringArray=tutorial_lines(objective,420,18)
+		for i in range(mini(objective_lines.size(),2)):text(Vector2(56,86+i*22),objective_lines[i],18,WHITE)
 	if c.hull<=65: text(Vector2(56,116),"DAMAGED",18,AMBER,true)
 	var time_left: String = clock_text()
 	if show and not time_left.is_empty():
 		put(mono,Vector2(1244,58),"ELAPSED",18,GREEN,HORIZONTAL_ALIGNMENT_RIGHT,300)
 		put(display,Vector2(1244,106),time_left,52,WHITE,HORIZONTAL_ALIGNMENT_RIGHT,300)
 	if show: put(mono,Vector2(1244,132),"AUTO-FLY" if app.copilot else "CARDBOARD YOKE" if app.vision.tracking else "",15,GREEN,HORIZONTAL_ALIGNMENT_RIGHT,300)
-	# Heading tape.
-	var heading: float = fposmod(f.get_heading_degrees()+(298 if app.route_id=="sf" else 0),360)
-	if show:
-		for index in [-3,-2,-1,1,2,3]:
-			put(mono,Vector2(770+index*74,62),"%03d" % int(fposmod(heading+index*10,360)),16,Color(GREEN.r,GREEN.g,GREEN.b,0.9-absf(index)*0.14),HORIZONTAL_ALIGNMENT_CENTER,60)
-		panel(Rect2(762,30,76,44),0.6,GREEN)
-		put(display,Vector2(762,65),"%03d" % int(heading),34,WHITE,HORIZONTAL_ALIGNMENT_CENTER,76)
-	# Speed and altitude sit on the lower borders: numbers beside the aircraft read
-	# as clutter on top of it. The cockpit shows them on its own displays instead.
-	if show and not app.cockpit:
-		put(mono,Vector2(56,726),"SPEED",18,GREEN)
-		put(display,Vector2(56,806),str(int(cas_knots(f))),84,WHITE)
-		put(mono,Vector2(56,832),"KNOTS",18,GREEN)
-		var g: float = read_number(f,"g_load",1.0)
-		put(mono,Vector2(56,864),"G %+.1f" % g,20,RED if absf(g)>=FlightDynamics.G_LIMIT-0.2 else AMBER if absf(g)>=5.0 else GREEN)
-		put(mono,Vector2(196,864),"AFTERBURNER" if f.afterburner else "AIRBRAKE" if f.airbrake>.1 else "POWER %d%%" % int(f.throttle*100),18,AMBER if f.afterburner or f.airbrake>.1 else GREEN)
-		bar(Rect2(340,854,180,8),1.0 if f.afterburner else f.throttle,AMBER if f.afterburner else GREEN)
-		put(mono,Vector2(1244,726),"ALTITUDE",18,GREEN,HORIZONTAL_ALIGNMENT_RIGHT,300)
-		put(display,Vector2(1244,806),thousands(int(f.position.y*3.28084)),84,WHITE,HORIZONTAL_ALIGNMENT_RIGHT,300)
-		put(mono,Vector2(1244,832),"FEET",18,GREEN,HORIZONTAL_ALIGNMENT_RIGHT,300)
-		put(mono,Vector2(1244,864),"CLIMB %+d" % (int(f.vertical_speed*1.9685)*100),18,GREEN,HORIZONTAL_ALIGNMENT_RIGHT,300)
-	if show and (f.gear or f.flaps>0): put(mono,Vector2(1244,894),"GEAR %s · FLAPS %d" % ["DOWN" if f.gear else "UP",f.flaps],18,AMBER,HORIZONTAL_ALIGNMENT_RIGHT,300)
+	if show:draw_heading_compass(f);draw_attitude_altitude(f)
+	# A compact lower-left instrument row leaves the aiming area clear.
+	if show:draw_pilot_readouts(f)
 	# Next waypoint.
 	if app.mission.active and app.mission.phase in ["opening","combat","return"]:
 		var waypoint: Vector3 = app.mission.route_target()
@@ -359,7 +341,6 @@ func draw_flight() -> void:
 		if c.combo>=3: centered(282,"%d IN A ROW" % c.combo,20,Color(WHITE.r,WHITE.g,WHITE.b,c.reward_flash))
 	if c.hit_flash>0: draw_rect(Rect2(0,0,1600,1000),Color(RED.r,RED.g,RED.b,clampf(c.hit_flash*0.9,0,1)),false,14)
 	if not app.cockpit: draw_scope(Vector2(1450,306),c)   # the cockpit's own display carries the radar
-	draw_weapons(c)
 	draw_objective(c)
 	draw_alerts(f,c)
 	if (app.flight_kind=="approach" or (app.mission.active and app.mission.phase in ["return","approach"])) and f.airborne:
@@ -371,8 +352,56 @@ func draw_flight() -> void:
 	if show and not app.audio.radio.caption.is_empty():
 		put(mono,Vector2(0,626),app.audio.radio.speaker,15,GREEN,HORIZONTAL_ALIGNMENT_CENTER,1600)
 		put(body,Vector2(0,654),app.audio.radio.caption,20,WHITE,HORIZONTAL_ALIGNMENT_CENTER,1600)
-	if app.vision.tracking or app.developer_mode: draw_control_feedback()
 	if app.developer_mode: text(Vector2(620,990),"%d FPS · %.0f M/S · %s" % [Engine.get_frames_per_second(),f.speed,"HIGH" if app.high_quality else "BALANCED"],14,SOFT,true)
+func draw_heading_compass(f: FlightDynamics) -> void:
+	var heading: float=fposmod(f.get_heading_degrees()+(298 if app.route_id=="sf" else 0),360)
+	panel(Rect2(520,22,560,88),.42)
+	var nearest: int=int(floor(heading/5))*5
+	for offset in range(-7,9):
+		var degree: int=nearest+offset*5
+		var x: float=800+(degree-heading)*7.5
+		if x<535 or x>1065:continue
+		var normalized: int=posmod(degree,360)
+		var major: bool=normalized%10==0
+		line(Vector2(x,87),Vector2(x,73 if major else 80),GREEN,1.5)
+		if major and absf(x-800)>58:
+			var label: String=["N","E","S","W"][normalized/90] if normalized%90==0 else "%03d" % normalized
+			put(mono,Vector2(x-25,61),label,15,GREEN,HORIZONTAL_ALIGNMENT_CENTER,50)
+	panel(Rect2(749,28,102,48),.85,GREEN)
+	put(display,Vector2(749,65),"%03d°" % int(heading),32,WHITE,HORIZONTAL_ALIGNMENT_CENTER,102)
+	draw_colored_polygon(PackedVector2Array([Vector2(800,82),Vector2(793,96),Vector2(807,96)]),GREEN)
+
+func draw_attitude_altitude(f: FlightDynamics) -> void:
+	var nose: Vector2=app.camera.unproject_position(f.position+f.forward()*2000)
+	var center: Vector2=Vector2(nose.x+240,nose.y).clamp(Vector2(1030,290),Vector2(1110,525))
+	panel(Rect2(center-Vector2(93,133),Vector2(186,266)),.24)
+	var pitch: float=rad_to_deg(f.pitch)
+	for degrees in range(-90,91,10):
+		var y: float=(pitch-degrees)*3.0
+		if absf(y)>83:continue
+		var width: float=62 if degrees==0 else 42
+		var color: Color=WHITE if degrees==0 else GREEN
+		for side in [-1.0,1.0]:
+			var a: Vector2=Vector2(side*12,y).rotated(-f.roll)
+			var b: Vector2=Vector2(side*width,y).rotated(-f.roll)
+			line(center+a,center+b,color,2 if degrees==0 else 1.4)
+			line(center+b,center+b+Vector2(0,4 if degrees>=0 else -4).rotated(-f.roll),color,1.4)
+		var label_at: Vector2=center+Vector2(width+7,y+5).rotated(-f.roll)
+		put(mono,label_at,str(degrees),12,color)
+	line(center+Vector2(-22,0),center+Vector2(-6,0),AMBER,3)
+	line(center+Vector2(6,0),center+Vector2(22,0),AMBER,3)
+	draw_circle(center,2,AMBER)
+	for degrees in [-60,-30,0,30,60]:
+		var direction:=Vector2(sin(deg_to_rad(degrees)),-cos(deg_to_rad(degrees)))
+		line(center+direction*105,center+direction*113,GREEN,1.5)
+	var roll: float=clampf(-f.roll,-PI/2,PI/2)
+	var pointer:=center+Vector2(sin(roll),-cos(roll))*99
+	draw_circle(pointer,3,WHITE)
+	put(mono,center+Vector2(-74,123),"BANK %+.0f°" % rad_to_deg(f.roll),13,GREEN)
+	put(mono,center+Vector2(109,-22),"ALTITUDE",14,GREEN)
+	put(display,center+Vector2(105,20),thousands(int(f.position.y*3.28084)),32,WHITE)
+	put(mono,center+Vector2(109,44),"FEET",13,SOFT)
+
 func thousands(value: int) -> String:
 	var digits: String = str(absi(value))
 	var out := ""
@@ -409,6 +438,7 @@ func draw_sight(f: FlightDynamics,c: CombatDirector) -> void:
 	for direction in [Vector2.LEFT,Vector2.RIGHT,Vector2.UP,Vector2.DOWN]: line(center+direction*20,center+direction*34,sight,2)
 	draw_circle(center,2.5,sight)
 	for enemy: Dictionary in c.enemies:
+		if not c.active:break
 		if app.camera.is_position_behind(enemy.position): continue
 		var point: Vector2 = app.camera.unproject_position(enemy.position)
 		if point.x<25 or point.x>1575 or point.y<115 or point.y>810: continue
@@ -419,8 +449,8 @@ func draw_sight(f: FlightDynamics,c: CombatDirector) -> void:
 			brackets(point,radius,tone)
 			if c.lock_progress>=1: diamond(point,radius*0.45,RED,3)
 			else: ring(point,radius*0.62,-PI/2,-PI/2+TAU*c.lock_progress,AMBER,3)
-			big(point+Vector2(radius+16,-6),"LOCKED" if c.lock_progress>=1 else "LOCKING",30,tone,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
-			text(point+Vector2(radius+16,20),"%d m" % int(distance),20,WHITE)
+			big(point+Vector2(-55,-radius-28),"LOCKED" if c.lock_progress>=1 else "LOCKING",30,tone,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
+			text(point+Vector2(-45,-radius-7),"%d m" % int(distance),20,WHITE)
 			var pip: Vector2 = app.camera.unproject_position(f.position+c.assisted_direction()*distance)
 			if pip.distance_to(center)>9: line(center,pip,Color(tone.r,tone.g,tone.b,0.55),2)
 		else:
@@ -619,23 +649,31 @@ func draw_settings() -> void:
 	button("sensitivity_reset",Rect2(card.position+Vector2(36,763),Vector2(280,52)),"RESET DEFAULTS")
 	button("settings",Rect2(card.position+Vector2(card.size.x-236,763),Vector2(200,52)),"DONE",true,"HOME")
 
-func camera_card(rect: Rect2,title: String,preview,tracking: bool) -> void:
+func camera_card(rect: Rect2,title: String,preview,tracking: bool,compact: bool = false) -> void:
 	panel(rect,.88,GREEN if preview.texture!=null and tracking else HAIRLINE)
-	put(mono,rect.position+Vector2(12,21),title,14,GREEN)
-	var picture:=Rect2(rect.position+Vector2(6,31),rect.size-Vector2(12,60))
+	put(mono,rect.position+Vector2(7 if compact else 12,17 if compact else 21),title,12 if compact else 14,GREEN)
+	var picture:=Rect2(rect.position+Vector2(3,23),rect.size-Vector2(6,42)) if compact else Rect2(rect.position+Vector2(6,31),rect.size-Vector2(12,60))
 	if preview.texture!=null:
 		var extent: Vector2=preview.texture.get_size();var ratio: float=minf(picture.size.x/extent.x,picture.size.y/extent.y);extent*=ratio
 		draw_texture_rect(preview.texture,Rect2(picture.position+(picture.size-extent)/2,extent),false)
 	else:
 		put(body,picture.position+Vector2(10,picture.size.y/2),"Waiting for camera",16,SOFT)
-	put(mono,rect.position+Vector2(12,rect.size.y-10),"TRACKING" if tracking and preview.texture!=null else "LIVE / TAG NOT FOUND" if preview.texture!=null else "DISCONNECTED",13,GREEN if tracking and preview.texture!=null else AMBER)
+	put(mono,rect.position+Vector2(7 if compact else 12,rect.size.y-(6 if compact else 10)),"TRACKING" if tracking and preview.texture!=null else "LIVE / TAG NOT FOUND" if preview.texture!=null else "DISCONNECTED",13,GREEN if tracking and preview.texture!=null else AMBER)
+func draw_pilot_readouts(f: FlightDynamics) -> void:
+	panel(Rect2(32,838,536,146),.82)
+	var top: float=838
+	put(mono,Vector2(50,top+25),"SPEED",14,GREEN)
+	put(display,Vector2(50,top+69),"%d" % int(cas_knots(f)),44,WHITE)
+	put(mono,Vector2(142,top+65),"KTS",14,SOFT)
+	put(mono,Vector2(330,top+25),"POWER",14,GREEN)
+	put(display,Vector2(330,top+69),"%d%%" % roundi(f.throttle*100),38,WHITE)
+	put(mono,Vector2(50,top+103),"PITCH %+.1f°" % rad_to_deg(f.pitch),15,GREEN)
+	put(mono,Vector2(220,top+103),"YAW %+.1f°" % rad_to_deg(wrapf(f.heading,-PI,PI)),15,GREEN)
+	put(mono,Vector2(390,top+103),"BANK %+.1f°" % rad_to_deg(f.roll),15,GREEN)
+
 func draw_camera_previews() -> void:
-	if app.mode=="paused":
-		camera_card(Rect2(56,340,360,248),"LAPTOP / YOKE + ID 4",app.yoke_preview,app.vision.tracking)
-		camera_card(Rect2(1184,340,360,248),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4)
-		return
-	camera_card(Rect2(56,162,258,196),"LAPTOP / YOKE + ID 4",app.yoke_preview,app.vision.tracking)
-	camera_card(Rect2(328,162,258,196),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4)
+	camera_card(Rect2(976,772,296,212),"LAPTOP / YOKE + ID 4",app.yoke_preview,app.vision.tracking,true)
+	camera_card(Rect2(1288,772,296,212),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4,true)
 func draw_camera_setup() -> void:
 	zones.clear();dim();panel(Rect2(180,90,1240,820),.95)
 	put(display_bold,Vector2(218,166),"TWO-CAMERA COCKPIT",56,WHITE)
@@ -666,7 +704,7 @@ func context_coach() -> Dictionary:
 		return {"title":"LANDED / STAY ON THE GROUND", "body":"Reduce throttle. Your touchdown stays planted while you slow down.", "status":state+" · BADGE A / G: GEAR + FLAPS"}
 	if app.landing_started:
 		var configuration: String="Gear + flaps are DOWN. Keep them down for touchdown." if f.gear and f.flaps>0 else "Press F to lower the flaps; gear is already DOWN." if f.gear else "BADGE A / G: put gear + flaps DOWN."
-		return {"title":"B / BADGE B: LANDING MODE ACTIVE", "body":configuration+" Reduce throttle. Steer and pitch your own approach.", "status":state+" · YOU HAVE THE CONTROLS"}
+		return {"title":"REDUCE SPEED / THROTTLE BACK", "body":configuration+" Slow toward 120 knots. Steer and pitch your approach.", "status":state+" · B: RESTART APPROACH"}
 	if not f.airborne:
 		return {"title":"TAKE OFF / INCREASE POWER", "body":"Push the throttle forward. Pull the yoke toward you as speed builds; keyboard W and UP also work.", "status":state+" · AFTER TAKEOFF: BADGE A / G RETRACTS GEAR + FLAPS"}
 	if f.gear:
@@ -681,22 +719,24 @@ func context_coach() -> Dictionary:
 	return {"title":title, "body":message, "status":state+" · B / BADGE B: LAND NOW"}
 func draw_context_coach() -> void:
 	var coach: Dictionary=context_coach()
-	panel(Rect2(330,704,940,164),.9,GREEN)
-	put(display_bold,Vector2(354,740),str(coach.title),27,GREEN)
-	var lines: PackedStringArray=tutorial_lines(str(coach.body),892,18)
-	for i in range(mini(lines.size(),3)):put(body,Vector2(354,771+i*23),lines[i],18,WHITE)
-	put(mono,Vector2(354,847),str(coach.status),14,SOFT)
+	panel(Rect2(600,772,352,212),.9,GREEN)
+	put(display_bold,Vector2(616,802),str(coach.title),18,GREEN)
+	var lines: PackedStringArray=tutorial_lines(str(coach.body),320,15)
+	for i in range(mini(lines.size(),5)):put(body,Vector2(616,827+i*19),lines[i],15,WHITE)
+	var status_lines: PackedStringArray=tutorial_lines(str(coach.status),320,11,mono)
+	for i in range(mini(status_lines.size(),3)):put(mono,Vector2(616,947+i*14),status_lines[i],11,SOFT)
 
 func centered_text(at: Vector2, value: String, font_size: int = 18, color: Color = WHITE) -> void:
 	var width := body.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x
 	put(body,at-Vector2(width/2,0),value,font_size,color)
 
-func tutorial_lines(value: String, width: float, font_size: int) -> PackedStringArray:
+func tutorial_lines(value: String, width: float, font_size: int, face: Font = null) -> PackedStringArray:
+	var measured_font: Font=body if face==null else face
 	var lines := PackedStringArray()
 	var current := ""
 	for word: String in value.split(" "):
 		var candidate := word if current.is_empty() else current+" "+word
-		if not current.is_empty() and body.get_string_size(candidate,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x > width:
+		if not current.is_empty() and measured_font.get_string_size(candidate,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x > width:
 			lines.append(current); current = word
 		else: current = candidate
 	if not current.is_empty(): lines.append(current)
@@ -782,19 +822,21 @@ func draw_control_setup() -> void:
 	var step: Array=lesson.step()
 	var group: String=lesson.focus()
 	draw_rect(Rect2(0,0,1600,1000),GLASS)
-	put(display_bold,Vector2(64,73),"SET UP YOUR CARDBOARD COCKPIT",46,WHITE)
+	put(display_bold,Vector2(64,73),"CALIBRATE AND FLY" if lesson.calibration_only else "SET UP YOUR CARDBOARD COCKPIT",46,WHITE)
 	put(mono,Vector2(1132,62),"LIVE CAMERA CHECKS",16,GREEN)
 	var labels: Array[String]=["01 / CALIBRATE","02 / THROTTLE","03 / YOKE","04 / PLASMA","05 / BUTTONS"]
+	if lesson.calibration_only:labels.assign(["YOKE CALIBRATION"])
 	var groups: Array[String]=["calibrate","throttle","yoke","weapons","buttons"]
+	if lesson.calibration_only:groups.assign(["calibrate"])
 	for i in range(groups.size()):
-		var selected: bool=i==0 if lesson.calibrating else group==groups[i] or done and i==4
-		var rect:=Rect2(64+i*298,101,280,43)
+		var selected: bool=lesson.calibration_only or (i==0 if lesson.calibrating else group==groups[i] or done and i==4)
+		var rect:=Rect2(64+i*298,101,1472 if lesson.calibration_only else 280,43)
 		panel(rect,.9,GREEN if selected else HAIRLINE)
 		put(mono,rect.position+Vector2(14,28),labels[i],17,GREEN if selected else SOFT)
 	camera_card(Rect2(64,164,724,480),"LAPTOP / YOKE + ID 4",app.yoke_preview,v.tracking)
 	camera_card(Rect2(812,164,724,480),"PHONE / THROTTLE",app.throttle_preview,v.throttle_confidence>.4)
 	panel(Rect2(64,664,1472,208),.95)
-	var heading: String="CONTROLS CHECKED" if done else str(step[2]).to_upper()
+	var heading: String=("CALIBRATION COMPLETE" if lesson.calibration_only else "CONTROLS CHECKED") if done else str(step[2]).to_upper()
 	put(display_bold,Vector2(90,702),heading,32,WHITE)
 	var instruction: String="Centre the yoke, set 0% throttle and keep the plasma gun tag covered." if done else str(step[3])
 	var lines: PackedStringArray=tutorial_lines(instruction,1418,18)

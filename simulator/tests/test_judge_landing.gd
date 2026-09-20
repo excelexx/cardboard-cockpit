@@ -23,7 +23,10 @@ func run()->void:
 	check(not app.mouse_yoke,"B does not enable the former mouse-yoke binding")
 	check(app.landing_started and app.mission.phase=="approach" and not app.copilot and app.vision.enabled,"B immediately begins a camera-controlled landing, without kill quotas")
 	check(not app.combat.active and app.combat.launch_queue.is_empty(),"Choosing landing stops waves and automatic weapons")
-	var first:Vector3=app.flight.position;app.begin_landing();check(app.flight.position==first,"Repeated landing request never resets an active approach")
+	var first:Vector3=app.flight.position
+	check(first.z==3400 and first.y==115,"The landing approach starts farther out at matching height")
+	app.flight.position+=Vector3(100,-20,-500);event.keycode=KEY_B;app._input(event)
+	check(app.flight.position==first and app.mode=="flight","Pressing B again restarts at the original approach position")
 	if not app.flight.gear:app.toggle_gear()
 	check(app.flight.gear and app.flight.flaps==2,"A/G configures landing gear and flaps together")
 	app.vision.yoke=Vector2(.7,0)

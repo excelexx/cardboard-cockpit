@@ -376,6 +376,7 @@ func _release_all_flock_voices() -> void:
 
 func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> void:
 	acquire_clock-=dt
+	if context_paused:tone.stop()
 	if acquisition>0 and acquisition<1 and acquire_clock<=0 and not context_paused:
 		ping(.65+acquisition*.6);acquire_clock=.085
 	for sound in spatial_players:
@@ -426,7 +427,7 @@ func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> 
 	wind.volume_db = -80 if muted or not flying else lerpf(-58,-25,clampf(speed/220,0,1))+duck_level*0.5+(-2.0 if context_cockpit else 1.0)
 
 func ping(pitch: float = 1.0) -> void:
-	if not muted and tone.stream != null:
+	if not muted and not context_paused and tone.stream != null:
 		tone.pitch_scale = pitch
 		tone.play()
 
@@ -444,6 +445,7 @@ func _exit_tree() -> void:
 	flock_state.clear()
 
 func set_music_active(enabled: bool) -> void:
+	if context_paused:return
 	for sound: AudioStreamPlayer in [music,geese]:
 		if enabled and sound.stream!=null and not sound.playing: sound.play()
 		elif not enabled and not context_paused: sound.stop()

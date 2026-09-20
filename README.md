@@ -1,12 +1,12 @@
 # Goose Protocol — SPECTRE X-26
 
-Version **0.20.1** is one continuous San Francisco judge demo: take off, fly, shoot adaptive dual plasma and keep clearing new flocks for as long as you like. Coaching stays visible throughout. Press **D** or **badge B** when you want to land, then fly the approach yourself.
+Version **0.21.0** is one continuous San Francisco judge demo: take off, fly, shoot adaptive dual plasma and keep clearing new flocks for as long as you like. Coaching stays visible throughout. Press **B** or **badge B** when you want to land, then fly the approach yourself.
 
 Open **Launch Cardboard Cockpit.command** or the packaged **Cardboard Cockpit.app**. The demo uses excelex's cardboard controls and settings with the current graphics and aircraft presentation. **Watch demo** flies and shoots automatically. [Judge demo flow](docs/JUDGE_DEMO.md).
 
 ## Controls
 
-Choose **Play**, complete cardboard calibration and control checks, or choose **Use keyboard** in setup. Older Tutorial entry points open the same demo. Both live setup previews are equally large and preserve the complete camera image without cropping.
+Choose **Play / Enter / badge Start** for calibration only, or **Set Up Cardboard** for the full control tutorial. **Use keyboard** bypasses camera setup. Older Tutorial entry points open the same demo. Both live setup previews are equally large and preserve the complete camera image without cropping.
 
 | Input | Action |
 |---|---|
@@ -20,7 +20,7 @@ Choose **Play**, complete cardboard calibration and control checks, or choose **
 | Q / V | Barrel roll / cockpit or chase view |
 | Badge A / keyboard A or G | Gear and flaps together: retract after takeoff, deploy for landing |
 | F | Flaps only |
-| B / badge B | Enter landing mode; retain manual approach control |
+| B / badge B | Enter landing mode / restart approach; retain manual control |
 | H / hold E / Z | Route assist / eject / cosmetic flares |
 | C / Escape / R / M | Cardboard setup / pause / replay / mute |
 
@@ -32,7 +32,7 @@ After takeoff, the coach prompts **BADGE A / G: RETRACT GEAR + FLAPS**. During l
 
 ## Cardboard and badge
 
-Open **Launch Two-Camera Cockpit.command** (or **Launch Cardboard Tracker.command**) with the phone connected. The laptop tracks yoke ID 7 and gun ID 4; the phone tracks the relative throttle's IDs 0/1/2. Setup checks calibration, throttle idle/full/idle, yoke instructions, and gun show/cover/show before starting. [Vision setup and print masters](docs/vision-setup.md).
+Open **Launch Two-Camera Cockpit.command** (or **Launch Cardboard Tracker.command**) with the phone connected. The laptop tracks yoke ID 7 and gun ID 4; the phone tracks the relative throttle's IDs 0/1/2. The full setup checks calibration, throttle idle/full/idle, yoke instructions, gun uncover/cover, and badge A/B practice. Quick Start only calibrates the yoke before the live-camera/idle check. [Vision setup and print masters](docs/vision-setup.md).
 
 Settings retains separate pitch, bank and yaw sensitivity and agility, plus aim assistance. excelex defaults are restored: agility **1.30×** per axis and aim assistance **1.40×**; saved pilot preferences remain intact until Reset defaults is selected. Sensitivity changes apply live to the tracker, with no double gain.
 
