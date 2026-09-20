@@ -195,6 +195,7 @@ func _gui_input(event: InputEvent) -> void:
 func _draw() -> void:
 	if not is_instance_valid(app): return
 	zones.clear()
+	if app.mode=="control_setup":draw_control_setup();return
 	if app.mode=="title": draw_title()
 	else: draw_flight()
 	if app.camera_previews and app.vision.enabled and app.mode in ["flight","rollout"] and not app.settings_visible and not app.calibration_visible:draw_camera_previews()
@@ -684,3 +685,134 @@ func draw_training_coach() -> void:
 	put(display_bold,Vector2(354,756),app.mission.label(),27,GREEN)
 	put(body,Vector2(354,791),app.mission.instruction(),18,WHITE)
 	put(mono,Vector2(354,831),app.mission.badge_hint(),14,SOFT)
+
+func centered_text(at: Vector2, value: String, font_size: int = 18, color: Color = WHITE) -> void:
+	var width := body.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x
+	put(body,at-Vector2(width/2,0),value,font_size,color)
+
+func tutorial_lines(value: String, width: float, font_size: int) -> PackedStringArray:
+	var lines := PackedStringArray()
+	var current := ""
+	for word: String in value.split(" "):
+		var candidate := word if current.is_empty() else current+" "+word
+		if not current.is_empty() and body.get_string_size(candidate,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x > width:
+			lines.append(current); current = word
+		else: current = candidate
+	if not current.is_empty(): lines.append(current)
+	return lines
+
+func tutorial_arrow(from: Vector2, to: Vector2, color: Color = CYAN) -> void:
+	line(from,to,color,7)
+	var direction := (to-from).normalized()
+	var side := direction.orthogonal()
+	draw_colored_polygon(PackedVector2Array([to,to-direction*23+side*14,to-direction*23-side*14]),color)
+
+func draw_tutorial_cue(rect: Rect2, key: String, group: String) -> void:
+	var center := rect.get_center()
+	var color := GREEN if app.controls_lesson.passed else CYAN
+	if group == "throttle":
+		# A labelled rail diagram, independent of how the phone is mounted.
+		var left := center+Vector2(-88,35)
+		var right := center+Vector2(88,35)
+		line(left,right,MUTED,5)
+		for point: Vector2 in [left,right]: draw_circle(point,7,MUTED)
+		var handle := left.lerp(right,clampf(app.vision.throttle,0,1))
+		line(handle-Vector2(0,8),handle-Vector2(0,43),WHITE,9)
+		line(handle+Vector2(-15,-43),handle+Vector2(15,-43),WHITE,9)
+		var toward_full := key == "full"
+		tutorial_arrow(Vector2(left.x if toward_full else right.x,center.y-45),Vector2(right.x if toward_full else left.x,center.y-45),color)
+		centered_text(left+Vector2(0,36),"0%",20)
+		centered_text(right+Vector2(0,36),"100%",20)
+		centered_text(center+Vector2(0,-80),"TOWARD FULL" if toward_full else "TOWARD IDLE",18,color)
+	elif group == "yoke":
+		if key in ["left","right"]:
+			var points := PackedVector2Array()
+			var direction := -1.0 if key == "left" else 1.0
+			for i in range(25):
+				var angle := -PI/2+direction*float(i)/24*PI*.65
+				points.append(center+Vector2(cos(angle),sin(angle))*81)
+			draw_polyline(points,color,7,true)
+			tutorial_arrow(points[points.size()-3],points[-1],color)
+			centered_text(center+Vector2(0,113),"TURN LEFT" if key=="left" else "TURN RIGHT",18,color)
+		elif key in ["yaw_left","yaw_right"]:
+			var direction := -1.0 if key=="yaw_left" else 1.0
+			tutorial_arrow(center+Vector2(-direction*74,-65),center+Vector2(direction*74,-65),color)
+			centered_text(center+Vector2(0,113),"SWIVEL LEFT" if key=="yaw_left" else "SWIVEL RIGHT",18,color)
+		elif key in ["up","down"]:
+			var direction := -1.0 if key == "up" else 1.0
+			tutorial_arrow(center+Vector2(80,-direction*62),center+Vector2(80,direction*62),color)
+			centered_text(center+Vector2(0,113),"PITCH UP" if key=="up" else "PITCH DOWN",18,color)
+		else:
+			line(center+Vector2(-85,0),center+Vector2(85,0),Color(CYAN,.4),1)
+			centered_text(center+Vector2(0,113),"YOKE BASICS" if key=="yoke_info" else "HOLD LEVEL",18,color)
+		# Simple yoke silhouette with two grips and a centre stem.
+		var rotation := -.23 if key=="left" else .23 if key=="right" else 0.0
+		var shape := PackedVector2Array()
+		for point: Vector2 in [Vector2(-48,-26),Vector2(-48,8),Vector2(0,30),Vector2(48,8),Vector2(48,-26)]:
+			shape.append(center+point.rotated(rotation))
+		draw_polyline(shape,WHITE,9,true)
+		line(center+Vector2(0,30).rotated(rotation),center+Vector2(0,62).rotated(rotation),WHITE,9)
+	elif group == "weapons":
+		var covering := key.begins_with("cover")
+		var lifting := key == "show"
+		var tag := "GUN"
+		if key == "grip":
+			draw_circle(center+Vector2(-42,0),28,GREEN)
+			draw_circle(center+Vector2(42,0),28,Color(.28,.58,1))
+			centered_text(center+Vector2(-42,7),"M",23,Color(.02,.06,.08))
+			centered_text(center+Vector2(42,7),"R",23,Color(.02,.06,.08))
+			centered_text(center+Vector2(0,88),"MIDDLE / RING",17,color)
+		else:
+			draw_rect(Rect2(center+Vector2(-43,-20),Vector2(86,75)),WHITE,false,4)
+			centered_text(center+Vector2(0,28),tag,30)
+			tutorial_arrow(center+Vector2(0,-92 if covering else -32),center+Vector2(0,-32 if covering else -92),color)
+			centered_text(center+Vector2(0,105),"COVER TAG" if covering else "LIFT FINGER" if lifting else "SHOW TAG",18,color)
+	else:
+		line(center+Vector2(-50,0),center+Vector2(-12,38),GREEN,9)
+		line(center+Vector2(-12,38),center+Vector2(65,-45),GREEN,9)
+		centered_text(center+Vector2(0,98),"READY",20,GREEN)
+
+
+func draw_control_setup() -> void:
+	zones.clear()
+	var lesson=app.controls_lesson
+	var v: VisionClient=app.vision
+	var done: bool=lesson.complete()
+	var step: Array=lesson.step()
+	var group: String=lesson.focus()
+	draw_rect(Rect2(0,0,1600,1000),GLASS)
+	put(display_bold,Vector2(64,73),"SET UP YOUR CARDBOARD COCKPIT",46,WHITE)
+	put(mono,Vector2(1132,62),"LIVE CAMERA CHECKS",16,GREEN)
+	var labels: Array[String]=["01 / CALIBRATE","02 / THROTTLE","03 / YOKE","04 / GUN"]
+	var groups: Array[String]=["calibrate","throttle","yoke","weapons"]
+	for i in range(4):
+		var selected: bool=i==0 if lesson.calibrating else group==groups[i] or done and i==3
+		var rect:=Rect2(64+i*374,101,350,43)
+		panel(rect,.9,GREEN if selected else HAIRLINE)
+		put(mono,rect.position+Vector2(14,28),labels[i],17,GREEN if selected else SOFT)
+	camera_card(Rect2(64,164,724,300),"LAPTOP / YOKE + GUN",app.yoke_preview,v.tracking)
+	camera_card(Rect2(812,164,724,300),"PHONE / THROTTLE",app.throttle_preview,v.throttle_confidence>.4)
+	panel(Rect2(64,486,1472,342),.95)
+	draw_tutorial_cue(Rect2(90,517,226,190),"ready" if done else str(step[0]),"ready" if done else group)
+	var at:=Vector2(360,537)
+	var heading: String="CONTROLS CHECKED" if done else str(step[2]).to_upper()
+	put(display_bold,at,heading,37,WHITE);at.y+=43
+	var instruction: String="Centre the yoke, set 0% throttle and turn the gun off." if done else str(step[3])
+	for value: String in tutorial_lines(instruction,1120,20):
+		put(body,at,value,20,WHITE);at.y+=29
+	at.y+=10
+	var hint: String=("Hold steady for one second to resume your flight." if app.setup_next_action.is_empty() else "Hold steady for one second to start your flight.") if done else str(step[4])
+	for value: String in tutorial_lines(hint,1120,17):
+		put(body,at,value,17,SOFT);at.y+=26
+	var values: String="THROTTLE %3d%%   BANK %+.0f%%   PITCH %+.0f%%   YAW %+.0f%%   GUN %s" % [roundi(v.throttle*100),v.steering().x*100,v.steering().y*100,v.steering().z*100,"ON" if v.gun_trigger else "OFF"]
+	put(mono,Vector2(360,720),values,17,GREEN)
+	var status: String=lesson.status
+	if not app.control_setup_picture():status="Waiting for both live cameras." if done else "Waiting for the phone camera." if group=="throttle" else "Waiting for the laptop camera."
+	put(body,Vector2(360,760),status,18,GREEN if lesson.passed or lesson.can_start else AMBER)
+	var progress: float=clampf(float(lesson.ready_ms)/lesson.READY_HOLD_MS,0,1) if done else lesson.progress()
+	draw_rect(Rect2(90,803,1418,5),HAIRLINE);draw_rect(Rect2(90,803,1418*progress,5),GREEN)
+	if not v.connected:put(body,Vector2(64,868),"Start Launch Two-Camera Cockpit with your phone connected, then return here.",17,AMBER)
+	else:put(body,Vector2(64,868),"Checks advance when the camera sees the action. Flight stays paused while you test.",17,SOFT)
+	button("setup_cancel",Rect2(64,901,288,56),"BACK",false,"ESC / HOME")
+	button("setup_keyboard",Rect2(370,901,300,56),"USE KEYBOARD")
+	button("setup_retry",Rect2(1236,901,300,56),"RETRY THIS STEP",true)

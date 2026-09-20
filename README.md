@@ -1,6 +1,6 @@
 # Goose Protocol — SPECTRE X-26
 
-Version **0.15.0** combines the current San Francisco visuals and gameplay with the team’s two-camera controls, settings and pause screens, plus a separate badge-guided **Tutorial**. Normal Play retains the current flock encounter and assisted SFO landing. Tutorial takes off, clears sixteen targets and follows a longer route to land. Both have unlimited ammunition and forgiving flight assistance.
+Version **0.15.1** combines the current San Francisco visuals and gameplay with the team’s two-camera controls, settings and pause screens, plus a separate badge-guided **Tutorial**. Normal Play retains the current flock encounter and assisted SFO landing. Tutorial takes off, clears sixteen targets and follows a longer route to land. Both have unlimited ammunition and forgiving flight assistance.
 
 Open **Launch Cardboard Cockpit.command** or **build/Cardboard Cockpit.app**. **Play / Enter** guides takeoff and the SF route while you shoot. Tap **Space** to switch the minigun and continuous energy cannon on; tap **T** to switch repeated four-missile salvos on. Tap either again to stop. **Watch demo** flies and shoots automatically. Keyboard steering takes over from route assistance; **H** rejoins it. **R** immediately replays.
 
@@ -32,7 +32,7 @@ Aim near a visible contact. Intent scoring, prediction, hysteresis and smoothly 
 
 The **cardboard yoke** owns steering and both latched weapon switches. The **cardboard throttle** owns power, boost and braking. The **wireless badge** supplies occasional secondary controls: START start/replay, HOME pause, A gear, B assisted landing, LEFT view, RIGHT missile inset, UP route assist, DOWN short press text visibility / hold tactical view. See [switch construction, mapping and evidence](docs/WEAPON_SWITCHES.md) and [printable switch faces](vision/markers/weapon-switches.html).
 
-For the laptop yoke and phone throttle, use **Launch Two-Camera Cockpit.command**, open **Set up cardboard**, and calibrate neutral before starting. Two independent previews appear in setup, flight and pause. **Settings** saves pitch/bank/yaw sensitivity, separate agility sliders, aim assistance, camera previews and badge hints.
+For the laptop yoke and phone throttle, use **Launch Two-Camera Cockpit.command**, open **Set up cardboard**, and calibrate neutral before starting. Two independent previews appear in setup, flight and pause. Setup now restores excelex’s guided checks: three-second yoke calibration, throttle idle/full/idle, yoke instructions, and gun show/cover/show. Checks advance from fresh camera observations. Hold the centred yoke with idle throttle and the gun off to start. Camera Play and Tutorial both run setup first; **Use keyboard** remains available. **Settings** saves pitch/bank/yaw sensitivity, separate agility sliders, aim assistance, camera previews and badge hints.
 
 For the original single-camera controls, use [vision setup](docs/vision-setup.md) and [construction guide](docs/cardboard-build-guide.md) for yoke ID 7 and throttle ID 23. Flip-tab faces use 31/32 and 41/42 in the same `DICT_4X4_50` dictionary.
 

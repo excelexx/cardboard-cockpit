@@ -70,6 +70,11 @@ var paper_test := false
 var used_copilot := false
 var demo_auto_fire := true
 var help_visible := false
+const ControlsLesson = preload("res://systems/control_tutorial.gd")
+var controls_lesson = ControlsLesson.new()
+var setup_return_mode := "title"
+var setup_next_action := "training"
+
 var calibration_visible := false
 var credits_visible := false
 var developer_mode := false
@@ -130,6 +135,7 @@ func _ready() -> void:
 	set_quality(high_quality)
 	get_viewport().size_changed.connect(_apply_render_scale)
 	var start := false
+	var setup_requested := false
 	var guide := false
 	for arg: String in OS.get_cmdline_user_args():
 		if arg=="--flight": start = true
@@ -141,6 +147,7 @@ func _ready() -> void:
 		elif arg=="--demo": flight_kind = "demo"; start = true
 		elif arg=="--cockpit": cockpit = true
 		elif arg=="--stickers":
+			setup_requested = true
 			vision.enabled = true
 			mouse_yoke = false
 			calibration_visible = true
@@ -160,7 +167,10 @@ func _ready() -> void:
 	else:
 		world.visible = false; aircraft.visible = false; fighter_fx.visible = false
 
+	if setup_requested and not start:begin_control_setup("training")
+
 func start_flight(kind: String = "demo") -> void:
+	vision.yoke_calibration.stop()
 	if mission.has_method("cleanup_visuals"):mission.cleanup_visuals()
 	mission=Training.new() if kind=="training" else Mission.new();mission.app=self
 	settings_visible=false
@@ -199,12 +209,17 @@ func start_flight(kind: String = "demo") -> void:
 	world.visible = true; aircraft.visible = not cockpit; fighter_fx.visible = true
 	camera_rig.reset(); camera_rig.update(1.0/60.0)
 
-func overlay_visible() -> bool: return help_visible or calibration_visible or credits_visible or settings_visible
+func overlay_visible() -> bool: return mode=="control_setup" or help_visible or calibration_visible or credits_visible or settings_visible
 func _notification(what: int) -> void:
 	if what==NOTIFICATION_APPLICATION_FOCUS_OUT and mode in ["flight","rollout","ejected"] and not test_mode and not paper_test and capture_file.is_empty():
 		resume_mode = mode; mode = "paused"
 func _input(event: InputEvent) -> void:
 	if test_mode: return
+	if mode=="control_setup":
+		if event is InputEventKey and event.pressed and not event.echo:
+			if event.keycode==KEY_ESCAPE or event.keycode==KEY_C:cancel_control_setup()
+			elif event.keycode==KEY_ENTER:finish_control_setup()
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode==KEY_ESCAPE:
 			if settings_visible: settings_visible=false
@@ -216,7 +231,7 @@ func _input(event: InputEvent) -> void:
 			elif mode=="results": on_action("title")
 			return
 		if event.keycode==KEY_F1: help_visible = not help_visible; calibration_visible = false; credits_visible = false;settings_visible=false; return
-		if event.keycode==KEY_C: calibration_visible = not calibration_visible; help_visible = false; credits_visible = false;settings_visible=false; return
+		if event.keycode==KEY_C: on_action("camera"); return
 		if event.keycode==KEY_M: audio.muted = not audio.muted; save_settings(); return
 		if overlay_visible(): return
 		match event.keycode:
@@ -287,6 +302,39 @@ func apply_gameplay_settings() -> void:
 	flight.bank_agility=gameplay_settings.bank_agility
 	flight.yaw_agility=gameplay_settings.yaw_agility
 	if is_instance_valid(combat):combat.aim_strength=gameplay_settings.auto_aim;combat.assist=gameplay_settings.auto_aim>0
+func begin_control_setup(next_action: String = "training") -> void:
+	setup_return_mode=mode
+	setup_next_action=next_action
+	mode="control_setup"
+	controls_lesson.reset();vision.yoke_calibration.start()
+	vision.enabled=true;mouse_yoke=false
+	settings_visible=false;help_visible=false;credits_visible=false;calibration_visible=false
+	primary_latched=false;salvo_latched=false;combat.beam_active=false
+	control=Vector3.ZERO
+
+func cancel_control_setup() -> void:
+	vision.yoke_calibration.stop()
+	if mode=="control_setup":mode=setup_return_mode
+
+func control_setup_picture() -> bool:
+	if controls_lesson.complete():return yoke_preview.texture!=null and throttle_preview.texture!=null
+	return throttle_preview.texture!=null if controls_lesson.focus()=="throttle" else yoke_preview.texture!=null
+
+func update_control_setup(dt: float) -> void:
+	if mode!="control_setup":return
+	controls_lesson.tick(dt,vision,control_setup_picture(),Time.get_ticks_msec())
+	if controls_lesson.can_start:finish_control_setup()
+
+func finish_control_setup() -> void:
+	if mode!="control_setup" or not controls_lesson.complete() or not controls_lesson.can_start:return
+	if not controls_lesson.live(vision,control_setup_picture(),Time.get_ticks_msec()) or not controls_lesson.ready_pose(vision):return
+	vision.yoke_calibration.stop()
+	if setup_next_action.is_empty():mode=setup_return_mode;return
+	start_flight("training" if setup_next_action=="training" else "demo")
+	copilot=false;used_copilot=false;demo_auto_fire=false
+	flight.throttle=vision.throttle;flight.engine=vision.throttle
+	if setup_next_action=="fly" and mission.cinematic:tutorial.start()
+
 func on_action(action: String) -> void:
 	match action:
 		"settings":
@@ -300,8 +348,10 @@ func on_action(action: String) -> void:
 			pilot_number=pilot_number%9999+1;on_action("title")
 		"route": pass
 		"training":
+			if vision.enabled:begin_control_setup("training");return
 			start_flight("training");copilot=not vision.enabled;used_copilot=copilot;demo_auto_fire=false
 		"fly":
+			if vision.enabled:begin_control_setup("fly");return
 			start_flight();copilot=not vision.enabled;used_copilot=copilot;demo_auto_fire=false
 			if mission.cinematic:tutorial.start()
 		"restart":
@@ -318,7 +368,18 @@ func on_action(action: String) -> void:
 		"guided": start_flight(); copilot = true; used_copilot = true; demo_auto_fire = true
 		"resume": mode = resume_mode
 		"help": help_visible = not help_visible; calibration_visible = false; credits_visible = false;settings_visible=false
-		"camera": calibration_visible = not calibration_visible; help_visible = false; credits_visible = false;settings_visible=false
+		"camera":
+			if mode=="control_setup":cancel_control_setup()
+			else:begin_control_setup("training" if mode in ["title","results"] else "")
+		"setup_retry":
+			controls_lesson.retry()
+			if controls_lesson.calibrating:vision.yoke_calibration.start()
+		"setup_start":finish_control_setup()
+		"setup_cancel":cancel_control_setup()
+		"setup_keyboard":
+			var next: String=setup_next_action
+			cancel_control_setup();vision.enabled=false
+			if not next.is_empty():on_action(next)
 		"credits": credits_visible = not credits_visible;settings_visible=false
 		"vision":
 			vision.enabled = not vision.enabled
@@ -328,6 +389,7 @@ func on_action(action: String) -> void:
 		"mute": audio.muted = not audio.muted; save_settings()
 		"quality": set_quality(not high_quality)
 		"title":
+			vision.yoke_calibration.stop()
 			tutorial.stop()
 			if mission.has_method("cleanup_visuals"):mission.cleanup_visuals()
 			mode = "title";settings_visible=false; combat.active = false; mission.active = false; help_visible = false; calibration_visible = false; credits_visible = false
@@ -337,9 +399,10 @@ func on_action(action: String) -> void:
 func _process(dt: float) -> void:
 	runtime += dt; toast_time = maxf(0,toast_time-dt)
 	vision.poll(dt);tutorial.tick(dt)
-	var wants_preview: bool=vision.enabled and (calibration_visible or camera_previews and not settings_visible and mode in ["flight","rollout","paused"])
+	var wants_preview: bool=vision.enabled and (mode=="control_setup" or calibration_visible or camera_previews and not settings_visible and mode in ["flight","rollout","paused"])
 	yoke_preview.poll(wants_preview,vision.endpoint,"laptop")
 	throttle_preview.poll(wants_preview,vision.endpoint,"phone")
+	update_control_setup(dt)
 	if vision.weapons_available and cv_weapon_revision!=vision.weapons_revision:
 		cv_weapon_revision=vision.weapons_revision;primary_latched=vision.primary_switch
 		if vision.legacy_weapons:salvo_latched=vision.salvo_switch
@@ -384,6 +447,10 @@ func capture_frame() -> void:
 func _physics_process(dt: float) -> void:
 	badge.poll();badge.tick(self,dt)
 	near_obstacle_cooldown=maxf(0,near_obstacle_cooldown-dt)
+	if mode=="control_setup":
+		if badge.tapped(2):cancel_control_setup()
+		elif badge.tapped(8):finish_control_setup()
+		return
 	if badge.tapped(8):
 		if settings_visible:settings_visible=false
 		elif mode in ["title","results"]:on_action("fly")
