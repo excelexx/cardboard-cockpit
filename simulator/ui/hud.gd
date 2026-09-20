@@ -434,6 +434,9 @@ func draw_sight(_f: FlightDynamics,c: CombatDirector) -> void:
 		var distance: float=_f.position.distance_to(enemy.position)
 		var radius: float=clampf(22000.0/maxf(distance,1.0),18,70)
 		brackets(point,radius,RED)
+		var health: float=clampf(float(enemy.health)/maxf(float(enemy.max_health),1),0,1)
+		ring(point,radius+7,-PI/2,TAU-PI/2,Color(0.1,0.1,0.1,0.7),4)
+		ring(point,radius+7,-PI/2,-PI/2+TAU*health,GREEN,4)
 func plasma_status(active: bool, ids: Variant) -> String:
 	if not active:return "OFF"
 	if ids is Array and ids.size()>=2:

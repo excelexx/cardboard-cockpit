@@ -25,3 +25,9 @@ Goose meshes now use 512 / 240 / 152 triangles, down from 7,808 / 1,232 / 376. P
 Geese spawn at the aircraft altitude, subject to terrain clearance; horizontal placement and flock spacing are unchanged. Model scale is now 12, twice the preceding build. Control ceilings are 6x, music gain reaches 4x, and other mixer channels reach 2x. The Python tracker accepts the same extended input range. Music no longer ducks during instructor or radio speech.
 
 Validation: directional wave checks (72), mixer/settings checks (32), and Python control-settings tests (3) pass.
+
+## Slow focused encounters
+
+Waves alternate between one and two geese. Arrivals are one at a time, ten seconds apart (including between waves), starting ten seconds after takeoff. This replaces distance-based arrival spacing. Each living goose has a health ring outside its red brackets. Both plasma emitters focus one goose and deal 100 health over 1.5 seconds; ordinary hits do not trigger camera shake.
+
+Validation: 49 timed/altitude checks, 253 endless-wave checks, 28 plasma checks (including survival before 1.5 seconds and death at 1.5 seconds), and 19 combat checks pass.

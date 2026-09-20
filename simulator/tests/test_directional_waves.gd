@@ -1,33 +1,26 @@
 extends "res://tests/test_endless_waves.gd"
 func run()->void:
 	setup()
-	for heading: float in [0.0,PI*.5,PI,-PI*.5]:
-		app.flight.airborne=true;app.flight.heading=heading;app.flight.pitch=.25;app.flight.position=Vector3(0,500,0)
-		app.mission.reset(true);app.flight.airborne=true
-		app.mission.tick(4);app.mission.tick(2)
-		check(app.mission.wave_ids.size()>=1 and app.mission.wave_ids.size()<=4,"Each stream begins with one to four birds")
-		while app.mission.skein_pending>0:
-			var before: int=app.combat.next_id
-			var gap: float=app.mission.stream_gap-app.mission.stream_distance
-			check(app.mission.stream_gap>=600 and app.mission.stream_gap<=1500,"Next swarm spacing is randomly bounded between 600 and 1500 metres")
-			app.flight.position+=app.flight.forward()*(gap-.2);app.mission.tick(.01)
-			check(app.combat.next_id==before,"Birds do not bunch up before the next sampled gap")
-			app.flight.position+=app.flight.forward()*.3;app.mission.tick(.01)
-			var spawned: int=app.combat.next_id-before
-			check(spawned>=1 and spawned<=4,"The next sampled distance produces one to four birds")
-			for bird: Dictionary in app.combat.enemies:
-				if bird.id>=before:
-					check(app.flight.forward().dot((bird.position-app.flight.position).normalized())>.8,"New birds are ahead of the current heading")
-					check(is_equal_approx(bird.position.y,app.flight.position.y),"New birds match aircraft altitude even while pitched up")
-		check(app.mission.skein_total()==6 and app.combat.enemies.size()<=12,"Arrival counts stay honest and bounded")
-	app.flight.heading+=PI
-	# Place every bird behind the new heading explicitly; earlier groups may have been passed.
-	for bird: Dictionary in app.combat.enemies:bird.position=app.flight.position-app.flight.forward()*1000
-	var kills: int=app.combat.kills;app.mission.tick(Mission.EMPTY_VIEW_SECONDS+.01)
-	check(app.mission.phase=="wave_break","Leaving the whole stream behind schedules another encounter")
-	app.flight.position+=app.flight.forward()*(app.mission.stream_gap+1)
+	app.flight.airborne=true;app.flight.position=Vector3(0,500,0);app.flight.pitch=.25
+	app.mission.tick(8);app.mission.tick(1.99)
+	check(app.combat.next_id==0,"No goose before ten airborne seconds")
 	app.mission.tick(.01)
-	check(app.mission._flock_ahead(app.combat) and app.combat.kills==kills,"Replacement stream starts ahead without inventing kills")
-	app.landing_started=true;var before: int=app.combat.next_id;app.mission.tick(100)
-	check(app.combat.next_id==before,"Landing stops all arrivals")
+	var last_spawn: float=app.mission.clock
+	var count: int=app.combat.next_id
+	check(count==1,"First arrival is one goose")
+	for step in range(1000):
+		app.flight.heading+=.01
+		app.flight.position+=app.flight.forward()*30
+		app.mission.tick(.1)
+		if app.combat.next_id>count:
+			check(app.combat.next_id==count+1,"Only one goose spawns at a time")
+			check(app.mission.clock-last_spawn>=9.999,"Spawns stay ten seconds apart across wave boundaries")
+			check(app.mission.wave_size>=1 and app.mission.wave_size<=2,"Waves contain one or two geese")
+			var bird: Dictionary=app.combat.enemies.back()
+			check(is_equal_approx(bird.position.y,app.flight.position.y),"Spawn matches current aircraft altitude")
+			check(app.flight.forward().dot((bird.position-app.flight.position).normalized())>.8,"Spawn remains ahead of the aircraft")
+			last_spawn=app.mission.clock;count=app.combat.next_id
+	check(count>=9,"Arrivals continue at the requested cadence")
+	app.landing_started=true;app.mission.tick(100)
+	check(app.combat.next_id==count,"Landing stops arrivals")
 	await finish()

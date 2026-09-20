@@ -219,11 +219,11 @@ func tick(dt: float) -> void:
 	message_time = maxf(0,message_time-dt)
 	if engagement_enabled: spawn_clock -= dt
 	attack_spacing = maxf(0,attack_spacing-dt)
-	var desired_contacts: int=2 if elapsed<20 else 3 if intent.intensity<.7 else 4
+	var desired_contacts: int=2
 	if boss_id>=0:desired_contacts=1
 	if engagement_enabled and spawn_clock<=0 and enemies.size()<desired_contacts:
 		spawn_contact(); arrival_index += 1
-		spawn_clock = lerpf(2.8,1.25,intent.intensity) if arrival_index%3 else lerpf(3.2,1.8,intent.intensity)
+		spawn_clock = Tune.ARRIVAL_INTERVAL
 	for enemy: Dictionary in enemies:
 		if enemy.health<=0:
 			enemy.dying+=dt;enemy.position+=enemy.velocity*dt*.3;enemy.node.position=enemy.position
@@ -555,7 +555,7 @@ func hurt_enemy(enemy: Dictionary,damage: float,source: String,at: Vector3) -> v
 	app.fighter_fx.debris(enemy.position);app.audio.play_effect("explosion",-12 if enemy.kind=="boss" else -18,.7 if enemy.kind=="boss" else 1)
 	app.camera_rig.kill_impulse(.85 if enemy.kind=="boss" else .65)
 	if enemy.kind=="boss":boss_defeated=true
-	else:spawn_clock=minf(spawn_clock,.75);app.audio.radio.say("target_down" if kills%2 else "target_down_alt")
+	else:app.audio.radio.say("target_down" if kills%2 else "target_down_alt")
 
 func _plasma_targets() -> Array[int]:
 	var ids: Array[int]=[-1,-1]
@@ -573,11 +573,8 @@ func _plasma_targets() -> Array[int]:
 		if beam_target_ids.has(int(b.id)):cb-=50000
 		return ca<cb)
 	var first: Dictionary=candidates[0]
-	if candidates.size()==1 or (beam_target_ids[0]==int(first.id) and beam_target_ids[1]==int(first.id)) or float(first.health)>Tune.PLASMA_FOCUS_HEALTH or first.get("kind","")=="boss":
-		ids.assign([int(first.id),int(first.id)]);return ids
-	ids.assign([int(first.id),int(candidates[1].id)])
-	# Keep two retained targets on their original emitters instead of flickering swaps.
-	if ids[1]==beam_target_ids[0]:ids.reverse()
+	# Focusing both emitters on one goose gives a predictable 1.5-second takedown.
+	ids.assign([int(first.id),int(first.id)])
 	return ids
 
 func update_beam(dt: float) -> void:

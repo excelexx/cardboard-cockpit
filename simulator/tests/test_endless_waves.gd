@@ -53,10 +53,10 @@ func fill_wave() -> void:
 	for frame in range(24):
 		if app.mission.skein_pending==0:break
 		app.flight.position+=app.flight.forward()*(app.mission.stream_gap+1)
-		app.mission.tick(.01)
+		app.mission.tick(maxf(.01,app.mission.next_spawn_at-app.mission.clock))
 func start_first_wave() -> void:
 	app.flight.airborne=true;app.flight.gear=true;app.flight.flaps=1;app.flight.position=Vector3(0,500,-1000)
-	app.mission.tick(4.0);app.mission.tick(2.0);fill_wave()
+	app.mission.tick(8.0);app.mission.tick(2.0);fill_wave()
 func kill_birds(count: int) -> void:
 	var remaining := count
 	for enemy in app.combat.enemies:
@@ -66,7 +66,7 @@ func kill_birds(count: int) -> void:
 	app.mission.tick(.01)
 func next_wave() -> void:
 	app.flight.position+=app.flight.forward()*maxf(1,app.mission.stream_gap-app.mission.stream_distance+1)
-	app.mission.tick(.01);fill_wave()
+	app.mission.tick(maxf(.01,app.mission.next_spawn_at-app.mission.clock));fill_wave()
 func finish() -> void:
 	print("ENDLESS WAVES: %d checks / %d failures" % [checks,failures.size()])
 	app.queue_free();await process_frame
@@ -76,9 +76,9 @@ func run() -> void:
 	app.mission.tick(70.0)
 	check(app.mission.wave_number==0 and app.mission.phase=="opening","Ground wait never starts a clock-triggered combat wave")
 	start_first_wave()
-	check(app.mission.wave_number==1 and app.mission.wave_size==6,"First proper wave arrives six seconds after airborne")
+	check(app.mission.wave_number==1 and app.mission.wave_size==1,"First proper wave arrives ten seconds after airborne")
 	check(app.flight.gear,"Gear-down flight does not block the first wave")
-	check(app.mission.skein_total()==6,"Total means actual arrivals, not a predetermined quota")
+	check(app.mission.skein_total()==1,"Total means actual arrivals, not a predetermined quota")
 	app.mission.controls()
 	check(app.flight.gear and app.flight.flaps==1,"Assistance preserves pilot gear and flap choices")
 	app.demo_auto_fire=true;app.mission.controls();app.demo_auto_fire=false
@@ -88,13 +88,13 @@ func run() -> void:
 	for wave in range(1,41):
 		var size: int=app.mission.size_for_wave(wave)
 		expected_spawned+=size
-		check(app.mission.wave_number==wave and app.mission.wave_size==size,"Wave number and growing size advance")
+		check(app.mission.wave_number==wave and app.mission.wave_size==size,"Wave number advances with one or two geese")
 		check(app.mission.skein_total()==expected_spawned,"Cumulative actual arrivals remain exact")
 		if wave%4==0:
 			kill_birds(size);expected_down+=size
 		else:
-			kill_birds(2);expected_down+=2
-			app.mission.tick(Mission.WAVE_SECONDS+.01)
+			kill_birds(1);expected_down+=1
+			if app.mission.phase!="wave_break":app.mission.tick(Mission.WAVE_SECONDS+.01)
 		check(app.mission.phase=="wave_break" and not app.mission.skein_final,"A clear or timeout always leads to another wave")
 		check(app.mission.skein_down==expected_down,"Expired survivors never become kills")
 		check(app.mission.skein_ids.size()<=12 and app.mission.wave_ids.size()<=12 and app.mission.skein_alive.size()<=12 and app.mission.skein_killed.size()<=12,"Only current-wave identity history is retained")
@@ -103,7 +103,7 @@ func run() -> void:
 		await process_frame
 	check(app.mission.clock>600 and app.mission.wave_number==40,"More than ten minutes and thirty waves remain playable")
 	check(app.landing_calls==0 and app.result_calls==0,"No deadline or wave quota requests landing or finishes sortie")
-	check(app.mission.skein_total()>250 and app.mission.skein_down>32,"Cumulative counts continue beyond the former 32-bird ending")
+	check(app.mission.skein_total()==60 and app.mission.skein_down>32,"Cumulative counts continue beyond the former 32-bird ending")
 	check(app.combat.managed_mission and is_inf(app.combat.spawn_clock),"Mission suppresses finite patrol ending and ambient arrivals")
 	var before: int=app.combat.next_id
 	app.mission.transition("approach")

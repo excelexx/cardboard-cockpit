@@ -14,10 +14,10 @@ const FLOCK_SPEED := 19.0
 const FLOCK_REGROUP_DISTANCE := 900.0
 const FLOCK_SPREAD := 1000.0
 const FLOCK_CLOSE_RATE := 20.0
-const SECOND_WAVE_SIZE := 8
+const SECOND_WAVE_SIZE := 2
 const WAVE_SECONDS := 18.0
-const FIRST_WAVE_AIRBORNE_SECONDS := 6.0
-const MAX_WAVE_SIZE := 12
+const FIRST_WAVE_AIRBORNE_SECONDS := 10.0
+const MAX_WAVE_SIZE := 2
 const HISTORY_LIMIT := 32
 const WAVE_BREAK_SECONDS := 3.0
 func route_points() -> Array[Vector3]: return SHOWCASE_POINTS if cinematic else SFRoute.POINTS if app.route_id=="sf" else CoastalRoute.POINTS
@@ -46,6 +46,8 @@ var airborne_clock := 0.0
 var empty_view_clock := 0.0
 const STREAM_MIN_DISTANCE := 600.0
 const STREAM_MAX_DISTANCE := 1500.0
+const SPAWN_INTERVAL := 10.0
+var next_spawn_at := 0.0
 var stream_gap := 1050.0
 var stream_distance := 0.0
 var stream_position := Vector3.ZERO
@@ -74,7 +76,7 @@ func reset(enabled: bool) -> void:
 	cinematic=enabled and app.route_id=="sf";act=0;skein_cleared_at=-1;roll_demo_done=false
 	skein_ids.clear();skein_alive.clear();skein_pending=0;skein_down=0;skein_success=false;skein_final=false;skein_size=0
 	wave_number=0;wave_size=0;wave_ids.clear();skein_killed.clear()
-	airborne_clock=0;empty_view_clock=0;observed_down=0;sortie_kill_base=app.combat.kills;wave_kill_base=sortie_kill_base;last_wave_cleared=false
+	next_spawn_at=0;airborne_clock=0;empty_view_clock=0;observed_down=0;sortie_kill_base=app.combat.kills;wave_kill_base=sortie_kill_base;last_wave_cleared=false
 	flock_course=Vector3.ZERO;flock_altitude=0.0;Outcome.cinematic_state={}
 	if cinematic:
 		app.combat.managed_mission=true;app.combat.spawn_clock=INF;app.combat.engagement_enabled=false
@@ -203,14 +205,14 @@ func _tick_showcase(dt: float) -> void:
 		act=3;transition("skein");_open_skein(c,1)
 	elif phase=="wave_break" and app.flight.airborne:
 		stream_distance+=app.flight.position.distance_to(stream_position);stream_position=app.flight.position
-		if stream_distance>=stream_gap:transition("skein");_open_skein(c,wave_number+1)
+		if clock>=next_spawn_at:transition("skein");_open_skein(c,wave_number+1)
 	if phase=="skein":
 		_drive_skein(c,dt)
 		if skein_spawned() and wave_remaining()==0:_finish_wave(c,true)
 		else:
 			empty_view_clock=0.0 if _flock_ahead(c) else empty_view_clock+dt
 			if skein_spawned():wave_tail_clock+=dt
-			if wave_tail_clock>=WAVE_SECONDS or (skein_spawned() and (empty_view_clock>=EMPTY_VIEW_SECONDS or stream_distance>=stream_gap)):_finish_wave(c,false)
+			if wave_tail_clock>=WAVE_SECONDS or (skein_spawned() and (empty_view_clock>=EMPTY_VIEW_SECONDS or clock>=next_spawn_at)):_finish_wave(c,false)
 	_publish_outcome()
 	c.engagement_enabled=phase=="skein"
 	var delta: Vector3=route_target()-app.flight.position
@@ -243,7 +245,7 @@ func wave_down() -> int:
 func wave_remaining() -> int: return maxi(0,wave_size-wave_down())
 func wave_label() -> String: return "WAVE %d" % wave_number if wave_number>0 else "ENDLESS GEESE"
 func size_for_wave(number: int) -> int:
-	return Tune.SKEIN_SIZE if number<=1 else SECOND_WAVE_SIZE if number==2 else 10 if number==3 else MAX_WAVE_SIZE
+	return 1 if number%2==1 else 2
 
 func _open_skein(c: CombatDirector,number: int = 1) -> void:
 	if skein_final or app.landing_started or phase in ["approach","rollout"]:return
@@ -257,16 +259,7 @@ func _open_skein(c: CombatDirector,number: int = 1) -> void:
 	wave_number=number;wave_size=size_for_wave(number);wave_kill_base=c.kills
 	wave_ids.clear();skein_ids.clear();skein_alive.clear();skein_killed.clear();flock_altitude=0.0
 	flock_course=_flock_course(app.flight.heading)
-	if _combat_flock():
-		c.spawn_skein(wave_size,flock_course)
-		var ids: Variant=c.get("skein_ids")
-		if ids is Array:
-			for id: int in ids as Array:
-				if wave_ids.size()>=wave_size:break
-				if not wave_ids.has(id):
-					wave_ids.append(id);skein_ids.append(id);skein_alive.append(id);skein_size+=1
-		skein_pending=0
-	else:skein_pending=wave_size
+	skein_pending=wave_size
 	c.announce("WAVE %d — %d GEESE" % [wave_number,wave_size])
 
 func _finish_wave(c: CombatDirector,cleared: bool) -> void:
@@ -293,9 +286,9 @@ func request_landing() -> void:
 func _drive_skein(c: CombatDirector,dt: float) -> void:
 	stream_distance+=app.flight.position.distance_to(stream_position)
 	stream_position=app.flight.position
-	if skein_pending>0 and stream_distance>=stream_gap:
-		_spawn_slice(c);stream_distance=fmod(stream_distance,stream_gap)
-		stream_gap=randf_range(STREAM_MIN_DISTANCE,STREAM_MAX_DISTANCE)
+	if skein_pending>0 and clock>=next_spawn_at:
+		_spawn_slice(c)
+		next_spawn_at=clock+SPAWN_INTERVAL
 	_tally_skein(c)
 	if not _combat_flock():_hold_formation(c,dt)
 
@@ -322,7 +315,7 @@ func _spawn_slice(c: CombatDirector) -> void:
 	var f: FlightDynamics=app.flight
 	var forward: Vector3=f.forward()
 	var wing:=Vector3(cos(f.heading),0,sin(f.heading))
-	var count: int=mini(skein_pending,randi_range(1,4))
+	var count: int=mini(skein_pending,1)
 	var anchor: Vector3=f.position+forward*1200
 	for i in range(count):
 		if c.enemies.size()>=MAX_WAVE_SIZE:break
