@@ -36,6 +36,10 @@ var rollout_clock := 0.0
 var burner_latch := false
 var inhale := 0.0
 var attributes: CameraAttributesPractical
+var ground_motion := 0.0
+var steady_eye := Basis.IDENTITY
+var steady_height := 0.0
+var steady_ready := false
 
 const SHAKE_STRENGTH := 0.90 # Brief, visible feedback on confirmed kills only.
 const HEAD_MOTION_STRENGTH := 0.0
@@ -82,6 +86,7 @@ func reset() -> void:
 	aim = Vector3.ZERO; head = Vector3.ZERO; head_pitch = 0; head_yaw = 0
 	ground_lift = 0; settle = 0; settle_clock = 0
 	results_clock = 0; rollout_clock = 0; inhale = 0; burner_latch = false
+	ground_motion=0;steady_ready=false
 	if is_instance_valid(camera): camera.attributes = null
 func update(dt: float) -> void:
 	if app.mode=="paused": return
@@ -95,6 +100,8 @@ func update(dt: float) -> void:
 	last_speed = f.speed
 	var plane_basis: Basis = Basis.from_euler(Vector3(f.pitch,-f.heading,-f.roll))
 	var ground: float = app.world.ground_height(f.position.x,f.position.z)
+	var grounded: bool=not f.airborne or app.mode=="rollout" or f.position.y-ground<120
+	ground_motion=move_toward(ground_motion,1.0 if grounded else 0.0,dt*2.0)
 	var speed_norm: float = clampf((f.speed-120.0)/260.0,0,1)
 	var proximity: float = (1.0-clampf((f.position.y-ground)/150.0,0,1))*speed_norm
 	_update_fov(dt,f,speed_norm,proximity)
@@ -113,7 +120,7 @@ func update(dt: float) -> void:
 		noise.get_noise_2d(t,0.0)*thump+noise.get_noise_2d(v,90.0)*vibration,
 		noise.get_noise_2d(t,37.0)*thump+noise.get_noise_2d(v,131.0)*vibration,
 		noise.get_noise_2d(t,74.0)*thump+noise.get_noise_2d(v,172.0)*vibration)
-	wobble *= SHAKE_STRENGTH
+	wobble *= SHAKE_STRENGTH*lerpf(1.0,.2,ground_motion)
 	var angular := Vector3(wobble.x*SHAKE_ANGLE,wobble.y*SHAKE_ANGLE*0.6,wobble.z*SHAKE_ROLL)
 	if app.pilot_ejected and is_instance_valid(app.fighter_fx.parachute):
 		app.cockpit_frame.set_presentation_visible(false)
@@ -151,6 +158,9 @@ func _cockpit_view(dt: float, f: FlightDynamics, angular: Vector3, shift: Vector
 	camera.attributes = null
 	var alpha: float = clampf(f.aoa,-0.12,0.16)
 	var eye_basis: Basis = Basis.from_euler(Vector3(f.pitch+alpha,-f.heading+clampf(f.beta,-0.10,0.10),-f.roll))
+	if not steady_ready:steady_eye=eye_basis;steady_height=f.position.y;steady_ready=true
+	steady_eye=steady_eye.slerp(eye_basis,lerpf(1.0,1-exp(-dt*8.0),ground_motion))
+	eye_basis=steady_eye
 	var g_excess: float = clampf(f.g_load-1.0,-2.5,5.0)
 	var want_head := Vector3(
 		clampf(-f.yaw_velocity*0.045,-0.045,0.045),
@@ -165,7 +175,8 @@ func _cockpit_view(dt: float, f: FlightDynamics, angular: Vector3, shift: Vector
 	travel.x = clampf(travel.x,-HEAD_LIMIT,HEAD_LIMIT)
 	travel.y = clampf(travel.y-sin(settle_clock*19.0)*settle*0.09,-HEAD_LIMIT,HEAD_LIMIT)
 	travel.z = clampf(travel.z,-HEAD_LIMIT,HEAD_LIMIT)
-	camera.position = f.position+eye_basis*Vector3(0,2.6,-5.0)
+	steady_height=lerpf(steady_height,f.position.y,lerpf(1.0,1-exp(-dt*8.0),ground_motion))
+	camera.position = Vector3(f.position.x,steady_height,f.position.z)+eye_basis*Vector3(0,2.6,-5.0)
 	camera.basis = eye_basis*look_basis*Basis.from_euler(angular)
 	camera.position += camera.basis*travel
 	# The frame keeps most of the airframe's own attitude: the view rattles against it.
@@ -193,10 +204,10 @@ func _chase_view(dt: float, f: FlightDynamics, plane_basis: Basis, ground: float
 		results_clock = 0
 		camera.attributes = null
 		# Yaw LEAD, not lag: the boom swings to the inside of the turn.
-		yaw = lerp_angle(yaw,f.heading+clampf(f.yaw_velocity*0.55,-0.5,0.5),1-exp(-dt*7))
+		yaw = lerp_angle(yaw,f.heading+clampf(f.yaw_velocity*0.55*lerpf(1.0,.2,ground_motion),-0.5,0.5),1-exp(-dt*7))
 		# barrel_angle is unwrapped, so the roll never reverses at the +-PI seam.
 		var want_bank: float = -f.barrel_angle*0.82 if rolling else clampf(-f.roll*0.30-f.roll_velocity*0.10,-BANK_LIMIT,BANK_LIMIT)
-		var desired := Vector3(-app.control.x*0.8,5.2+speed_norm*1.0,22.0+speed_norm*4+clampf(acceleration*0.035,-0.4,0.8))
+		var desired := Vector3(-app.control.x*0.8*lerpf(1.0,.2,ground_motion),5.2+speed_norm*1.0,22.0+speed_norm*4+clampf(acceleration*0.035,-0.4,0.8)*lerpf(1.0,.2,ground_motion))
 		if app.mode=="rollout":
 			rollout_clock += dt
 			var settled: float = clampf(rollout_clock/ROLLOUT_SETTLE,0,1)
@@ -216,6 +227,9 @@ func _chase_view(dt: float, f: FlightDynamics, plane_basis: Basis, ground: float
 	var lift: float = maxf(0.0,(ground+GROUND_CLEARANCE)-camera.position.y)
 	ground_lift = lerpf(ground_lift,lift,1-exp(-dt*(9.0 if lift>ground_lift else 3.0)))
 	camera.position.y = maxf(camera.position.y+ground_lift,ground+1.2)
+	if not steady_ready:steady_height=camera.position.y;steady_ready=true
+	steady_height=lerpf(steady_height,camera.position.y,lerpf(1.0,1-exp(-dt*8.0),ground_motion))
+	camera.position.y=steady_height
 	camera.position.y -= sin(settle_clock*19.0)*settle*0.55
 	_look(truth)
 	camera.rotate_object_local(Vector3.FORWARD,bank)

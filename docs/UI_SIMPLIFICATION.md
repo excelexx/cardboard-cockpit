@@ -47,3 +47,9 @@ Full waves of two or three geese arrive every ten seconds, slightly offset left/
 First touchdown allocated two GPU particle emitters, their curves, meshes, and materials on the contact frame. The native rendered probe reproduced a 3,043.7 ms first-touchdown peak, versus 24.5 ms on a repeat landing. Tyre smoke now uses eight shared-mesh quads created during aircraft setup, animated and faded without touchdown allocations or a particle compute pipeline. The same probe measured 26.1 ms on first touchdown and 20.1 ms on repeat, with 0.67 ms touchdown CPU work. These are local probe measurements, not a universal frame-rate guarantee.
 
 Validation: 39 wave/altitude checks, 253 endless-wave checks, 34 plasma/laser-width checks, 19 combat checks, and 21 judge-landing checks pass. tools/profile_touchdown.gd reproduces the native measurement and checks smoke pool reuse.
+
+## Staggered distant waves and steadier runway camera
+
+Wave geese now appear at 2.2, 2.6, and 3.0 km along the camera sightline (two-bird waves use the first two slots), with alternating small lateral offsets of 90–120 m. Laser and acquisition range extends to 3.5 km, and managed waves are excluded from the old ambient-distance retirement rule so distant geese remain visible. The 1,300-foot floor and ten-second wave interval are preserved.
+
+Within 120 m of terrain and during rollout, the camera damps rapid attitude and height changes, reduces chase acceleration/yaw offsets, and lowers shake amplitude by 80%. Normal airborne kill shake is unchanged. A synthetic jitter check measured 1.294° source movement versus 0.152° cockpit and 0.023° chase movement. Wave, laser-range, camera, and landing tests pass.

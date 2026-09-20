@@ -311,31 +311,24 @@ func _flock_course(heading: float) -> Vector3:
 					break
 	return course.normalized()*clampf(course.length(),16.0,24.0)
 
-func _wave_anchor(c: CombatDirector) -> Vector3:
-	var wing:=Vector3(cos(app.flight.heading),0,sin(app.flight.heading))
+func _wave_position(c: CombatDirector,index: int) -> Vector3:
 	var next_number: int=wave_number+1 if phase in ["opening","gather","wave_break"] else wave_number
-	var anchor: Vector3=c.spawn_sight_point(1200)+wing*(180.0 if next_number%2==0 else -180.0)
-	for offset in [-65.0,0.0,65.0]:
-		var place: Vector3=anchor+wing*offset
-		anchor.y=maxf(anchor.y,app.world.ground_height(place.x,place.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
-	return anchor
+	var side: float=1.0 if next_number%2==0 else -1.0
+	var lateral: float=[120.0,-90.0,90.0][index%3]*side
+	var point: Vector3=c.spawn_sight_point(Tune.GOOSE_SPAWN_DISTANCE+index*Tune.GOOSE_DEPTH_SPACING)+c.spawn_sight_right()*lateral
+	point.y=maxf(point.y,app.world.ground_height(point.x,point.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
+	return point
 
 func _spawn_visible(c: CombatDirector) -> bool:
-	var point: Vector3=_wave_anchor(c)
-	var wing:=Vector3(cos(app.flight.heading),0,sin(app.flight.heading))
-	for offset in [-65.0,0.0,65.0]:
-		if not c.spawn_point_clear(point+wing*offset):return false
+	for i in range(MAX_WAVE_SIZE):
+		if not c.spawn_point_clear(_wave_position(c,i)):return false
 	return true
 
 func _spawn_slice(c: CombatDirector) -> void:
-	var f: FlightDynamics=app.flight
-	var forward: Vector3=f.forward()
-	var wing:=Vector3(cos(f.heading),0,sin(f.heading))
 	var count: int=skein_pending
-	var anchor: Vector3=_wave_anchor(c)
 	for i in range(count):
 		if c.enemies.size()>=MAX_WAVE_SIZE:break
-		var place: Vector3=anchor+wing*(float(i)-float(count-1)*.5)*65.0
+		var place: Vector3=_wave_position(c,i)
 		var previous_count: int=c.enemies.size()
 		c.spawn_contact("goose")
 		if c.enemies.size()<=previous_count:break

@@ -169,6 +169,12 @@ func extend_demo_route() -> void:
 		enemy.node.position = enemy.position
 	target_id = -1; lock_progress = 0
 
+func spawn_sight_right() -> Vector3:
+	var direction: Vector3=forward()
+	if "camera" in app and is_instance_valid(app.camera):direction=-app.camera.global_basis.z
+	var right: Vector3=direction.cross(Vector3.UP)
+	return right.normalized() if right.length_squared()>.001 else Vector3(cos(app.flight.heading),0,sin(app.flight.heading))
+
 func spawn_sight_point(distance: float) -> Vector3:
 	var point: Vector3=app.flight.position+forward()*distance
 	if "camera" in app and is_instance_valid(app.camera):
@@ -183,7 +189,7 @@ func spawn_contact(kind: String = "normal") -> void:
 	if training_target_limit>=0 and next_id>=training_target_limit:return
 	if training_target_limit<0 and kind=="normal" and elapsed>28 and next_id%5==3:kind="elite"
 	if arrival_index%3==0:motif=choose_motif();event("scan",app.flight.position+forward()*700,.6)
-	var sight_point: Vector3=spawn_sight_point(1200)
+	var sight_point: Vector3=spawn_sight_point(Tune.GOOSE_SPAWN_DISTANCE)
 	if not managed_mission and not spawn_point_clear(sight_point):return
 	var node := goose_model();add_child(node)
 	var right := Vector3(cos(app.flight.heading),0,sin(app.flight.heading))
@@ -246,7 +252,7 @@ func tick(dt: float) -> void:
 		enemy.hit_flash=maxf(0,enemy.hit_flash-dt*5)
 		var to_plane: Vector3 = app.flight.position-enemy.position
 		var distance: float = to_plane.length()
-		if training_target_limit<0 and enemy.kind!="boss" and (enemy.age>24 or distance>2500 or forward().dot(-to_plane)<-90): enemy.retiring = true
+		if not managed_mission and training_target_limit<0 and enemy.kind!="boss" and (enemy.age>24 or distance>6000 or forward().dot(-to_plane)<-90): enemy.retiring = true
 		var present: bool = (engagement_enabled or enemy.kind=="boss") and not enemy.retiring
 		enemy.fade = minf(.1 if enemy.kind=="boss" and enemy.age<4 else 1.0,enemy.fade+dt*Tune.CONTACT_FADE_IN) if present else maxf(0,enemy.fade-dt*Tune.CONTACT_FADE_OUT)
 		var lateral: Vector3 = enemy.get("right",Vector3.RIGHT)

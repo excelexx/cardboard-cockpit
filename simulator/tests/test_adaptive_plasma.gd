@@ -36,6 +36,12 @@ func run() -> void:
 	check(is_equal_approx(app.combat.visuals.plasma_view_width,.64),"Cockpit lasers keep the thicker width")
 	app.cockpit=false;app.combat.visuals.draw_plasma()
 	check(is_equal_approx(app.combat.visuals.plasma_view_width,1.0),"External lasers keep their original width")
+	fresh();app.combat.managed_mission=true
+	var distant: Dictionary=bird(Vector3(100,0,-3000));distant.requires_aim_adjustment=true
+	app.combat.tick(.016)
+	check(not distant.retiring and app.combat.enemies.has(distant),"Distant wave geese survive the retirement checks")
+	app.combat.fire_primary();app.combat.update_beam(.1)
+	check(distant.health<100,"Far end of the staggered wave remains within laser range")
 	fresh();var a: Dictionary=bird(Vector3(-30,0,-500));var b: Dictionary=bird(Vector3(30,0,-500))
 	check(app.aircraft.find_child("CG26",true,false)==null and app.aircraft.find_child("GatlingRotor",true,false)==null,"No live minigun remains")
 	check(not app.combat.has_method("fire_gun") and not app.combat.has_method("fire_missile"),"The pilot has no minigun or conscious missile firing API")

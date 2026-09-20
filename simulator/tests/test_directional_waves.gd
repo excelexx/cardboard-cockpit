@@ -19,12 +19,13 @@ func run()->void:
 			var added: int=app.combat.next_id-count
 			check(added>=2 and added<=3,"Entire waves spawn together with two or three geese")
 			check(app.mission.clock-last_spawn>=9.999 and app.mission.clock-last_spawn<10.3,"New waves arrive every ten seconds")
-			var center:=Vector3.ZERO
-			for bird: Dictionary in app.combat.enemies:
+			for i in range(app.combat.enemies.size()):
+				var bird: Dictionary=app.combat.enemies[i]
 				check(bird.position.y>=396.23,"All geese spawn at or above 1,300 feet")
-				center+=bird.position
-			center/=float(added)
-			check(is_equal_approx(center.distance_to(app.combat.spawn_sight_point(1200)),180.0),"Wave is slightly offset from camera sightline")
+				var reference: Vector3=app.combat.spawn_sight_point(2200+i*400)
+				var delta: Vector3=bird.position-reference
+				check(absf(delta.dot(-app.camera.global_basis.z))<.01,"Goose depth is 2.2 km plus 400 m per bird")
+				check(delta.length()<=120.01,"Goose is close to the sightline with a small lateral offset")
 			last_spawn=app.mission.clock;count=app.combat.next_id
 	check(count>=15,"Ten-second waves continue")
 	app.landing_started=true;app.mission.tick(100)
