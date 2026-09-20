@@ -21,6 +21,10 @@ func run() -> void:
 	check(not app.combat.has_method("fire_gun") and not app.combat.has_method("fire_missile"),"The pilot has no minigun or conscious missile firing API")
 	app.combat.fire_primary();app.combat.update_beam(.1)
 	check(app.combat.beam_target_ids[0]!=app.combat.beam_target_ids[1] and app.combat.beam_target_ids.has(a.id) and app.combat.beam_target_ids.has(b.id),"Two visible geese receive separate plasma beams")
+	app.combat.visuals.draw_plasma()
+	for index in range(2):
+		var bloom=app.combat.visuals.plasma_impact_blooms[index]
+		check(bloom.visible and bloom.global_position.is_equal_approx(app.combat.beam_ends[index]),"A plasma impact bloom stays attached to its actual hit point")
 	check(is_equal_approx(a.health,90) and is_equal_approx(b.health,90),"Split beams damage both real targets")
 	app.combat.hurt_enemy(a,1000,"beam",a.position);app.combat.update_beam(.1)
 	check(app.combat.beam_target_ids[0]==b.id and app.combat.beam_target_ids[1]==b.id and is_equal_approx(b.health,70),"A lone remaining goose receives both cannons at doubled combined damage")

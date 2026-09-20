@@ -54,8 +54,8 @@ static func missile(in_flight: bool = false) -> Node3D:
 		# Narrow tapered motor plume leaves the seeker, body and fins readable.
 		for layer in range(2):
 			var plume := MeshInstance3D.new(); var cone := CylinderMesh.new()
-			cone.top_radius = .10 if layer==0 else .040; cone.bottom_radius = .004
-			cone.height = 2.0 if layer==0 else 1.05; cone.radial_segments = 20
+			cone.top_radius = .16 if layer==0 else .065; cone.bottom_radius = .004
+			cone.height = 3.2 if layer==0 else 1.75; cone.radial_segments = 20
 			plume.mesh = cone; plume.rotation.x = -PI/2
 			plume.position.z = 1.46+cone.height*.5
 			plume.name = "Ignition" if layer==0 else "MotorFlame"

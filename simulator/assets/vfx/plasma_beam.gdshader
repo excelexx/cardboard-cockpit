@@ -113,9 +113,10 @@ void fragment() {
 		float density = pow(chord, 2.4) * min(stretch, 2.2);
 		float packet = pow(0.5 + 0.5 * sin(along * 0.34 - TIME * 42.0 + phase), 5.0);
 		float fine = pow(0.5 + 0.5 * sin(along * 1.9 - TIME * 150.0), 3.0);
+		float surge = pow(0.5 + 0.5 * cos(along * 0.044 - TIME * 26.0), 14.0);
 		float flicker = 0.88 + 0.12 * sin(TIME * 63.0 + along * 0.6);
-		vec3 hot = mix(tint * 1.70, vec3(1.0, 0.985, 0.96), 0.16 + 0.44 * pow(chord, 2.2));
-		emitted = hot * (0.85 + packet * 2.0 + fine * 0.7) * density * flicker;
+		vec3 hot = mix(tint * 1.70, vec3(1.0, 0.985, 0.96), 0.10 + 0.28 * pow(chord, 2.2));
+		emitted = hot * (0.72 + packet * 1.65 + fine * 0.55 + surge * 1.6) * density * flicker;
 	} else if (layer == 1) {
 		// Counter-wound plasma strands with turbulence flowing to the target.
 		float density = pow(chord, 0.85) * min(stretch, 1.8);

@@ -4,10 +4,12 @@ var output: String
 func _initialize() -> void:call_deferred("run")
 func run() -> void:
 	if OS.get_environment("COCKPIT_DISABLE_BADGE")!="1":printerr("Offline review requires badge disabled");quit(2);return
-	output=ProjectSettings.globalize_path("res://../build/adaptive-plasma/action");DirAccess.make_dir_recursive_absolute(output)
+	output=OS.get_environment("COCKPIT_CAPTURE_DIR")
+	if output.is_empty():output=ProjectSettings.globalize_path("res://../build/projectile-polish/chase")
+	output=ProjectSettings.globalize_path(output);DirAccess.make_dir_recursive_absolute(output)
 	app=load("res://scenes/main.tscn").instantiate();app.set_meta("route_override","sf");root.add_child(app)
 	app.set_process(false);app.set_physics_process(false);app.test_mode=true;app.audio.muted=true
-	app.start_flight("combat");app.cockpit=false;app.text_hud=true;app.flight.spawn_airborne(Vector3(5000,1200,-14000),180);app.flight.heading=.2
+	app.start_flight("combat");app.cockpit=OS.get_environment("COCKPIT_CAPTURE_COCKPIT")=="1";app.text_hud=true;app.flight.spawn_airborne(Vector3(5000,1200,-14000),180);app.flight.heading=.2
 	app.flight.flaps=0;app.flight.gear=false;app.apply_aircraft_pose();app.combat.spawn_clock=999;app.camera_rig.reset();app.fire_guard=0
 	for index in range(12):
 		app.combat.spawn_contact();var enemy: Dictionary=app.combat.enemies.back()

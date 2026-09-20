@@ -12,6 +12,7 @@ class CombatHarness extends Node:
 	var app: Node
 	var active := true
 	var beam_active := false
+	var beam_target_ids: Array[int]=[-1,-1]
 	var beam_ends: Array[Vector3] = [Vector3(-100,0,-500), Vector3(100,0,-500)]
 	var flares_fired := 0
 
