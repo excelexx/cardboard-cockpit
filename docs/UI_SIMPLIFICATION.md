@@ -9,3 +9,9 @@
 - Full setup retains its step navigation and one necessary instruction per step; its duplicate explanatory copy is removed. Calibration and input validation behavior are unchanged.
 
 Verification: directional wave spacing (34 checks), endless waves (253), HUD readouts (75), control tutorial (75): **437 checks passed**. Native UI captures use simulated camera images with badge communication disabled; no new physical camera/badge acceptance is claimed.
+
+## Center HUD follow-up
+
+The flight aiming area now contains only the crosshair and its hit confirmation. Target labels, distances, brackets, guide lines, waypoint overlays, and reward popups are removed. Alerts and captions are moved to the left; landing guidance and a three-mark pitch ladder with altitude are on the right. Goose model scale increases from 3 to 6 (twice the linear size). Flock counts and spacing are unchanged.
+
+Validation: HUD readouts (75 checks) and combat feel (16 checks) pass; native flight screenshot inspected.

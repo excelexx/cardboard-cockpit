@@ -236,10 +236,10 @@ func _draw() -> void:
 		draw_pause()
 		if app.camera_previews and app.vision.enabled and not app.settings_visible and not app.calibration_visible:draw_camera_previews()
 	if app.mode=="results": draw_results()
-	if app.toast_time>0 and app.mode=="flight": centered(176,app.toast.to_upper(),18,GREEN)
+	if app.toast_time>0 and app.mode=="flight": put(mono,Vector2(56,176),app.toast.to_upper(),18,GREEN)
 	if app.landing_transition>0:
 		draw_rect(Rect2(0,0,1600,1000),Color(0.01,.02,.03,clampf(app.landing_transition/1.2,0,1)))
-		centered(496,"YOUR LANDING APPROACH",40,WHITE,display_bold)
+		put(display_bold,Vector2(56,176),"YOUR LANDING APPROACH",32,WHITE)
 	if app.help_visible: draw_help()
 	if app.calibration_visible: draw_camera_setup()
 	if app.credits_visible: draw_credits()
@@ -347,34 +347,24 @@ func draw_flight() -> void:
 	if show:draw_heading_compass(f);draw_attitude_altitude(f)
 	# A compact lower-left instrument row leaves the aiming area clear.
 	if show:draw_pilot_readouts(f)
-	# Next waypoint.
-	if app.mission.active and app.mission.phase in ["opening","combat","return"]:
-		var waypoint: Vector3 = app.mission.route_target()
-		if not app.camera.is_position_behind(waypoint):
-			var nav: Vector2 = app.camera.unproject_position(waypoint).clamp(Vector2(160,150),Vector2(1440,730))
-			diamond(nav,12,GREEN,2)
-			text(nav+Vector2(20,6),"GO HERE",16,GREEN,true)
 	draw_sight(f,c)
 	if c.hit_confirm>0:
 		var center: Vector2 = app.camera.unproject_position(c.reticle_point())
 		for sx in [-1,1]:
 			for sy in [-1,1]: line(center+Vector2(sx*14,sy*14),center+Vector2(sx*24,sy*24),Color(1,1,1,c.hit_confirm),3)
-	if c.reward_flash>0:
-		big(Vector2(0,250),"+%d" % c.last_reward,56,Color(GREEN.r,GREEN.g,GREEN.b,c.reward_flash),HORIZONTAL_ALIGNMENT_CENTER,1600,true)
-		if c.combo>=3: centered(282,"%d IN A ROW" % c.combo,20,Color(WHITE.r,WHITE.g,WHITE.b,c.reward_flash))
 	if c.hit_flash>0: draw_rect(Rect2(0,0,1600,1000),Color(RED.r,RED.g,RED.b,clampf(c.hit_flash*0.9,0,1)),false,14)
 	if not app.cockpit: draw_scope(Vector2(1450,306),c)   # the cockpit's own display carries the radar
 	draw_objective(c)
 	draw_alerts(f,c)
 	if (app.flight_kind=="approach" or (app.mission.active and app.mission.phase in ["return","approach"])) and f.airborne:
 		var guidance: Dictionary = app.approach_data()
-		var cross := Vector2(800,700)
+		var cross := Vector2(1390,680)
 		line(cross-Vector2(90,0),cross+Vector2(90,0),Color(GREEN.r,GREEN.g,GREEN.b,0.5),2)
 		line(cross-Vector2(0,40),cross+Vector2(0,40),Color(GREEN.r,GREEN.g,GREEN.b,0.5),2)
 		diamond(cross+Vector2(guidance.localizer*80,-guidance.glideslope*34),7,WHITE,3)
 	if show and not app.audio.radio.caption.is_empty():
-		put(mono,Vector2(0,626),app.audio.radio.speaker,15,GREEN,HORIZONTAL_ALIGNMENT_CENTER,1600)
-		put(body,Vector2(0,654),app.audio.radio.caption,20,WHITE,HORIZONTAL_ALIGNMENT_CENTER,1600)
+		put(mono,Vector2(56,810),app.audio.radio.speaker,15,GREEN)
+		put(body,Vector2(56,838),app.audio.radio.caption,18,WHITE)
 	if app.developer_mode: text(Vector2(620,990),"%d FPS · %.0f M/S · %s" % [Engine.get_frames_per_second(),f.speed,"HIGH" if app.high_quality else "BALANCED"],14,SOFT,true)
 func draw_heading_compass(f: FlightDynamics) -> void:
 	var heading: float=fposmod(f.get_heading_degrees()+(298 if app.route_id=="sf" else 0),360)
@@ -393,33 +383,18 @@ func draw_heading_compass(f: FlightDynamics) -> void:
 	draw_colored_polygon(PackedVector2Array([Vector2(800,82),Vector2(793,96),Vector2(807,96)]),GREEN)
 
 func draw_attitude_altitude(f: FlightDynamics) -> void:
-	var center: Vector2=app.camera.unproject_position(app.combat.reticle_point()).clamp(Vector2(150,180),Vector2(1330,700))
+	# Keep the aiming area empty; show only three pitch marks at the right edge.
+	var center := Vector2(1390,480)
 	var pitch: float=rad_to_deg(f.pitch)
-	for degrees in range(-90,91,10):
-		var y: float=(pitch-degrees)*3.0
-		if absf(y)>83:continue
-		var width: float=62 if degrees==0 else 42
-		var color: Color=WHITE if degrees==0 else GREEN
-		for side in [-1.0,1.0]:
-			var a: Vector2=Vector2(side*12,y).rotated(-f.roll)
-			var b: Vector2=Vector2(side*width,y).rotated(-f.roll)
-			line(center+a,center+b,color,2 if degrees==0 else 1.4)
-			line(center+b,center+b+Vector2(0,4 if degrees>=0 else -4).rotated(-f.roll),color,1.4)
-		var label_at: Vector2=center+Vector2(width+7,y+5).rotated(-f.roll)
-		put(mono,label_at,str(degrees),12,color)
-	line(center+Vector2(-22,0),center+Vector2(-6,0),AMBER,3)
-	line(center+Vector2(6,0),center+Vector2(22,0),AMBER,3)
-	draw_circle(center,2,AMBER)
-	for degrees in [-60,-30,0,30,60]:
-		var direction:=Vector2(sin(deg_to_rad(degrees)),-cos(deg_to_rad(degrees)))
-		line(center+direction*105,center+direction*113,GREEN,1.5)
-	var roll: float=clampf(-f.roll,-PI/2,PI/2)
-	var pointer:=center+Vector2(sin(roll),-cos(roll))*99
-	draw_circle(pointer,3,WHITE)
-	put(mono,center+Vector2(-74,123),"BANK %+.0f°" % rad_to_deg(f.roll),13,GREEN)
-	put(mono,center+Vector2(109,-22),"ALTITUDE",14,GREEN)
-	put(display,center+Vector2(105,20),thousands(int(f.position.y*3.28084)),32,WHITE)
-	put(mono,center+Vector2(109,44),"FEET",13,SOFT)
+	var nearest: int=int(round(pitch/10.0))*10
+	for offset in range(-1,2):
+		var degrees: int=nearest+offset*10
+		var y: float=center.y+(pitch-degrees)*3.0
+		line(Vector2(center.x-28,y),Vector2(center.x+28,y),GREEN,1.5)
+		put(mono,Vector2(center.x+38,y+5),str(degrees),12,GREEN)
+	put(mono,center+Vector2(-38,80),"ALTITUDE",14,GREEN)
+	put(display,center+Vector2(-42,118),thousands(int(f.position.y*3.28084)),32,WHITE)
+	put(mono,center+Vector2(-38,142),"FEET",13,SOFT)
 
 func thousands(value: int) -> String:
 	var digits: String = str(absi(value))
@@ -442,7 +417,7 @@ func draw_flight_path(f: FlightDynamics) -> void:
 	for side in [-1.0,1.0]:
 		var tip: Vector2 = at+Vector2(-22,side*gap)
 		line(tip,tip+Vector2(-9,side*6),faint,1.5)
-func draw_sight(f: FlightDynamics,c: CombatDirector) -> void:
+func draw_sight(_f: FlightDynamics,c: CombatDirector) -> void:
 	var tracking: bool = c.target_id>=0 and c.assist
 	var locked: bool = tracking and c.lock_progress>=1
 	# Where the nose points: a quiet ring. Where the guns point: the cross.
@@ -450,24 +425,6 @@ func draw_sight(f: FlightDynamics,c: CombatDirector) -> void:
 	var sight: Color = RED if locked else AMBER if tracking else GREEN
 	for direction in [Vector2.LEFT,Vector2.RIGHT,Vector2.UP,Vector2.DOWN]: line(center+direction*20,center+direction*34,sight,2)
 	draw_circle(center,2.5,sight)
-	for enemy: Dictionary in c.enemies:
-		if not c.active:break
-		if app.camera.is_position_behind(enemy.position): continue
-		var point: Vector2 = app.camera.unproject_position(enemy.position)
-		if point.x<25 or point.x>1575 or point.y<115 or point.y>810: continue
-		if enemy.id==c.target_id:
-			var distance: float = f.position.distance_to(enemy.position)
-			var radius: float = clampf(14000/maxf(distance,1),28,54)
-			var tone: Color = RED if c.lock_progress>=1 else AMBER
-			brackets(point,radius,tone)
-			if c.lock_progress>=1: diamond(point,radius*0.45,RED,3)
-			else: ring(point,radius*0.62,-PI/2,-PI/2+TAU*c.lock_progress,AMBER,3)
-			big(point+Vector2(-55,-radius-28),"LOCKED" if c.lock_progress>=1 else "LOCKING",30,tone,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
-			text(point+Vector2(-45,-radius-7),"%d m" % int(distance),20,WHITE)
-			var pip: Vector2 = app.camera.unproject_position(f.position+c.assisted_direction()*distance)
-			if pip.distance_to(center)>9: line(center,pip,Color(tone.r,tone.g,tone.b,0.55),2)
-		else:
-			diamond(point,8,Color(RED.r,RED.g,RED.b,0.9),2)
 func plasma_status(active: bool, ids: Variant) -> String:
 	if not active:return "OFF"
 	if ids is Array and ids.size()>=2:
@@ -500,13 +457,14 @@ func draw_objective(c: CombatDirector) -> void:
 	put(mono,Vector2(540,118),"%s  ·  %d/%d" % [wave_title,int(tally.x),int(tally.y)],20,AMBER,HORIZONTAL_ALIGNMENT_CENTER,520)
 
 func draw_alerts(f: FlightDynamics,c: CombatDirector) -> void:
-	var y := 662.0
-	if f.stall_time>.6: banner(y,"NOSE TOO HIGH",["Ease off, add power"],RED); y -= 62
+	var y := 220.0
+	if f.stall_time>.6:
+		put(mono,Vector2(56,y),"NOSE TOO HIGH · EASE OFF, ADD POWER",17,RED); y+=28
 	if app.eject_hold>0:
-		banner(y,"EJECTING",["Keep holding","[E]"],RED)
-		bar(Rect2(640,y+22,320,8),app.eject_hold/.9,RED); y -= 72
-	if app.mode=="ejected": banner(y,"EJECTED",["You are out of the jet"],AMBER); y -= 62
-	if c.message_time>0: banner(216,c.message.to_upper(),[],AMBER)
+		put(mono,Vector2(56,y),"EJECTING · KEEP HOLDING E",17,RED); y+=28
+	if app.mode=="ejected":
+		put(mono,Vector2(56,y),"EJECTED",17,AMBER); y+=28
+	if c.message_time>0:put(mono,Vector2(56,y),c.message.to_upper(),17,AMBER)
 
 func draw_clear_flight() -> void:
 	var f: FlightDynamics=app.flight
@@ -528,12 +486,6 @@ func draw_clear_flight() -> void:
 			diamond(app.camera.unproject_position(target).clamp(Vector2(170,160),Vector2(1430,550)),11,GREEN,2)
 	var center: Vector2=app.camera.unproject_position(c.reticle_point())
 	line(center-Vector2(22,0),center-Vector2(7,0),GREEN);line(center+Vector2(7,0),center+Vector2(22,0),GREEN)
-	if c.active and c.engagement_enabled:
-		for enemy: Dictionary in c.enemies:
-			if enemy.id!=c.target_id or app.camera.is_position_behind(enemy.position): continue
-			var at: Vector2=app.camera.unproject_position(enemy.position)
-			brackets(at,28,RED if c.lock_progress>=1 else AMBER)
-			text(at+Vector2(40,6),"%d m" % int(f.position.distance_to(enemy.position)),18,WHITE)
 	if app.paper_test:
 		text(Vector2(56,920),"BANK %+.0f%%   PITCH %+.0f%%" % [app.control.x*100,app.control.y*100],20,WHITE,true)
 		text(Vector2(56,952),"R resets the flight. SPACE in the camera window re-centers.",16,SOFT)
