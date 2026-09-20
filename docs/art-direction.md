@@ -23,14 +23,14 @@ Tree textures are used on crossed geometry with varied scale, rotation, color an
 
 ## Blender work
 
-
+`tools/build_m26_blender.py` creates the original M-26 missile in Blender 4.5.11 LTS: a rounded body and ceramic seeker, beveled control/tail fins, identification collars, nozzle, small fasteners and a service stencil. It bakes bevels/weighted normals, groups geometry by material, saves `docs/source/M26.blend` and exports `simulator/assets/weapons/m26.glb`. The native game does not require Blender.
 
 The airframe preserves the licensed FlightGear model and animations. This release removes the old floating plates and nose probe, corrects exhaust/gun/pylon positions, applies the new livery and uses restrained material highlights plus a small aircraft-only fill light for readability.
 
-Tracers are deliberately enlarged, and geese are closer and larger for forgiving arcade play.
+Missiles and tracers are deliberately enlarged, and geese are closer and larger. These are presentation choices for a forgiving arcade game.
 
 `tools/build_cg26_blender.py` creates the original CG-26 shoulder-mounted rotary cannon, with six hollow barrels, rotating braces, receiver, ventilation slots, feed housing and amber service band. `docs/source/CG26.blend` retains editable source; the exported hierarchy preserves the gimbal, rotor and muzzle attachment. The gun follows the displayed aim and spins down after release.
 
 Runtime-loaded 3D textures explicitly include mipmaps. Foliage uses alpha-to-coverage with 4× MSAA in both quality modes; stable instance color data avoids the earlier temporal speckling.
 
-The CG-26 has a small receiver recoil and a short source-derived mechanical attack at the start of each trigger press.
+Version 0.9 refines the M-26 with a graphite motor sleeve, brighter metallic airframe, larger beveled fins and a second serial band. The exhaust is a soft angular-faded animated gas shader with a warm dissipating tail. Smoke remains for two seconds after a missile disappears. The CG-26 adds a small receiver recoil and a short source-derived mechanical attack at the beginning of each trigger press.

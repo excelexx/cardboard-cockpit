@@ -20,8 +20,14 @@ func _initialize() -> void:
 	f.throttle = 1; f.step(.1,Vector3.ZERO,false,0,true)
 	check(f.engine>0 and f.engine<.1 and f.speed<1,"Engine thrust spools smoothly")
 	f.speed = f.effective_rotation_speed()+1
-	f.step(.02,Vector3(0,.7,0),false,0,true)
+	var rotation_time := 0.0
+	for i in range(240):
+		f.step(1.0/120.0,Vector3(0,.7,0),false,0,true)
+		rotation_time += 1.0/120.0
+		if f.airborne: break
 	check(f.airborne and f.position.y>3,"Rotation requires airspeed and pitch input")
+	# The nose comes up before the mains leave, and that costs under a second.
+	check(rotation_time<1.0 and f.pitch>.08,"Rotation is visible and stays inside the takeoff budget")
 	var right = fresh(true); var left = fresh(true)
 	simulate(right,1,Vector3(.4,0,0)); simulate(left,1,Vector3(-.4,0,0))
 	check(right.heading>0 and left.heading<0,"Banked turns follow pilot input")
@@ -48,11 +54,13 @@ func _initialize() -> void:
 	check(f.barrel_remaining==0 and absf(f.roll)<.1,"Quick roll recovers cleanly")
 	f.position.y = 15
 	check(not f.start_barrel_roll(),"Quick roll blocked close to the ground")
-	f = fresh(true); f.position = Vector3(0,3.03,-14200); f.gear = true; f.speed = 70; f.pitch = -.05; f.roll = .06; f.vertical_speed = -2
+	# A fighter lands mains first, nose up. P4's flare puts it here; the contact
+	# test is attitude aware, so the fixture flies the real touchdown attitude.
+	f = fresh(true); f.position = Vector3(0,3.03,-14200); f.gear = true; f.speed = 70; f.pitch = .14; f.roll = .06; f.vertical_speed = -2
 	f.velocity = Vector3(0,-2,-70)
 	f.step(.033,Vector3.ZERO,false,0,true)
 	check(f.contact=="landed","Stable gear-down touchdown succeeds")
-	check(absf(f.pitch)>.035 and absf(f.roll)>.04,"Touchdown preserves attitude for gradual settling")
+	check(f.pitch>.08 and absf(f.roll)>.04,"Touchdown preserves the nose-high landing attitude")
 	var pitch: float = f.pitch; var at: Vector3 = f.position
 	f.rollout_step(.016,true,0,true)
 	check(absf(f.pitch-pitch)<.003 and f.position.distance_to(at)<1.3,"Rollout begins continuously")

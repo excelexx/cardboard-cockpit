@@ -11,4 +11,4 @@ cleanup() {
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
-./tools/run.sh -- --stickers --demo --route=sf
+./tools/run.sh -- --stickers --route=sf

@@ -9,8 +9,7 @@ func check(value: bool,label: String):
 func run():
 	app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
-	app.gameplay_settings.reset(); app.apply_gameplay_settings()
-	app.start_flight("combat", true); app.flight.position.y = 500
+	app.start_flight("combat"); app.flight.position.y = 500
 	check(app.combat.enemies.is_empty(),"Combat starts without a flock appearing at once")
 	var arrivals: Array[float] = []; var last_id := 0; var max_contacts := 0
 	for i in range(2400):
@@ -24,8 +23,8 @@ func run():
 	for i in range(1,arrivals.size()): smallest_gap = minf(smallest_gap,arrivals[i]-arrivals[i-1])
 	check(max_contacts<=4 and arrivals.size()>=5,"Paced arrivals keep at most four contacts and continue after old contacts leave")
 	check(smallest_gap>=1.75 and arrivals[0]>.5,"Each arrival is separated, including the first contact")
-	check(app.combat.shots.is_empty() and app.combat.hull==100,"Pacing retains harmless geese")
-	app.start_flight("combat", true); app.combat.spawn_clock = 999; app.combat.spawn_contact()
+	check(app.combat.hostile_launches==0 and app.combat.hull==100,"Pacing retains harmless geese")
+	app.start_flight("combat"); app.combat.spawn_clock = 999; app.combat.spawn_contact()
 	var enemy: Dictionary = app.combat.enemies[0]
 	enemy.position = app.flight.position+Vector3(sin(deg_to_rad(4)),0,-cos(deg_to_rad(4)))*600
 	enemy.fade = 1; enemy.age = 2; enemy.course = Vector3(0,0,-1); enemy.right = Vector3.ZERO
@@ -36,12 +35,23 @@ func run():
 	enemy.position = app.flight.position+Vector3(sin(deg_to_rad(6.8)),0,-cos(deg_to_rad(6.8)))*600
 	app.combat.tick(1.0/60)
 	check(app.combat.target_id==enemy.id,"Small drift outside acquisition radius preserves a comfortable lock margin")
-	enemy.position = app.flight.position+Vector3(sin(deg_to_rad(12)),0,-cos(deg_to_rad(12)))*600
+	enemy.position = app.flight.position+Vector3(sin(deg_to_rad(38)),0,-cos(deg_to_rad(38)))*600
 	app.combat.tick(1.0/60)
-	check(app.combat.target_id==-1 and app.combat.lock_progress==0,"A target outside the small envelope releases immediately")
+	check(app.combat.target_id==-1 and app.combat.lock_progress<1,"A target outside the adaptive envelope releases immediately")
 	for i in range(24): app.combat.update_aim(1.0/120)
 	check(app.combat.assisted_direction().angle_to(app.flight.forward())<deg_to_rad(.5),"Gun sight returns to the nose after losing the target")
-	app.start_flight("combat", true); app.flight.position.y = 600; app.flight.power_input = 1; app.flight.throttle = 1
+	app.combat.fire_missile()
+	check(app.combat.launch_queue[0].target==-1,"An off-centre contact does not become a hidden missile lock")
+	app.combat.update_launches(.3)
+	var shot: Dictionary = app.combat.shots.back(); var initial_speed: float = shot.velocity.length()
+	for i in range(30): app.combat.update_shots(1.0/60)
+	check(shot.velocity.length()>initial_speed+80 and shot.target==-1,"An unlocked missile ignites and accelerates without retargeting")
+	var trail = shot.trail_node
+	app.combat.free_shot(shot); app.combat.shots.clear()
+	check(not app.combat.detached_trails.is_empty() and is_instance_valid(trail),"Missile smoke remains briefly after the projectile disappears")
+	app.combat.update_detached_trails(3.1)
+	check(app.combat.detached_trails.is_empty(),"Detached missile smoke fades and releases its resources")
+	app.start_flight("combat"); app.flight.position.y = 600; app.flight.power_input = 1; app.flight.throttle = 1
 	var speed: float = app.flight.speed
 	for i in range(240): app.flight.step(1.0/120,Vector3.ZERO,false,0,false)
 	check(app.flight.speed>speed+130,"Full acceleration creates a strong speed change within two seconds")

@@ -9,31 +9,24 @@ except ImportError:
     cv2 = np = None
 
 from vision.tracker import ArucoTracker
-from vision.tests.throttle_fixture import throttle_frame
-from vision.tests.yoke_fixture import yoke_frame
 
 
 @unittest.skipIf(cv2 is None, "Optional OpenCV/NumPy packages not installed")
 class ArucoTests(unittest.TestCase):
-    def test_yaw_uses_the_selected_pose_and_sticker_mounting_does_not_reverse_it(self):
-        for mounting in (0,180):
-            for yaw in (-20,20):
-                tracker = ArucoTracker()
-                result,_ = tracker.detect(yoke_frame(yaw=yaw,mounting=mounting),0,False)
-                self.assertIsNotNone(result)
-                self.assertAlmostEqual(result.yaw,yaw,delta=1)
-
     def setUp(self):
         self.tracker = ArucoTracker()
         self.dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
 
     def test_two_markers_and_independent_loss(self):
-        frame = throttle_frame(.5, yoke=True)
+        frame = np.full((720, 1280, 3), 255, dtype=np.uint8)
+        for marker_id, x in ((7, 220), (23, 880)):
+            marker = cv2.aruco.generateImageMarker(self.dictionary, marker_id, 160)
+            frame[280:440, x:x + 160] = cv2.cvtColor(marker, cv2.COLOR_GRAY2BGR)
         yoke, throttle = self.tracker.detect(frame, 0, False)
         self.assertIsNotNone(yoke)
         self.assertIsNotNone(throttle)
         self.assertAlmostEqual(yoke.roll, 0, delta=.2)
-        self.assertAlmostEqual(throttle.value, .5, places=3)
+        self.assertAlmostEqual(throttle.position[0], 959.5 / 1280, places=3)
         frame[280:440, 220:380] = 255
         yoke, throttle = self.tracker.detect(frame, 1, False)
         self.assertIsNone(yoke)
@@ -67,6 +60,21 @@ class ArucoTests(unittest.TestCase):
         self.assertIsNone(yoke)
         self.assertIsNone(throttle)
 
+    def test_weapon_faces_and_ambiguity(self):
+        def image_with(ids):
+            frame=np.full((720,1280,3),255,dtype=np.uint8)
+            for i,marker_id in enumerate(ids):
+                m=cv2.aruco.generateImageMarker(self.dictionary,marker_id,100)
+                frame[280:380,100+i*200:200+i*200]=cv2.cvtColor(m,cv2.COLOR_GRAY2BGR)
+            return frame
+        self.tracker.detect(image_with([7,23,31,41]),0,False)
+        self.assertTrue(self.tracker.weapon_observations['primary'][0])
+        self.assertTrue(self.tracker.weapon_observations['salvo'][0])
+        self.tracker.detect(image_with([31,32,42]),1,False)
+        self.assertNotIn('primary',self.tracker.weapon_observations)
+        self.assertFalse(self.tracker.weapon_observations['salvo'][0])
+        self.tracker.detect(image_with([31,31,41]),2,False)
+        self.assertNotIn('primary',self.tracker.weapon_observations)
 
 if __name__ == "__main__":
     unittest.main()

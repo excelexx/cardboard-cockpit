@@ -9,6 +9,6 @@ const PROFILE: Dictionary = {
 	"span":12.6, "length":17.4, "engines":1,
 	"rotation_speed":Tune.ROTATION_SPEED, "max_speed":Tune.MAX_SPEED, "acceleration":Tune.BASE_ACCELERATION,
 	"roll_rate":Tune.ROLL_RATE, "pitch_rate":Tune.PITCH_RATE, "clearance":3.0,
-	"color":Color(0.22,0.27,0.31), "label":"CANNON"
+	"color":Color(0.22,0.27,0.31), "label":"CANNON / GUIDED MISSILES"
 }
 const PLANES: Array[Dictionary] = [PROFILE]

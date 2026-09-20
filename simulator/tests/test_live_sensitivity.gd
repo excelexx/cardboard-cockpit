@@ -37,6 +37,23 @@ func wait_for_settings() -> bool:
 	check(false,"Live camera settings must reach Python and return to the game: tracking=%s, applied=%s, packet=%s" % [app.vision.tracking,app.vision.tracker_settings.applied,packet])
 	return false
 
+func wait_for_stable_pose() -> bool:
+	# Count fresh camera samples, not Godot timer ticks: CPU load changes capture cadence.
+	var deadline := Time.get_ticks_msec()+6000
+	var previous := Vector3.INF
+	var sequence := -1
+	var stable := 0
+	while Time.get_ticks_msec()<deadline:
+		await tick()
+		if packet.get("sequence",-1)==sequence or not packet.has("raw_yoke"):continue
+		sequence=int(packet.sequence)
+		var sample:=Vector3(packet.raw_yoke.roll,packet.raw_yoke.pitch,packet.raw_yoke.yaw)
+		stable=stable+1 if sample.distance_to(previous)<.0000001 else 0
+		previous=sample
+		if stable>=8:return true
+	check(false,"Fixed camera pose must settle before comparing sensitivity")
+	return false
+
 func aircraft_rates() -> Vector3:
 	app.settings_visible = false; app.mode = "flight"; app.control = Vector3.ZERO
 	app.flight.reset(app.profile()); app.flight.spawn_airborne(Vector3(0,3000,0),160)
@@ -59,7 +76,7 @@ func run() -> void:
 	for axis: String in ["pitch","bank","yaw"]: app.hud.sensitivity_sliders[axis].value = .5
 	if await wait_for_settings():
 		# Let the physical filter settle before comparing the same stationary pose.
-		for i in range(50): await tick()
+		await wait_for_stable_pose()
 		var raw: Dictionary = packet.raw_yoke.duplicate()
 		var slow := aircraft_rates()
 		for axis: String in ["pitch","bank","yaw"]:
@@ -73,8 +90,8 @@ func run() -> void:
 			for index: int in range(3):
 				var axis: String = ["roll","pitch","yaw"][index]
 				check(absf(raw[axis])>.08,"Fixed rendered pose exercises "+axis)
-				check(is_equal_approx(packet.raw_yoke[axis],raw[axis]),"Sensitivity preserves physical calibration: "+axis)
-				check(is_equal_approx(packet.yoke[axis],raw[axis]*1.5),"Python preview and transmitted output use the slider: "+axis)
+				check(is_equal_approx(packet.raw_yoke[axis],raw[axis]),"Sensitivity preserves physical calibration: %s before=%s after=%s" % [axis,raw[axis],packet.raw_yoke[axis]])
+				check(is_equal_approx(packet.yoke[axis],raw[axis]*1.5),"Python preview and transmitted output use the slider: %s raw=%s output=%s" % [axis,raw[axis],packet.yoke[axis]])
 				check(is_equal_approx(output[index],packet.yoke[axis]),"Game and Python agree without double gain: "+axis)
 				check(absf(fast[index])>absf(slow[index])*2.7,"Changing the slider changes actual aircraft angular speed: "+axis)
 		# A tracker restart resets its gains. The game must restore them automatically.

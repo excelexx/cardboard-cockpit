@@ -68,7 +68,7 @@ def main():
         parser.error(str(error))
     for role, index in zip(('LAPTOP YOKE', 'PHONE THROTTLE'), cameras):
         print('%s: camera %d%s' % (role, index, ' / ' + names[index] if names else ''), flush=True)
-    print('Choose Play in the game for calibration and control checks. Q stops both cameras.', flush=True)
+    print('Use SET UP CARDBOARD to calibrate, then TUTORIAL for takeoff, targets and landing. Q stops both cameras.', flush=True)
     def stop(_signal, _frame):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, stop)

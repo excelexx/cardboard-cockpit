@@ -21,7 +21,7 @@ func stop() -> void:
 
 func poll(wanted: bool, control_endpoint: String, focus: String = "") -> void:
 	var desired := control_endpoint.trim_suffix("/") + "/preview"
-	if focus in ["throttle", "yoke", "weapons", "all"]: desired += "/" + focus
+	if focus in ["throttle", "yoke", "weapons", "all", "laptop", "phone"]: desired += "/" + focus
 	if not wanted or desired != endpoint:
 		stop()
 		endpoint = desired

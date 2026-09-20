@@ -33,6 +33,11 @@ var throttle: float = 0.0
 var yoke_confidence: float = 0.0
 var throttle_confidence: float = 0.0
 var gun_trigger := false
+var primary_switch:=false
+var salvo_switch:=false
+var weapons_revision:=0
+var weapons_available:=false
+var legacy_weapons:=false
 var last_received: int = -1
 var retry_at: int = 0
 var sequence: int = -1
@@ -53,6 +58,7 @@ var enabled := false:
 			yoke_confidence = 0.0
 			throttle_confidence = 0.0
 			gun_trigger = false
+			clear_weapons()
 			last_received = -1
 			sequence = -1
 			yoke_enabled = true
@@ -109,6 +115,7 @@ func poll(dt: float) -> void:
 			yoke_confidence = 0.0
 			throttle_confidence = 0.0
 			gun_trigger = false
+			clear_weapons()
 		status = "TRACKER DISCONNECTED · KEYBOARD READY"
 	socket.poll()
 	connected = socket.get_ready_state() == WebSocketPeer.STATE_OPEN
@@ -130,9 +137,12 @@ func poll(dt: float) -> void:
 		if throttle_confidence>0.4:
 			status = "YOKE + THROTTLE TRACKED" if tracking else "YOKE OUT OF VIEW · THROTTLE TRACKED" if yoke_enabled else "THROTTLE TRACKED · KEYBOARD STEERING"
 
+func clear_weapons() -> void:
+	if primary_switch or salvo_switch:weapons_revision+=1
+	primary_switch=false;salvo_switch=false;gun_trigger=false
 func _expire_weapons(now: int) -> void:
-	if not enabled or not connected or last_received < 0 or now-last_received >= WEAPON_STALE_AFTER_MS:
-		gun_trigger = false
+	if not enabled or not connected or last_received < 0 or now-last_received >= (STALE_AFTER_MS if legacy_weapons else WEAPON_STALE_AFTER_MS):
+		clear_weapons()
 
 func _is_number(value: Variant) -> bool:
 	return (value is float or value is int) and is_finite(float(value))
@@ -168,8 +178,13 @@ func _accept_packet(packet: PackedByteArray, now: int) -> bool:
 		return false
 	# Version-1 senders without weapon tags remain compatible and cannot fire.
 	var weapons: Variant = data.get("weapons", {"gun": false})
-	if not weapons is Dictionary or not weapons.get("gun") is bool:
-		return false
+	if not weapons is Dictionary:return false
+	var has_legacy: bool=weapons.has("primary") or weapons.has("salvo")
+	if weapons.has("gun") and not weapons.gun is bool:return false
+	if has_legacy:
+		for key: String in ["primary","salvo"]:
+			if not weapons.get(key) is bool or not _is_number(weapons.get(key+"_confidence")) or weapons[key+"_confidence"]<0 or weapons[key+"_confidence"]>1:return false
+	elif not weapons.has("gun"):return false
 	var values: Array = [y.get("roll"), y.get("pitch"), y.get("confidence"), t.get("value"), t.get("confidence")]
 	for index: int in range(values.size()):
 		var value: Variant = values[index]
@@ -197,5 +212,9 @@ func _accept_packet(packet: PackedByteArray, now: int) -> bool:
 	throttle = float(t.value)
 	throttle_confidence = float(t.confidence)
 	yoke_enabled = data.get("yoke_enabled", true)
-	gun_trigger = weapons.gun
+	var primary: bool=weapons.primary and weapons.primary_confidence>.35 if has_legacy else weapons.get("gun",false)
+	var salvo: bool=weapons.salvo and weapons.salvo_confidence>.35 if has_legacy else false
+	if not weapons_available or legacy_weapons!=has_legacy or primary!=primary_switch or salvo!=salvo_switch:weapons_revision+=1
+	weapons_available=data.has("weapons");legacy_weapons=has_legacy
+	primary_switch=primary;salvo_switch=salvo;gun_trigger=primary
 	return true

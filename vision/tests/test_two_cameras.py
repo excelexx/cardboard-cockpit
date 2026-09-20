@@ -72,11 +72,16 @@ class TwoCameraTests(unittest.IsolatedAsyncioTestCase):
                 self.assertGreater(packet["yoke"]["confidence"], .4)
                 self.assertAlmostEqual(packet["throttle"]["value"], .8, delta=.03)
                 self.assertEqual(packet["weapons"], {"gun": True})
-                async with connect(url+"/preview/throttle", proxy=None) as preview:
+                async with connect(url+"/preview/phone", proxy=None) as preview:
                     image = cv2.imdecode(np.frombuffer(await preview.recv(), np.uint8), cv2.IMREAD_COLOR)
                     observation = tracker.ThrottleTracker(cv2, np).detect(image)
                     self.assertIsNotNone(observation)
                     self.assertAlmostEqual(observation.value, .8, delta=.03)
+                async with connect(url+"/preview/laptop", proxy=None) as preview:
+                    image = cv2.imdecode(np.frombuffer(await preview.recv(), np.uint8), cv2.IMREAD_COLOR)
+                    observation = tracker.ThrottleTracker(cv2, np).detect(image)
+                    self.assertIsNotNone(observation)
+                    self.assertAlmostEqual(observation.value, .05, delta=.03, msg="Laptop preview must be the laptop frame, not a duplicate of the phone")
                 async with connect(url+"/preview/weapons", proxy=None) as preview:
                     image = cv2.imdecode(np.frombuffer(await preview.recv(), np.uint8), cv2.IMREAD_COLOR)
                     tags = tracker.WeaponTags(cv2, np)
@@ -104,7 +109,7 @@ class TwoCameraTests(unittest.IsolatedAsyncioTestCase):
                 self.assertAlmostEqual(packet["throttle"]["value"], .8, delta=.03)
                 self.assertGreater(packet["yoke"]["confidence"], .4)
                 self.assertTrue(packet["weapons"]["gun"])
-                async with connect(url+"/preview/throttle", proxy=None) as preview:
+                async with connect(url+"/preview/phone", proxy=None) as preview:
                     self.assertEqual(await preview.recv(), b"", "No laptop fallback when phone disappears")
 
                 self.phone.delay = 0; self.phone.fail_frame = False
@@ -165,3 +170,21 @@ class TwoCameraTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(tracker, "CameraSource", side_effect=AssertionError("No camera should open")):
             with self.assertRaisesRegex(ValueError, "distinct"):
                 await tracker.run(self.args)
+
+    async def test_phone_preview_never_falls_back_to_laptop_when_unconfigured(self):
+        self.args.throttle_camera=None
+        with patch.object(tracker,"CameraSource",return_value=self.laptop), patch.object(cv2,"VideoCapture",side_effect=AssertionError("No hardware in tests")):
+            service=asyncio.create_task(tracker.run(self.args))
+            url="ws://127.0.0.1:%d" % self.port
+            try:
+                for attempt in range(40):
+                    try:
+                        async with connect(url+"/preview/phone",proxy=None) as preview:
+                            self.assertEqual(await asyncio.wait_for(preview.recv(),2),b"")
+                            break
+                    except OSError:await asyncio.sleep(.025)
+                else:self.fail("Preview service did not start")
+            finally:
+                service.cancel()
+                try:await service
+                except asyncio.CancelledError:pass
