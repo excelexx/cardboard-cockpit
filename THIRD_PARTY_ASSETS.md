@@ -46,3 +46,13 @@ See [demo asset credits](docs/demo-assets.md) for the Canada goose (Poly by Goog
 City of Helsinki photographic city mesh, CC BY 4.0: [credits and modifications](simulator/assets/photogrammetry/CREDITS.md). USGS/Mapzen elevation: [attribution and modifications](simulator/assets/environment/README.md).
 
 Poly Haven CC0 architecture: [credits](simulator/assets/city/CREDITS.md). Optimized scanned rocks, tree model and derived tree silhouettes: [nature credits](simulator/assets/nature/CREDITS.md). Additional photographic 2K surfaces: [environment credits](simulator/assets/environment/README.md).
+
+# Interface fonts
+
+Saira Condensed (Omnibus-Type) and IBM Plex Mono (IBM), both under the SIL Open Font License 1.1, from the `google/fonts` repository. The font files and their licence texts are in `simulator/assets/fonts/`.
+
+Archivo (Omnibus-Type), SIL Open Font License 1.1, static Regular / Medium / SemiBold / Bold from the `Omnibus-Type/Archivo` repository: `simulator/assets/fonts/Archivo-*.ttf`, licence in `simulator/assets/fonts/OFL-Archivo.txt`.
+
+# Sky
+
+"Kloppenheim 06 (Pure Sky)" 8K HDRI by Greg Zaal and Jarod Guest, Poly Haven, CC0: `simulator/assets/look/kloppenheim_06_puresky_8k.hdr`, graded at run time by `simulator/assets/look/sunset_sky.gdshader`.

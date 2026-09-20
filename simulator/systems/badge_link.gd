@@ -11,6 +11,7 @@ class_name BadgeLink
 
 const HOST := "127.0.0.1"
 const PORT := 8770
+const BALANCE=preload("res://data/balance.gd")
 # The badge times out to idle after 5 s and the bridge after 3 s, so resend
 # well inside the tighter of the two.
 const HEARTBEAT := 1.0
@@ -21,8 +22,10 @@ var _udp := PacketPeerUDP.new()
 var _open := false
 var _phase := "idle"
 var _since := 0.0
+var telemetry_clock:=0.0
 
 func _init() -> void:
+	if DisplayServer.get_name()=="headless":return
 	_open = _udp.connect_to_host(HOST, PORT) == OK
 
 func phase_for(app: Node) -> String:
@@ -34,7 +37,7 @@ func phase_for(app: Node) -> String:
 	if flight.airborne:
 		# Only call it an approach once the gear is out and we are low.
 		if flight.gear:
-			var agl: float = flight.position.y - (app.surface_height(flight.position.x,flight.position.z) if app.has_method("surface_height") else app.world.ground_height(flight.position.x, flight.position.z))
+			var agl: float = flight.position.y - app.world.ground_height(flight.position.x, flight.position.z)
 			if agl < APPROACH_AGL:
 				return "landing"
 		return "sky"
@@ -43,8 +46,13 @@ func phase_for(app: Node) -> String:
 	return "landing" if flight.ever_airborne else "takeoff"
 
 func tick(app: Node, dt: float) -> void:
+	presentation_tick(app,dt)
 	if not _open:
 		return
+	telemetry_clock+=dt
+	if telemetry_clock>=.05:
+		telemetry_clock=0
+		_udp.put_packet(JSON.stringify(instrument_snapshot(app)).to_utf8_buffer())
 	var next: String = phase_for(app)
 	_since += dt
 	if next == _phase and _since < HEARTBEAT:
@@ -65,6 +73,7 @@ func close() -> void:
 # Existing BLE bridge now also returns the calibrated physical mask. It never
 # synthesizes global keyboard events: these controls belong only to this game.
 var helper_pid := -1
+var input_retry_at:=0
 var receiver := PacketPeerUDP.new()
 var receiver_open := false
 var connected := false
@@ -87,6 +96,11 @@ func open_inputs(port: int = 8771) -> bool:
 	return receiver_open
 func poll() -> void:
 	pressed = 0; released = 0
+	if DisplayServer.get_name()!="headless":
+		if receiver_open and helper_pid>0 and not OS.is_process_running(helper_pid):
+			receiver.close();receiver_open=false;helper_pid=-1
+		if not receiver_open and Time.get_ticks_msec()>=input_retry_at:
+			input_retry_at=Time.get_ticks_msec()+2000;open_inputs()
 	if receiver_open:
 		for _i in range(mini(32,receiver.get_available_packet_count())):
 			accept_input(receiver.get_packet(),Time.get_ticks_msec())
@@ -114,3 +128,81 @@ func accept_input(bytes: PackedByteArray,now: int) -> bool:
 	return true
 func held(code: int) -> bool: return connected and (mask&(1<<code))!=0
 func tapped(code: int) -> bool: return connected and (pressed&(1<<code))!=0
+
+## kind 2 means "objective contact": a bird from the big flock the sortie is
+## about. The wire format is unchanged, so the badge firmware needs no edit.
+func _objective_contact(app: Node,enemy: Dictionary) -> bool:
+	var ids: Variant=app.combat.get("skein_ids")
+	if ids is Array:return (ids as Array).has(enemy.id)
+	return app.mission.has_method("skein_has") and app.mission.skein_has(int(enemy.id))
+
+func instrument_snapshot(app: Node) -> Dictionary:
+	var f: FlightDynamics=app.flight
+	var c: CombatDirector=app.combat
+	var mode_value: int=2 if app.mode=="results" else 3 if app.mode=="paused" else 1 if app.mode in ["flight","rollout","crashed","ejected"] else 0
+	var flags:=0
+	if c.target_id>=0 and c.lock_progress>=1 and c.active:flags|=1
+	if c.active and c.incoming_distance<2200:flags|=2
+	if app.mission.phase in ["aftermath","approach","rollout"] or app.landing_started:flags|=4
+	if f.gear:flags|=8
+	if f.flaps>0:flags|=16
+	if app.copilot:flags|=32
+	if app.mode=="results" and app.mission_success:flags|=64
+	if app.mode=="flight" and c.active and c.gun_firing_time>0:flags|=128
+	var right:=Vector3(cos(f.heading),0,sin(f.heading));var forward:=Vector3(sin(f.heading),0,-cos(f.heading))
+	var contacts: Array=[]
+	if app.mode in ["flight","paused"] and c.active:
+		for enemy: Dictionary in c.enemies:
+			if enemy.health<=0 or enemy.get("retiring",false):continue
+			var delta: Vector3=enemy.position-f.position
+			contacts.append({"x":clampf(delta.dot(right),-32767,32767),"y":clampf(delta.dot(forward),-32767,32767),"vx":clampf(Vector3(enemy.get("velocity",Vector3.ZERO)-f.velocity).dot(right),-32767,32767),"vy":clampf(Vector3(enemy.get("velocity",Vector3.ZERO)-f.velocity).dot(forward),-32767,32767),"altitude":clampf(delta.y,-32767,32767),"kind":2 if _objective_contact(app,enemy) else 1,"selected":1 if enemy.id==c.target_id else 0})
+		for shot: Dictionary in c.shots:
+			if shot.kind not in ["missile","hostile_missile"]:continue
+			var delta: Vector3=shot.position-f.position
+			contacts.append({"x":clampf(delta.dot(right),-32767,32767),"y":clampf(delta.dot(forward),-32767,32767),"vx":clampf(Vector3(shot.get("velocity",Vector3.ZERO)-f.velocity).dot(right),-32767,32767),"vy":clampf(Vector3(shot.get("velocity",Vector3.ZERO)-f.velocity).dot(forward),-32767,32767),"altitude":clampf(delta.y,-32767,32767),"kind":4 if shot.kind=="hostile_missile" else 3,"selected":0})
+	# Threats and selected targets must not disappear behind the 12-contact limit.
+	contacts.sort_custom(func(a: Dictionary,b: Dictionary) -> bool:
+		var pa: int=0 if a.kind==4 else 1 if a.selected else 2 if a.kind==2 else 3
+		var pb: int=0 if b.kind==4 else 1 if b.selected else 2 if b.kind==2 else 3
+		return pa<pb if pa!=pb else a.x*a.x+a.y*a.y<b.x*b.x+b.y*b.y)
+	var friendly_missiles: int=0
+	for shot: Dictionary in c.shots:
+		if shot.kind=="missile":friendly_missiles+=1
+	var missile_ready: bool=c.active and f.airborne and c.missile_cooldown<=0 and friendly_missiles+c.launch_queue.size()<=BALANCE.MAX_MISSILES-4
+	var target: Dictionary=c.target()
+	var aim_offset: Vector3=c.lead_point(target)-f.position if not target.is_empty() else f.forward()
+	var detail: int=clampi(roundi(c.lock_progress*15),0,15) | (16 if tactical else 0)
+	if app.badge_launch_remaining>0:detail|=(4-ceili(app.badge_launch_remaining))<<5
+	if mode_value==2:detail=f.landing_score() if f.contact=="landed" and f.speed<=.1 else 0
+	return {"kind":"instrument","version":2,"sender_pid":OS.get_process_id(),"phase":phase_for(app),"detail":detail,"aim_yaw":clampf(rad_to_deg(atan2(aim_offset.dot(right),aim_offset.dot(forward))),-180,180),"aim_pitch":clampf(rad_to_deg(atan2(aim_offset.y,Vector2(aim_offset.x,aim_offset.z).length())-f.pitch),-90,90),"engine":clampf(f.engine*100,0,100),"throttle":clampf(f.throttle*100,0,100),"systems":(1 if f.afterburner else 0)|(2 if c.active and c.flare_cooldown<=0 else 0)|(4 if missile_ready else 0),"fpa_yaw":clampf(rad_to_deg(atan2(f.velocity.dot(right),f.velocity.dot(forward))),-180,180),"fpa_pitch":clampf(rad_to_deg(atan2(f.velocity.y,Vector2(f.velocity.x,f.velocity.z).length())-f.pitch),-90,90),"climb":clampf(f.vertical_speed*196.8504,-32767,32767),"seconds":clampf(f.elapsed,0,65535),"accuracy":clampf(float(c.rounds_hit)/c.rounds_fired*100,0,100) if c.rounds_fired>0 else 255,"world_x":clampf(f.position.x,-10000000,10000000),"world_z":clampf(f.position.z,-10000000,10000000),"g_load":clampf(f.g_load,-20,20),"mode":mode_value,"flags":flags,"roll":clampf(rad_to_deg(f.roll),-180,180),"pitch":clampf(rad_to_deg(f.pitch),-90,90),"heading":fposmod(f.get_heading_degrees()+(298 if app.route_id=="sf" else 0),360),"speed":clampf(f.speed*1.94384,0,2000),"altitude":clampf(f.position.y*3.28084,-2000,1000000),"score":maxi(0,c.score),"kills":mini(c.kills,65535),"pilot":app.pilot_number,"name":"PILOT","landing":3 if app.mode=="crashed" else 4 if app.mode=="ejected" else 1 if f.contact=="landed" and f.speed<=.1 else 2 if app.landing_started else 0,"range":clampf(f.position.distance_to(target.position),0,65535) if not target.is_empty() else 0,"contacts":contacts.slice(0,12)}
+
+# Presentation gestures remain independent of steering and weapon ownership.
+var tactical:=false
+var hud_toggle:=false
+var down_time:=0.0
+var down_long:=false
+var cue_stage:=0
+var cue_lock:=false
+var cue_results:=false
+func reset_presentation() -> void:
+	tactical=false;down_time=0;down_long=false;cue_stage=0;cue_lock=false;cue_results=false
+func presentation_tick(app: Node,dt: float) -> void:
+	hud_toggle=false
+	if held(3):
+		down_time+=dt
+		if down_time>=.65 and not down_long:
+			down_long=true
+			if app.mode in ["flight","paused"]:tactical=not tactical;app.audio.ping(1.35 if tactical else .95)
+	else:
+		if released&(1<<3) and down_time>0 and not down_long and connected:hud_toggle=true
+		down_time=0;down_long=false
+	var stage: int=4-ceili(app.badge_launch_remaining) if app.badge_launch_remaining>0 else 0
+	if stage!=cue_stage:
+		app.audio.ping(.65+stage*.18 if stage>0 else 1.45)
+		cue_stage=stage
+	var locked: bool=app.combat.active and app.combat.target_id>=0 and app.combat.lock_progress>=1
+	if locked and not cue_lock:app.audio.ping(1.5)
+	cue_lock=locked
+	var results: bool=app.mode=="results"
+	if results and not cue_results:app.audio.ping(1.25 if app.mission_success else .7)
+	cue_results=results

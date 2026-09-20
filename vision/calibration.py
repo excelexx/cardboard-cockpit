@@ -7,7 +7,7 @@ import json
 import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple
 
 
 def clamp(value: float, low: float, high: float) -> float:
@@ -88,6 +88,25 @@ class Calibration:
         if self.width <= 0 or self.height <= 0 or self.camera_index < 0:
             raise ValueError("Camera index and frame dimensions are invalid.")
 
+    def recentered(self, roll: float, pitch: float) -> "Calibration":
+        """Same travel around a new neutral, for the next pilot's grip.
+
+        A freely held yoke rests at a different angle in every pair of hands,
+        while the camera, the travel and the taped-down throttle do not change.
+        """
+        if not finite_number(roll) or not finite_number(pitch):
+            raise ValueError("Re-center needs finite angles.")
+        roll_shift = wrap_degrees(roll - self.roll.neutral)
+        pitch_shift = pitch - self.pitch.neutral
+        if abs(roll_shift) > 25 or abs(pitch_shift) > 25:
+            raise ValueError("That is over 25 degrees from the calibrated neutral. Run the full calibration (C).")
+        result = Calibration(
+            AxisCalibration(self.roll.negative + roll_shift, self.roll.neutral + roll_shift, self.roll.positive + roll_shift),
+            AxisCalibration(self.pitch.negative + pitch_shift, self.pitch.neutral + pitch_shift, self.pitch.positive + pitch_shift),
+            self.throttle, self.camera_index, self.width, self.height, self.version)
+        result.validate()
+        return result
+
     def save(self, path: Path) -> None:
         self.validate()
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -123,19 +142,11 @@ class YokeObservation:
     roll: float
     pitch: float
     confidence: float
-    yaw: float = 0.0
 
 
 @dataclass(frozen=True)
 class ThrottleObservation:
     position: Tuple[float, float]
-    confidence: float
-
-
-@dataclass(frozen=True)
-class RelativeThrottleObservation:
-    """Already normalized against the live endpoint markers, not saved pixels."""
-    value: float
     confidence: float
 
 
@@ -153,20 +164,16 @@ class ControlFilter:
     Confidence is zero immediately on loss so the client can show keyboard help.
     """
     def __init__(self, calibration: Calibration, smoothing_seconds: float = 0.10,
-                 deadzone: float = 0.06, hold_seconds: float = 0.25, pitch_gain: float = 1.0):
+                 deadzone: float = 0.06, hold_seconds: float = 0.25):
         calibration.validate()
         if not 0.01 <= smoothing_seconds <= 2 or not 0 <= deadzone < 0.5 or not 0 <= hold_seconds <= 2:
             raise ValueError("Invalid smoothing, deadzone, or hold duration.")
-        if not finite_number(pitch_gain) or pitch_gain <= 0:
-            raise ValueError("Pitch gain must be finite and positive.")
-        self.pitch_gain = pitch_gain
         self.calibration = calibration
         self.smoothing_seconds = smoothing_seconds
         self.deadzone = deadzone
         self.hold_seconds = hold_seconds
-        self.roll = self.pitch = self.yaw = self.throttle = 0.0
-        self.roll_target = self.pitch_target = self.yaw_target = 0.0
-        self.yaw_neutral = 0.0
+        self.roll = self.pitch = self.throttle = 0.0
+        self.roll_target = self.pitch_target = 0.0
         self.last_yoke = float("-inf")
         self.last_time: Optional[float] = None
         self.sequence = 0
@@ -176,37 +183,29 @@ class ControlFilter:
         return current + clamp(step, -rate * delta, rate * delta)
 
     def step(self, now: float, timestamp_ms: int, yoke: Optional[YokeObservation],
-             throttle: Optional[Union[ThrottleObservation, RelativeThrottleObservation]]) -> Dict[str, object]:
+             throttle: Optional[ThrottleObservation]) -> Dict[str, object]:
         if not finite_number(now) or type(timestamp_ms) is not int:
             raise ValueError("Invalid clocks.")
         delta = 1 / 30 if self.last_time is None else clamp(now - self.last_time, 0, 0.10)
         self.last_time = now
         yoke_confidence = throttle_confidence = 0.0
-        if yoke is not None and all(finite_number(v) for v in (yoke.roll, yoke.pitch, yoke.yaw, yoke.confidence)) and yoke.confidence >= 0.25:
+        if yoke is not None and all(finite_number(v) for v in (yoke.roll, yoke.pitch, yoke.confidence)) and yoke.confidence >= 0.25:
             self.roll_target = dead_zone(self.calibration.roll.normalize(yoke.roll), self.deadzone)
-            # Gain follows the neutral zone, preserving jitter rejection and sign.
-            self.pitch_target = clamp(dead_zone(self.calibration.pitch.normalize(yoke.pitch), self.deadzone) * self.pitch_gain, -1, 1)
-            self.yaw_target = dead_zone(clamp(wrap_degrees(yoke.yaw-self.yaw_neutral)/25, -1, 1), self.deadzone)
+            self.pitch_target = dead_zone(self.calibration.pitch.normalize(yoke.pitch), self.deadzone)
             self.last_yoke = now
             yoke_confidence = clamp(yoke.confidence, 0, 1)
         elif now - self.last_yoke > self.hold_seconds:
-            self.roll_target = self.pitch_target = self.yaw_target = 0.0
+            self.roll_target = self.pitch_target = 0.0
         self.roll = self._smooth(self.roll, self.roll_target, delta, 3.5)
         self.pitch = self._smooth(self.pitch, self.pitch_target, delta, 3.5)
-        self.yaw = self._smooth(self.yaw, self.yaw_target, delta, 3.5)
-        target = None
-        if isinstance(throttle, RelativeThrottleObservation):
-            if all(finite_number(v) for v in (throttle.value, throttle.confidence)) and throttle.confidence >= 0.25:
-                target = clamp(throttle.value, 0, 1)
-        elif throttle is not None and len(throttle.position) == 2 and all(finite_number(v) for v in (*throttle.position, throttle.confidence)) and throttle.confidence >= 0.25:
+        if throttle is not None and len(throttle.position) == 2 and all(finite_number(v) for v in (*throttle.position, throttle.confidence)) and throttle.confidence >= 0.25:
             target = self.calibration.throttle.normalize(throttle.position)
-        if target is not None:
             self.throttle = self._smooth(self.throttle, target, delta, 1.5)
             throttle_confidence = clamp(throttle.confidence, 0, 1)
         packet = {
             "version": 1, "sequence": self.sequence, "timestamp": timestamp_ms,
             "tracking": yoke_confidence > 0 and throttle_confidence > 0,
-            "yoke": {"roll": round(self.roll, 5), "pitch": round(self.pitch, 5), "yaw": round(self.yaw, 5), "confidence": round(yoke_confidence, 3)},
+            "yoke": {"roll": round(self.roll, 5), "pitch": round(self.pitch, 5), "confidence": round(yoke_confidence, 3)},
             "throttle": {"value": round(self.throttle, 5), "confidence": round(throttle_confidence, 3)},
         }
         self.sequence += 1

@@ -1,3 +1,7 @@
+# Live instrument update
+
+The current firmware adds a horizon, radar, pilot identity, action cues and result card while retaining the wireless buttons and phase LEDs. See [instrument implementation, protocol and verification](INSTRUMENT.md). The older notes below describe the original static-image firmware.
+
 # Badge Controller
 
 Turns the Hack the North 2026 hacker badge (ESP32-C3) into a wireless input

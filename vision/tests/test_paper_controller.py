@@ -1,38 +1,8 @@
 import unittest
 from vision.tracker import PaperController
-from vision.tests.yoke_fixture import yoke_frame
 
 
 class PaperTests(unittest.TestCase):
-    def test_independent_swivel_and_mounting_orientation(self):
-        import cv2
-        for mounting in (0,90,180):
-            for mirrored in (False,True):
-                controller = PaperController()
-                def frame(**kwargs):
-                    view = yoke_frame(mounting=mounting,**kwargs)
-                    return cv2.flip(view,1) if mirrored else view
-                for i in range(25): controller.detect(frame(),i/30,False)
-                for j,yaw in enumerate((-20,20)):
-                    for i in range(20): result,_ = controller.detect(frame(yaw=yaw),1+j+i/30,False)
-                    self.assertIsNotNone(result)
-                    self.assertGreater(result.yaw*yaw,0)
-                    self.assertGreater(abs(result.yaw),15)
-                    self.assertAlmostEqual(result.pitch,0,delta=.1)
-                for j,pose in enumerate(({"bank":15},{"pitch":20})):
-                    for i in range(20): result,_ = controller.detect(frame(**pose),4+j+i/30,False)
-                    self.assertAlmostEqual(result.yaw,0,delta=.1)
-
-    def test_yaw_neutral_jitter_and_motion_do_not_change_pitch_or_bank(self):
-        controller = PaperController()
-        for _ in range(20): controller.map_observation(4,8,1,yaw=10)
-        self.assertEqual(controller.yaw_neutral,10)
-        for i in range(30):
-            sample = controller.map_observation(4,8,1,yaw=10+(-1)**i*2)
-            self.assertEqual(sample.yaw,0)
-        for _ in range(3): sample = controller.map_observation(4,8,1,yaw=30)
-        self.assertGreater(sample.yaw,15)
-        self.assertEqual((sample.roll,sample.pitch),(0,0))
     def test_center_bank_pitch_and_recenter(self):
         controller = PaperController()
         for _ in range(19):

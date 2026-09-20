@@ -2,7 +2,7 @@
 
 Integrated from Festyve’s `graphics/coastal-overhaul`, revision `8be8a51`. The active coastal world is `scenes/coastal_world.gd`, with its preserved terrain/airport helpers isolated in `coastal_base_world.gd`. The original alpine world remains independently selectable from the flight deck.
 
-Eleven authored waypoints lead through Azure Bay, the marina, skyline, downtown, harbor, bridge, island channel, panorama, lighthouse, descent and Cape North approach. Blue navigation diamonds and the same waypoint list drive guidance and HUD. Arrival requires horizontal distance below 290 m and vertical error below 190 m. The tour uses the current SPECTRE and its permanent Gatling loadout, with staggered harmless geese; it introduces no aircraft or weapon upgrades.
+Eleven authored waypoints lead through Azure Bay, the marina, skyline, downtown, harbor, bridge, island channel, panorama, lighthouse, descent and Cape North approach. Blue navigation diamonds and the same waypoint list drive guidance and HUD. Arrival requires horizontal distance below 290 m and vertical error below 190 m. The tour uses the current SPECTRE and its permanent Gatling/missile loadout, with staggered harmless geese; it introduces no aircraft or weapon upgrades.
 
 The city contains two Helsinki photogrammetry districts: 128 coarse tiles plus 256 close refinements. Detail switches in complete four-tile groups with hysteresis. Sixty modular Kominka homes form five countryside settlements. Conservative collision bounds cover buildings; airport and bridge collision remains explicit. All assets are available offline. Credits accompany the datasets.
 
