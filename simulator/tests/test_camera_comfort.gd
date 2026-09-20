@@ -34,7 +34,7 @@ func run()->void:
 				idle_shift=maxf(idle_shift,at.distance_to(rig.camera.position))
 			previous=rig.camera.basis;at=rig.camera.position
 		check(rig.trauma==0 and idle_angle<.0001 and idle_shift<.0001,"No shake from flight, ground proximity, boost or generic impacts")
-		rig.kill_impulse(.8);var kill_angle:=0.0
+		rig.kill_impulse();var kill_angle:=0.0
 		for i in range(120):
 			rig.update(1.0/60);kill_angle=maxf(kill_angle,(previous.inverse()*rig.camera.basis).get_euler().length());previous=rig.camera.basis
 		check(kill_angle>.001 and rig.trauma==0,"Confirmed kills give a brief visible shake that settles away")

@@ -70,7 +70,7 @@ func _ready() -> void:
 	noise.frequency = 1.0
 
 func impulse(_amount: float) -> void:pass # Recoil, terrain, boost and generic impacts do not shake the view.
-func kill_impulse(amount: float = .15) -> void:trauma=minf(1,trauma+maxf(amount,0))
+func kill_impulse(amount: float = .65) -> void:trauma=minf(1,trauma+maxf(amount,0))
 ## The one impact in the mission the player is meant to enjoy: mains on concrete.
 ## Clamped at both ends so a greaser still registers and a firm arrival never hurts.
 func touchdown(strength: float) -> void:

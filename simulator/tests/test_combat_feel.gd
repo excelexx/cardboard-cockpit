@@ -54,5 +54,16 @@ func run():
 	check(app.flight.speed<speed-140 and app.flight.speed>78,"Airbraking sheds speed quickly without stopping the jet in midair")
 	for i in range(1800): app.flight.step(1.0/120,Vector3.ZERO,false,0,false)
 	check(app.flight.speed>=80 and app.flight.contact=="","Holding the airbrake remains forgiving at low speed")
+	app.start_flight("combat");app.combat.spawn_contact()
+	var victim: Dictionary=app.combat.enemies[0]
+	victim.health=10;victim.max_health=10
+	app.camera_rig.trauma=0
+	app.combat.hurt_enemy(victim,1,"plasma",victim.position)
+	check(app.camera_rig.trauma==0,"A nonlethal hit does not shake the camera")
+	app.combat.hurt_enemy(victim,20,"plasma",victim.position)
+	check(app.camera_rig.trauma>=.65,"A goose kill creates a visible shake pulse")
+	var kill_trauma: float=app.camera_rig.trauma
+	app.combat.hurt_enemy(victim,20,"plasma",victim.position)
+	check(app.camera_rig.trauma==kill_trauma,"A dead goose cannot retrigger the kill shake")
 	print("COMBAT FEEL: ",checks," checks / ",failures.size()," failures / peak contacts ",max_contacts," / arrival gap ",smallest_gap)
 	app.queue_free(); await process_frame; quit(0 if failures.is_empty() else 1)
