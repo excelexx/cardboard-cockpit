@@ -1,8 +1,8 @@
 {
-  "firmware": "instrument-3",
+  "firmware": "instrument-6",
   "backup_sha256": "aa8bce2fc8bcbff9e43f9b4fe9b42d5d227b9b318e07f699ec2c10749032ab85",
-  "application_sha256": "fd7e036b41bc5e21ba0eae86a4b5e70b571ff959bec614b16c814ac1d47e688c",
-  "application_bytes": 652048,
+  "application_sha256": "d95db84753428f08f2e13a4d7cffdca33a9c8bb21bf1eba86a2fa9edc3d5b310",
+  "application_bytes": 691984,
   "write_offset": "0x10000",
   "flash_verified": true,
   "preserved": {
@@ -23,12 +23,16 @@
       "sha256": "72f93fa861818d387d954ee94b82d467c0757fbeb9dca8d07ae0aac4d834ea5f"
     }
   },
-  "physical_lcd_visual_confirmation": "User confirmed moving horizon/radar and physical LEFT control on instrument-1; instrument-2 bezel refinement awaiting final visual feedback",
+  "physical_lcd_visual_confirmation": "Earlier moving display/buttons were human-confirmed; final firmware appearance awaits user feedback",
   "software_acceptance": {
-    "original_game_full_suite": "passed, including 63 Python tests",
-    "competing_source_regression": "passed; unrelated results/phase cannot override the owning game",
-    "integration_full_suite": "passed, including 70 Python tests",
-    "plasma_shader": "native Metal render compiled and visually inspected"
+    "firmware_compile": "passed",
+    "badge_python_tests": 13,
+    "actual_cpp_decoder_cross_language_tests": "passed",
+    "motion_undefined_behavior_checks": "passed",
+    "godot_snapshot_countdown_and_gesture_tests": "passed",
+    "kimi_visual_review": "no definite clipping, overlap or contrast issues reported in synthetic preview",
+    "integration_full_suite": "passed: all Godot checks and 77 Python tests",
+    "parallel_working_tree_suite": "A separate cannon test expects four rounds per packet while the parallel tuning currently configures two; badge-specific checks pass."
   },
   "led_configuration": {
     "maximum_raw_channel": 64,
@@ -54,20 +58,16 @@
     "patterns_exercised": "ready, takeoff, flight, target lock, missile warning, landing and successful results"
   },
   "live_ble_acceptance": {
-    "firmware": "instrument-3",
-    "duration_seconds": 30,
-    "packets_sent": 553,
-    "packets_accepted": 553,
+    "firmware": "instrument-6",
+    "protocol": 2,
+    "extension_bytes": 26,
+    "source": "actual running game, not synthetic demo",
+    "observed_received_packets": 3306,
     "bad_packets": 0,
-    "fps": 14.9,
-    "sampled_fps_range": [
-      14.6,
-      15.0
-    ],
-    "free_heap_bytes": 93300,
-    "payload_bits_per_second": 9026,
-    "observed_resets": 0,
-    "legacy_phase_readbacks": "all four passed",
-    "bluetooth_reconnect": "passed: fresh telemetry and button read after reconnect, counters preserved without USB reset"
+    "sampled_flight_fps_min": 14.6,
+    "sampled_flight_fps_max": 15.0,
+    "free_heap_bytes": 90624,
+    "physical_start_button": "observed in live relay log",
+    "final_display_visual_confirmation": "awaiting user feedback"
   }
 }
