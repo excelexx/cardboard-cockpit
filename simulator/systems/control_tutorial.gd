@@ -13,9 +13,10 @@ const STEPS := [
 	["full", "throttle", "Slide the throttle to 100%", "Move the handle along the rail to the full-power end.", "The power bar should rise as you slide."],
 	["idle", "throttle", "Bring the throttle back to 0%", "Slide back toward the idle end until the power reads 0%.", "Leave the throttle here for the next checks."],
 	["yoke_info", "yoke", "The yoke controls your flight", "Turn to bank, tilt to climb or descend, and swivel to steer left or right.", "No movement check needed. The plasma trigger checks are next."],
-	["grip", "weapons", "Set your shooting grip", "Put your middle finger on the green elastic band and ring finger on the blue elastic band.", "Show plasma gun tag ID 4. Keep your left hand free for the throttle."],
-	["cover_gun", "weapons", "Cover plasma gun tag ID 4 with your pointer finger", "Cover most of the printed pattern. Keep the yoke tag visible.", "Both plasma beams should turn OFF. Middle finger stays on green; ring finger stays on blue."],
-	["show", "weapons", "Lift your pointer finger to shoot", "Lift your pointer finger off the gun tag so the camera can see it.", "Both adaptive plasma beams turn ON. Cover the tag to stop."],
+	["show", "weapons", "Lift your pointer finger to shoot", "Uncover plasma gun tag ID 4. Keep your middle finger on green and ring finger on blue.", "Both adaptive plasma beams turn ON. Keep the yoke tag visible."],
+	["cover_gun", "weapons", "Cover the gun tag to stop shooting", "Cover plasma gun tag ID 4 with your pointer finger. Keep the yoke tag visible.", "Both plasma beams turn OFF. Leave the gun tag covered for the remaining checks."],
+	["gear", "buttons", "Press badge A for gear + flaps", "After takeoff, A retracts the gear and flaps together. During landing, A lowers them again.", "Press badge A, or keyboard A / G. This practice press keeps flight paused."],
+	["landing", "buttons", "Press badge B to choose landing", "B starts your landing approach whenever you are ready. You still steer, pitch and control power.", "Press badge B, or keyboard D. This is a practice check; it will not start a landing."],
 ]
 var index := 0
 var calibrating := true
@@ -41,7 +42,7 @@ func retry() -> void:
 func complete() -> bool: return not calibrating and index >= STEPS.size()
 func step() -> Array: return CALIBRATION_STEP if calibrating else STEPS[mini(index, STEPS.size()-1)]
 func focus() -> String: return "all" if complete() else str(step()[1])
-func progress() -> float: return calibration_progress if calibrating else clampf(float(held_ms)/(OVERVIEW_MS if step()[0]=="yoke_info" else HOLD_MS), 0, 1)
+func progress() -> float: return 1.0 if passed else calibration_progress if calibrating else clampf(float(held_ms)/(OVERVIEW_MS if step()[0]=="yoke_info" else HOLD_MS), 0, 1)
 func live(v: VisionClient, picture: bool, now: int) -> bool:
 	return picture and v.enabled and v.connected and v.last_received >= 0 and now-v.last_received < 150
 func ready_pose(v: VisionClient) -> bool:
@@ -53,12 +54,22 @@ func matches(v: VisionClient) -> bool:
 		return v.throttle_confidence > .4 and (v.throttle >= .9 if key=="full" else v.throttle <= .1)
 
 	match key:
-		"grip", "show": return v.gun_trigger
+		"show": return v.gun_trigger
 		"cover_gun": return v.tracking and not v.gun_trigger
 	return false
 
+func press(action: String) -> void:
+	if calibrating or complete() or focus()!="buttons" or passed:return
+	if action==step()[0]:passed=true;feedback=0;status="CHECK PASSED"
+
 func tick(dt: float, v: VisionClient, picture: bool, now: int) -> void:
 	age += clampf(dt, 0, .1)
+	if not calibrating and not complete() and focus()=="buttons":
+		status="CHECK PASSED" if passed else "Press the button shown above."
+		if passed:
+			feedback+=clampf(dt,0,.1)
+			if feedback>=FEEDBACK_SECONDS:index+=1;retry()
+		return
 	if not live(v, picture, now):
 		calibration_progress = 0
 		held_ms = 0; ready_ms = 0; can_start = false; last_sample = -1
@@ -86,7 +97,7 @@ func tick(dt: float, v: VisionClient, picture: bool, now: int) -> void:
 			else: status = "Show the yoke tag and hold it upright to start."
 		return
 	if complete():
-		status = "Controls ready — starting flight..." if ready_pose(v) else "Centre the yoke, set 0% throttle and cover the gun tag."
+		status = "Controls ready — starting flight..." if ready_pose(v) else "Centre the yoke, set 0% throttle and keep the gun tag covered."
 		if not ready_pose(v): ready_ms = 0; can_start = false
 	elif focus()=="throttle" and v.throttle_confidence <= .4:
 		status = "Show the throttle handle tag and both end tags."
@@ -113,7 +124,7 @@ func tick(dt: float, v: VisionClient, picture: bool, now: int) -> void:
 		can_start = ready_ms >= READY_HOLD_MS
 		return
 	# Allow time to read the finger placements before the first shooting check.
-	var read_seconds := 4.0 if step()[0] == "grip" else 0.0 if step()[0]=="yoke_info" else READ_SECONDS
+	var read_seconds := 4.0 if step()[0] == "show" else 0.0 if step()[0]=="yoke_info" else READ_SECONDS
 	if age < read_seconds or not matches(v):
 		held_ms = 0
 		return

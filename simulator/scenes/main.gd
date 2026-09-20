@@ -244,6 +244,8 @@ func _input(event: InputEvent) -> void:
 		if event is InputEventKey and event.pressed and not event.echo:
 			if event.keycode==KEY_ESCAPE or event.keycode==KEY_C:cancel_control_setup()
 			elif event.keycode==KEY_ENTER:finish_control_setup()
+			elif event.keycode in [KEY_A,KEY_G]:controls_lesson.press("gear")
+			elif event.keycode in [KEY_D,KEY_L]:controls_lesson.press("landing")
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode==KEY_ESCAPE:
@@ -463,6 +465,8 @@ func _physics_process(dt: float) -> void:
 	badge.poll();badge.tick(self,dt)
 	near_obstacle_cooldown=maxf(0,near_obstacle_cooldown-dt)
 	if mode=="control_setup":
+		if badge.tapped(0):controls_lesson.press("gear")
+		elif badge.tapped(1):controls_lesson.press("landing")
 		if badge.tapped(2):cancel_control_setup()
 		elif badge.tapped(8):finish_control_setup()
 		return

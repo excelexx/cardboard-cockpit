@@ -784,11 +784,11 @@ func draw_control_setup() -> void:
 	draw_rect(Rect2(0,0,1600,1000),GLASS)
 	put(display_bold,Vector2(64,73),"SET UP YOUR CARDBOARD COCKPIT",46,WHITE)
 	put(mono,Vector2(1132,62),"LIVE CAMERA CHECKS",16,GREEN)
-	var labels: Array[String]=["01 / CALIBRATE","02 / THROTTLE","03 / YOKE","04 / PLASMA"]
-	var groups: Array[String]=["calibrate","throttle","yoke","weapons"]
-	for i in range(4):
-		var selected: bool=i==0 if lesson.calibrating else group==groups[i] or done and i==3
-		var rect:=Rect2(64+i*374,101,350,43)
+	var labels: Array[String]=["01 / CALIBRATE","02 / THROTTLE","03 / YOKE","04 / PLASMA","05 / BUTTONS"]
+	var groups: Array[String]=["calibrate","throttle","yoke","weapons","buttons"]
+	for i in range(groups.size()):
+		var selected: bool=i==0 if lesson.calibrating else group==groups[i] or done and i==4
+		var rect:=Rect2(64+i*298,101,280,43)
 		panel(rect,.9,GREEN if selected else HAIRLINE)
 		put(mono,rect.position+Vector2(14,28),labels[i],17,GREEN if selected else SOFT)
 	camera_card(Rect2(64,164,724,480),"LAPTOP / YOKE + ID 4",app.yoke_preview,v.tracking)
@@ -796,7 +796,7 @@ func draw_control_setup() -> void:
 	panel(Rect2(64,664,1472,208),.95)
 	var heading: String="CONTROLS CHECKED" if done else str(step[2]).to_upper()
 	put(display_bold,Vector2(90,702),heading,32,WHITE)
-	var instruction: String="Centre the yoke, set 0% throttle and cover the plasma gun tag." if done else str(step[3])
+	var instruction: String="Centre the yoke, set 0% throttle and keep the plasma gun tag covered." if done else str(step[3])
 	var lines: PackedStringArray=tutorial_lines(instruction,1418,18)
 	for i in range(mini(lines.size(),2)):put(body,Vector2(90,733+i*23),lines[i],18,WHITE)
 	var hint: String=("Hold steady for one second to resume your flight." if app.setup_next_action.is_empty() else "Hold steady for one second to start the judge demo.") if done else str(step[4])
@@ -804,12 +804,12 @@ func draw_control_setup() -> void:
 	var values: String="THROTTLE %3d%%   BANK %+.0f%%   PITCH %+.0f%%   YAW %+.0f%%   PLASMA %s" % [roundi(v.throttle*100),v.steering().x*100,v.steering().y*100,v.steering().z*100,"ON" if v.gun_trigger else "OFF"]
 	put(mono,Vector2(90,820),values,16,GREEN)
 	var status: String=lesson.status
-	if not app.control_setup_picture():status="Waiting for both live cameras." if done else "Waiting for the phone camera." if group=="throttle" else "Waiting for the laptop camera."
+	if group!="buttons" and not app.control_setup_picture():status="Waiting for both live cameras." if done else "Waiting for the phone camera." if group=="throttle" else "Waiting for the laptop camera."
 	put(body,Vector2(90,850),status,17,GREEN if lesson.passed or lesson.can_start else AMBER)
 	var progress: float=clampf(float(lesson.ready_ms)/lesson.READY_HOLD_MS,0,1) if done else lesson.progress()
 	draw_rect(Rect2(90,863,1418,5),HAIRLINE);draw_rect(Rect2(90,863,1418*progress,5),GREEN)
 	if not v.connected:put(body,Vector2(64,894),"Start Launch Two-Camera Cockpit with your phone connected, then return here.",15,AMBER)
-	else:put(body,Vector2(64,894),"Checks advance when the camera sees the action. Flight stays paused while you test.",15,SOFT)
+	else:put(body,Vector2(64,894),"Checks advance from live camera actions or button presses. Flight stays paused while you test.",15,SOFT)
 	button("setup_cancel",Rect2(64,916,288,56),"BACK",false,"ESC / HOME")
 	button("setup_keyboard",Rect2(370,916,300,56),"USE KEYBOARD")
 	button("setup_retry",Rect2(1236,916,300,56),"RETRY THIS STEP",true)
