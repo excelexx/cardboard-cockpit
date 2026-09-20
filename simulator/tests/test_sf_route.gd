@@ -26,7 +26,7 @@ func run() -> void:
 		if app.mission.phase=="wave_break":
 			cleared_waves[app.mission.wave_number]=app.mission.wave_down()
 			if app.mission.wave_number>=3 and not requested_landing:
-				var land:=InputEventKey.new();land.keycode=KEY_D;land.physical_keycode=KEY_D;land.pressed=true;app._input(land)
+				var land:=InputEventKey.new();land.keycode=KEY_B;land.physical_keycode=KEY_B;land.pressed=true;app._input(land)
 				requested_landing=app.landing_started;manual_landing=not app.copilot
 				if not app.flight.gear:app.toggle_gear()
 		var previous: Vector3 = app.flight.position
@@ -53,9 +53,9 @@ func run() -> void:
 				root.get_texture().get_image().save_png(destination+"/route-%02d.png" % previous_index)
 		if app.mode=="results": break
 		if frame%600==0: await process_frame
-	if not requested_landing or not manual_landing or not app.mission_success or app.flight.contact!="landed" or app.flight.speed>.1:failures.append("Explicit D did not complete a pilot-controlled stopped landing")
-	if cleared_waves.get(1)!=12 or cleared_waves.get(2)!=20 or cleared_waves.get(3)!=32 or app.skein_down()!=64:failures.append("Three live waves were not actually cleared: "+str(cleared_waves)+" total="+str(app.skein_down()))
-	if seen_waves.get(1)!=12 or seen_waves.get(2)!=20 or seen_waves.get(3)!=32 or app.skein_total()!=64:failures.append("Endless progression did not present 12,20,32 targets")
+	if not requested_landing or not manual_landing or not app.mission_success or app.flight.contact!="landed" or app.flight.speed>.1:failures.append("Explicit B did not complete a pilot-controlled stopped landing")
+	if cleared_waves.get(1)!=6 or cleared_waves.get(2)!=8 or cleared_waves.get(3)!=10 or app.skein_down()!=24:failures.append("Three live waves were not actually cleared: "+str(cleared_waves)+" total="+str(app.skein_down()))
+	if seen_waves.get(1)!=6 or seen_waves.get(2)!=8 or seen_waves.get(3)!=10 or app.skein_total()!=24:failures.append("Endless progression did not present 6,8,10 targets")
 	var route_names: Array[String]=app.mission.route_names()
 	if not route_names.has("OCEAN BEACH") or not route_names.has("GOLDEN GATE") or not route_names.has("MARIN HEADLANDS") or app.mission.route_points().size()!=route_names.size():failures.append("The SF coastal route and landmark waypoints are unavailable")
 	for point: Vector3 in app.mission.route_points():
@@ -68,7 +68,7 @@ func run() -> void:
 	for chunk: Dictionary in app.world.region.chunks:world_assets.append(str(chunk.file))
 	for landmark: String in ["landmark_ggb-fb.scn","landmark_transamerica-fb.scn","landmark_KSFO_InternationalTerminal.scn"]:
 		if not world_assets.has(landmark) or not ResourceLoader.exists("res://assets/san_francisco/"+landmark):failures.append("Original SF landmark unavailable: "+landmark)
-	if app.combat.kills<1 or app.combat.rounds_fired!=0 or app.combat.missiles_fired<4 or not plasma_seen: failures.append("Demo did not demonstrate dual plasma, automatic four-missile bursts and actual hits")
+	if app.combat.kills<1 or app.combat.rounds_fired!=0 or app.combat.missiles_fired<4 or not plasma_seen: failures.append("Demo did not demonstrate dual plasma, automatic two-missile support and actual hits")
 	print("SF COMBAT: waves=",cleared_waves," objective=",app.skein_down(),"/64 kills=",app.combat.kills," rounds=",app.combat.rounds_fired," missiles=",app.combat.missiles_fired)
 	print("COAST SECONDS: ",coast_frames/60.0)
 	print("SF ROUTE RESULT: ","PASS" if failures.is_empty() else "FAIL"," seconds=",app.flight.elapsed," peak=",peak," landmarks=",app.mission.visited_route.size()," corrections=",floor_corrections)

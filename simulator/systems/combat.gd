@@ -367,7 +367,7 @@ func update_swarm_missiles() -> void:
 	if count+launch_queue.size()+Tune.SWARM_BURST_SIZE>Tune.MAX_MISSILES:return
 	missile_cooldown=Tune.MISSILE_INTERVAL;salvo_count+=1
 	for index in range(Tune.SWARM_BURST_SIZE):
-		var store: int=[0,2,1,3][index]
+		var store: int=[0,2,1,3][index+((salvo_count-1)%2)*Tune.SWARM_BURST_SIZE]
 		launch_queue.append({"target":int(choices[index].id),"side":-1.0 if store<2 else 1.0,"internal":false,"store":store,"slot":index,"salvo":salvo_count,"delay":Tune.MISSILE_RAIL_DELAY})
 	event("salvo",app.flight.position,1);app.audio.play_effect("gear_motor",-15,1.2)
 
@@ -405,11 +405,17 @@ func detonate_missile(shot: Dictionary,direct_target: int=-1) -> void:
 	if shot.get("detonated",false):return
 	shot.detonated=true;shot.life=0;shot.hit=true
 	var at: Vector3=shot.position
+	var splash: Array[Dictionary]=[]
 	for enemy: Dictionary in enemies:
 		if enemy.health<=0:continue
+		if enemy.id==direct_target:
+			hurt_enemy(enemy,Tune.MISSILE_DAMAGE,"missile_splash",at)
+		elif Vector3(enemy.position).distance_to(at)<=Tune.MISSILE_BLAST_RADIUS:splash.append(enemy)
+	splash.sort_custom(func(a: Dictionary,b: Dictionary)->bool:return Vector3(a.position).distance_squared_to(at)<Vector3(b.position).distance_squared_to(at))
+	for index in range(mini(splash.size(),Tune.MISSILE_SPLASH_MAX)):
+		var enemy: Dictionary=splash[index]
 		var distance: float=Vector3(enemy.position).distance_to(at)
-		if enemy.id!=direct_target and distance>Tune.MISSILE_BLAST_RADIUS:continue
-		var damage: float=Tune.MISSILE_DAMAGE if enemy.id==direct_target else Tune.MISSILE_SPLASH_DAMAGE*lerpf(1,.35,clampf(distance/Tune.MISSILE_BLAST_RADIUS,0,1))
+		var damage: float=Tune.MISSILE_SPLASH_DAMAGE*lerpf(1,.35,clampf(distance/Tune.MISSILE_BLAST_RADIUS,0,1))
 		hurt_enemy(enemy,damage,"missile_splash",at)
 	if is_instance_valid(visuals) and visuals.has_method("missile_blast"):visuals.missile_blast(at,Tune.MISSILE_BLAST_RADIUS)
 	app.audio.play_effect("explosion",-11,.80)

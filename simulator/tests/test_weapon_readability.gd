@@ -38,13 +38,13 @@ func run() -> void:
 		app.combat.spawn_contact();var enemy: Dictionary=app.combat.enemies.back()
 		enemy.position=app.flight.position+Vector3((i-3)*35,0,-800-i*50);enemy.fade=1;enemy.retiring=false
 	app.combat.update_swarm_missiles()
-	check(app.combat.swarm_active and app.combat.launch_queue.size()==4,"An eligible large flock schedules an automatic four-missile burst without a manual trigger")
+	check(app.combat.swarm_active and app.combat.launch_queue.size()==2,"An eligible large flock schedules an automatic two-missile burst without a manual trigger")
 	var stores: Dictionary={}
 	var targets: Dictionary={}
 	for request: Dictionary in app.combat.launch_queue:stores[request.store]=true;targets[request.target]=true
-	check(stores.size()==4 and targets.size()==4,"The burst uses all four hardpoints and four distinct targets")
+	check(stores.size()==2 and targets.size()==2,"The burst uses opposite hardpoints and two distinct targets")
 	app.combat.update_launches(.1)
-	check(app.combat.missiles_fired==4 and app.combat.shots.size()==4,"All four automatic missiles leave their stores")
+	check(app.combat.missiles_fired==2 and app.combat.shots.size()==2,"Both automatic missiles leave their stores")
 	for shot: Dictionary in app.combat.shots:check(shot.kind=="missile" and shot.node.scale.x>=3,"Automatic missiles use enlarged, readable models")
 	var shot: Dictionary=app.combat.shots[0]
 	for effect_name in ["EngineFlare","MotorLight","LaunchPulse"]:check(not shot.node.get_node(effect_name).visible,"A missile leaves the rail with its motor effects off")

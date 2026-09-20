@@ -1,6 +1,6 @@
 # Goose Protocol — SPECTRE X-26
 
-Version **0.20.0** is one continuous San Francisco judge demo: take off, fly, shoot adaptive dual plasma and keep clearing new flocks for as long as you like. Coaching stays visible throughout. Press **D** or **badge B** when you want to land, then fly the approach yourself.
+Version **0.20.1** is one continuous San Francisco judge demo: take off, fly, shoot adaptive dual plasma and keep clearing new flocks for as long as you like. Coaching stays visible throughout. Press **D** or **badge B** when you want to land, then fly the approach yourself.
 
 Open **Launch Cardboard Cockpit.command** or the packaged **Cardboard Cockpit.app**. The demo uses excelex's cardboard controls and settings with the current graphics and aircraft presentation. **Watch demo** flies and shoots automatically. [Judge demo flow](docs/JUDGE_DEMO.md).
 
@@ -12,7 +12,7 @@ Choose **Play**, complete cardboard calibration and control checks, or choose **
 |---|---|
 | Printed gun tag ID 4 visible / covered | Fire adaptive dual plasma / stop both beams |
 | Hold Space or left mouse / release | Fire adaptive dual plasma / stop both beams |
-| Large-flock support | Missiles launch automatically, four every second |
+| Large-flock support | Missiles launch automatically, two every five seconds |
 | Yoke rotation, tilt, swivel | Bank, pitch, yaw |
 | Relative throttle tags 0 / 1 / 2 | Idle endpoint / moving handle / full endpoint |
 | Arrows / comma and period | Pitch and bank / rudder |
@@ -20,11 +20,11 @@ Choose **Play**, complete cardboard calibration and control checks, or choose **
 | Q / V | Barrel roll / cockpit or chase view |
 | Badge A / keyboard A or G | Gear and flaps together: retract after takeoff, deploy for landing |
 | F | Flaps only |
-| D / badge B | Enter landing mode; retain manual approach control |
+| B / badge B | Enter landing mode; retain manual approach control |
 | H / hold E / Z | Route assist / eject / cosmetic flares |
 | C / Escape / R / M | Cardboard setup / pause / replay / mute |
 
-Two plasma beams are the manual weapon. They split across two targets or focus together on one, with **SPLIT**, **FOCUS** or **FIRING** shown on the HUD. Automatic missile support fires four missiles together at up to one burst per second during large flocks, when four eligible targets are available. [Adaptive plasma controls and feedback](docs/ADAPTIVE_PLASMA.md).
+Two plasma beams are the manual weapon. They split across two targets or focus together on one, with **SPLIT**, **FOCUS** or **FIRING** shown on the HUD. Automatic missile support fires two missiles together every five seconds during large flocks, when two eligible targets are available. [Adaptive plasma controls and feedback](docs/ADAPTIVE_PLASMA.md).
 
 Flocks continue with a visible **WAVE N** counter and live kills for the current wave. There is no countdown or fixed kill quota before landing. Only actual kills count. Yoke loss pauses the flight; a steady return resumes it. Sound starts enabled each launch; **M** mutes the current session. The steady camera keeps recoil and chase movement subdued for comfort.
 

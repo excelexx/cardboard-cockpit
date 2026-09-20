@@ -22,7 +22,7 @@ For the current prototype, show keyboard controls first. Only say “the cardboa
 | --- | --- |
 | Aircraft gets lost or crashes | R restarts from the runway with idle power and gear down. |
 | Need to stop immediately | Escape pauses. Choose Resume or return to hangar. |
-| Unexpected camera movement | Release right mouse; press B if mouse yoke was enabled. |
+| Unexpected camera movement | Release right mouse; use the cardboard yoke or arrow keys. |
 | Camera tracker fails | Any arrow, A/D or W/S takes over on keyboard; restart tracker separately. |
 | Low frame rate | Q selects Balanced quality; close other graphics-heavy apps. |
 | No sound | M toggles mute. Check Mac output volume. |

@@ -204,7 +204,7 @@ func _draw() -> void:
 		if app.camera_previews and app.vision.enabled and not app.settings_visible and not app.calibration_visible:draw_camera_previews()
 	if app.mode=="results": draw_results()
 	if app.toast_time>0 and app.mode=="flight": centered(176,app.toast.to_upper(),18,GREEN)
-	if app.mode=="flight" and app.flight.airborne and not app.landing_started and not app.overlay_visible():button("land",Rect2(1288,916,256,54),"LAND NOW",true,"D / B")
+	if app.mode=="flight" and app.flight.airborne and not app.landing_started and not app.overlay_visible():button("land",Rect2(1288,916,256,54),"LAND NOW",true,"B")
 	if app.landing_transition>0:
 		draw_rect(Rect2(0,0,1600,1000),Color(0.01,.02,.03,clampf(app.landing_transition/1.2,0,1)))
 		centered(496,"YOUR LANDING APPROACH",40,WHITE,display_bold)
@@ -224,7 +224,7 @@ func draw_title() -> void:
 	big(Vector2(92,268),"WILD GOOSE",124,WHITE,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
 	big(Vector2(92,376),"CHASE",124,WHITE,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
 	text(Vector2(96,436),"Fly, shoot and keep going. Coaching stays with you.",20,WHITE)
-	text(Vector2(96,466),"Endless flocks. Press D or badge B when you want to land.",20,WHITE)
+	text(Vector2(96,466),"Endless flocks. Press B or badge B when you want to land.",20,WHITE)
 	button("fly",Rect2(96,520,420,72),"PLAY",true,"ENTER · START")
 	button("guided",Rect2(96,604,420,52),"WATCH DEMO")
 	button("camera",Rect2(96,672,420,52),"SET UP CARDBOARD")
@@ -296,7 +296,7 @@ static func aoa_bracket_gap(f: FlightDynamics) -> float:
 
 # --- flight -----------------------------------------------------------------
 func mission_line() -> String:
-	if app.landing_started:return "Your approach · D / badge B landing mode"
+	if app.landing_started:return "Your approach · B / badge B landing mode"
 	if not app.flight.airborne:return "Take off · increase power and pull up"
 	return "Endless judge demo · land whenever you like"
 func clock_text() -> String:
@@ -443,7 +443,7 @@ func draw_weapons(c: CombatDirector) -> void:
 	var swarm: bool=bool(c.get("swarm_active"))
 	put(mono,Vector2(56,943),"AUTO MISSILES",18,GREEN)
 	put(mono,Vector2(240,943),("READY" if c.missile_cooldown<=0 else "%.1fs" % c.missile_cooldown) if swarm else "STANDBY",17,GREEN if swarm else SOFT)
-	put(body,Vector2(370,941),"FLOCK SUPPORT / FOUR EVERY SECOND" if swarm else "ACTIVATE AUTOMATICALLY IN LARGE FLOCKS",15,WHITE)
+	put(body,Vector2(370,941),"FLOCK SUPPORT / TWO EVERY FIVE SECONDS" if swarm else "ACTIVATE AUTOMATICALLY IN LARGE FLOCKS",15,WHITE)
 ## How much of the skein is down, in the span the old health bar used to hold:
 ## one pip per bird, amber as it goes down. No named individual, no health bar.
 func draw_objective(c: CombatDirector) -> void:
@@ -587,7 +587,7 @@ func draw_results() -> void:
 func draw_help() -> void:
 	zones.clear(); dim(); panel(Rect2(330,110,940,790),.9)
 	put(display_bold,Vector2(384,196),"CONTROLS",64,WHITE)
-	var rows: Array[Array] = [["ARROWS","Climb, dive and bank"],[",  .","Rudder left / right"],["W  S","Faster, slower"],["SHIFT","Hold for afterburner"],["SPACE / CLICK","Hold dual plasma; release to stop"],["AUTO MISSILES","Four per second during large flocks"],["GUN TAG ID 4","Show for plasma; cover to stop"],["Z","Flares"],["Q","Barrel roll"],["V","Cockpit or chase view"],["A / G  ·  F","Gear + flaps together / flaps only"],["D / BADGE B","Land now; steer your own approach"],["H","Auto-fly on / off"],["HOLD E","Eject"],["C  M  ESC","Set up cardboard, mute, pause"]]
+	var rows: Array[Array] = [["ARROWS","Climb, dive and bank"],[",  .","Rudder left / right"],["W  S","Faster, slower"],["SHIFT","Hold for afterburner"],["SPACE / CLICK","Hold dual plasma; release to stop"],["AUTO MISSILES","Two every five seconds in large flocks"],["GUN TAG ID 4","Show for plasma; cover to stop"],["Z","Flares"],["Q","Barrel roll"],["V","Cockpit or chase view"],["A / G  ·  F","Gear + flaps together / flaps only"],["B / BADGE B","Land now; steer your own approach"],["H","Auto-fly on / off"],["HOLD E","Eject"],["C  M  ESC","Set up cardboard, mute, pause"]]
 	for i in range(rows.size()):
 		put(mono,Vector2(388,250+i*37),rows[i][0],18,GREEN)
 		put(body,Vector2(610,250+i*37),rows[i][1],18,WHITE)
@@ -666,19 +666,19 @@ func context_coach() -> Dictionary:
 		return {"title":"LANDED / STAY ON THE GROUND", "body":"Reduce throttle. Your touchdown stays planted while you slow down.", "status":state+" · BADGE A / G: GEAR + FLAPS"}
 	if app.landing_started:
 		var configuration: String="Gear + flaps are DOWN. Keep them down for touchdown." if f.gear and f.flaps>0 else "Press F to lower the flaps; gear is already DOWN." if f.gear else "BADGE A / G: put gear + flaps DOWN."
-		return {"title":"D / BADGE B: LANDING MODE ACTIVE", "body":configuration+" Reduce throttle. Steer and pitch your own approach.", "status":state+" · YOU HAVE THE CONTROLS"}
+		return {"title":"B / BADGE B: LANDING MODE ACTIVE", "body":configuration+" Reduce throttle. Steer and pitch your own approach.", "status":state+" · YOU HAVE THE CONTROLS"}
 	if not f.airborne:
 		return {"title":"TAKE OFF / INCREASE POWER", "body":"Push the throttle forward. Pull the yoke toward you as speed builds; keyboard W and UP also work.", "status":state+" · AFTER TAKEOFF: BADGE A / G RETRACTS GEAR + FLAPS"}
 	if f.gear:
-		return {"title":"BADGE A / G: RETRACT GEAR + FLAPS", "body":"You are airborne. Retract the wheels and flaps, then keep flying and shooting.", "status":state+" · D / BADGE B: LAND WHENEVER YOU LIKE"}
+		return {"title":"BADGE A / G: RETRACT GEAR + FLAPS", "body":"You are airborne. Retract the wheels and flaps, then keep flying and shooting.", "status":state+" · B / BADGE B: LAND WHENEVER YOU LIKE"}
 	if f.flaps>0:
-		return {"title":"PRESS F TO RETRACT THE FLAPS", "body":"Gear is already UP. Bring the remaining flaps up for cruising.", "status":state+" · D / BADGE B: LAND WHENEVER YOU LIKE"}
+		return {"title":"PRESS F TO RETRACT THE FLAPS", "body":"Gear is already UP. Bring the remaining flaps up for cruising.", "status":state+" · B / BADGE B: LAND WHENEVER YOU LIKE"}
 	var title: String="FLY · SHOOT · KEEP GOING"
 	var message: String="Show plasma tag ID 4, or hold SPACE / left mouse. Cover or release to stop. New flocks keep arriving."
 	if app.tutorial.active:
 		var lesson: Dictionary=app.tutorial.lesson()
 		title=str(lesson.title);message=" ".join(lesson.lines)
-	return {"title":title, "body":message, "status":state+" · D / BADGE B: LAND NOW"}
+	return {"title":title, "body":message, "status":state+" · B / BADGE B: LAND NOW"}
 func draw_context_coach() -> void:
 	var coach: Dictionary=context_coach()
 	panel(Rect2(330,704,940,164),.9,GREEN)

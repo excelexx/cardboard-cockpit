@@ -73,9 +73,9 @@ func run() -> void:
 	app.mission.tick(70.0)
 	check(app.mission.wave_number==0 and app.mission.phase=="opening","Ground wait never starts a clock-triggered combat wave")
 	start_first_wave()
-	check(app.mission.wave_number==1 and app.mission.wave_size==12,"First proper wave arrives six seconds after airborne")
+	check(app.mission.wave_number==1 and app.mission.wave_size==6,"First proper wave arrives six seconds after airborne")
 	check(app.flight.gear,"Gear-down flight does not block the first wave")
-	check(app.mission.skein_total()==12,"Total means actual arrivals, not a predetermined quota")
+	check(app.mission.skein_total()==6,"Total means actual arrivals, not a predetermined quota")
 	app.mission.controls()
 	check(app.flight.gear and app.flight.flaps==1,"Assistance preserves pilot gear and flap choices")
 	app.demo_auto_fire=true;app.mission.controls();app.demo_auto_fire=false
@@ -94,13 +94,13 @@ func run() -> void:
 			app.mission.tick(Mission.WAVE_SECONDS+.01)
 		check(app.mission.phase=="wave_break" and not app.mission.skein_final,"A clear or timeout always leads to another wave")
 		check(app.mission.skein_down==expected_down,"Expired survivors never become kills")
-		check(app.mission.skein_ids.size()<=40 and app.mission.wave_ids.size()<=40 and app.mission.skein_alive.size()<=40 and app.mission.skein_killed.size()<=40,"Only current-wave identity history is retained")
-		check(app.mission.history.size()<=Mission.HISTORY_LIMIT and app.combat.enemies.size()<=40,"Mission history and live contacts stay bounded")
+		check(app.mission.skein_ids.size()<=12 and app.mission.wave_ids.size()<=12 and app.mission.skein_alive.size()<=12 and app.mission.skein_killed.size()<=12,"Only current-wave identity history is retained")
+		check(app.mission.history.size()<=Mission.HISTORY_LIMIT and app.combat.enemies.size()<=12,"Mission history and live contacts stay bounded")
 		if wave<24:next_wave()
 		await process_frame
 	check(app.mission.clock>600 and app.mission.wave_number==24,"More than ten minutes and twenty waves remain playable")
 	check(app.landing_calls==0 and app.result_calls==0,"No deadline or wave quota requests landing or finishes sortie")
-	check(app.mission.skein_total()>800 and app.mission.skein_down>32,"Cumulative counts continue beyond the former 32-bird ending")
+	check(app.mission.skein_total()>250 and app.mission.skein_down>32,"Cumulative counts continue beyond the former 32-bird ending")
 	check(app.combat.managed_mission and is_inf(app.combat.spawn_clock),"Mission suppresses finite patrol ending and ambient arrivals")
 	var before: int=app.combat.next_id
 	app.mission.transition("approach")

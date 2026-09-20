@@ -16,7 +16,7 @@ const STEPS := [
 	["show", "weapons", "Lift your pointer finger to shoot", "Uncover plasma gun tag ID 4. Keep your middle finger on green and ring finger on blue.", "Both adaptive plasma beams turn ON. Keep the yoke tag visible."],
 	["cover_gun", "weapons", "Cover the gun tag to stop shooting", "Cover plasma gun tag ID 4 with your pointer finger. Keep the yoke tag visible.", "Both plasma beams turn OFF. Leave the gun tag covered for the remaining checks."],
 	["gear", "buttons", "Press badge A for gear + flaps", "After takeoff, A retracts the gear and flaps together. During landing, A lowers them again.", "Press badge A, or keyboard A / G. This practice press keeps flight paused."],
-	["landing", "buttons", "Press badge B to choose landing", "B starts your landing approach whenever you are ready. You still steer, pitch and control power.", "Press badge B, or keyboard D. This is a practice check; it will not start a landing."],
+	["landing", "buttons", "Press badge B to choose landing", "B starts your landing approach whenever you are ready. You still steer, pitch and control power.", "Press badge B, or keyboard B. This is a practice check; it will not start a landing."],
 ]
 var index := 0
 var calibrating := true
