@@ -14,6 +14,7 @@ if [ ! -x .venv/bin/python ]; then ./tools/setup_vision.sh; fi
 "$engine" --headless --path simulator --script res://tests/test_xlx_controls.gd
 "$engine" --headless --path simulator --script res://tests/test_spectre_scene.gd
 "$engine" --headless --path simulator --script res://tests/test_radio.gd
+"$engine" --headless --path simulator --script res://tests/test_tracking_audio.gd
 "$engine" --headless --path simulator --script res://tests/test_demo_mission.gd
 "$engine" --headless --path simulator --script res://tests/test_ballistics.gd
 "$engine" --headless --path simulator --script res://tests/test_weapon_mounts.gd
@@ -23,6 +24,7 @@ if [ ! -x .venv/bin/python ]; then ./tools/setup_vision.sh; fi
 "$engine" --headless --path simulator --script res://tests/test_missile_blast.gd
 "$engine" --headless --path simulator --script res://tests/test_two_waves.gd
 "$engine" --headless --path simulator --script res://tests/test_endless_waves.gd
+"$engine" --headless --path simulator --script res://tests/test_directional_waves.gd
 "$engine" --headless --path simulator --script res://tests/test_judge_landing.gd
 "$engine" --headless --path simulator --script res://tests/test_combat_feel.gd
 "$engine" --headless --path simulator --script res://tests/test_balance_profile.gd

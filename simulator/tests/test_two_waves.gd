@@ -6,7 +6,7 @@ func run() -> void:
 	kill_birds(6)
 	check(app.mission.phase=="wave_break" and app.mission.wave_down()==6 and app.mission.skein_down==6,"Full first clear earns an honest reward beat")
 	check(app.mission.last_wave_cleared and not app.mission.skein_final,"A cleared introduction is not a sortie ending")
-	app.mission.tick(3.8)
+	app.mission.tick(2.8)
 	check(app.mission.wave_number==1,"The short reward beat remains visible")
 	app.mission.tick(.21);fill_wave()
 	check(app.mission.wave_number==2 and app.mission.wave_size==8 and app.mission.skein_total()==14,"Second wave adds eight to the actual-arrival count")

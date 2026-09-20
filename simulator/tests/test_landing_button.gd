@@ -20,11 +20,11 @@ func run() -> void:
 	check(app.flight.gear and app.flight.flaps==2,"Badge A explicitly lowers gear and flaps for landing")
 	check(not app.combat.active and app.combat.gun_firing_time<=0,"Landing safes weapons")
 	check(app.combat.score==0 and app.combat.kills==0,"Zero-kill landing is available immediately")
-	var at: Vector3=app.flight.position;app.begin_landing()
-	check(app.flight.position==at,"Repeated landing request does not reset approach")
+	app.flight.position+=Vector3(100,-20,-500);app.badge.next_press=1<<1;app._physics_process(0)
+	check(app.flight.position==Vector3(0,115,3400),"Repeated badge B resets the approach to its starting position")
 	for i in range(60*100):
 		app._physics_process(1.0/60)
 		if app.mode=="results":break
 	check(app.flight.contact=="landed" and app.flight.speed==0 and app.mode=="results" and app.mission_success,"Neutral manual approach lands and brakes to a stop")
 	app.on_action("keyboard_play");check(not app.landing_started,"Replay clears landing state")
-	app.queue_free();await process_frame;print("BADGE LANDING: PASS");quit(0 if failures.is_empty() else 1)
+	app.queue_free();await process_frame;print("BADGE LANDING: ",failures.size()," failures");quit(0 if failures.is_empty() else 1)

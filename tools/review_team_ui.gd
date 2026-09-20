@@ -25,7 +25,8 @@ func run() -> void:
 	app.vision.tracking=true;app.yoke_recovery=false
 	app.mode="paused";app.resume_mode="flight";await snapshot("pause")
 	app.on_action("settings");await snapshot("settings")
-	app.on_action("camera");await snapshot("camera-setup")
+	app.on_action("fly");await snapshot("quick-calibration")
+	app.cancel_control_setup();app.on_action("camera");await snapshot("camera-setup")
 	app.controls_lesson.calibrating=false;app.controls_lesson.index=1;app.vision.throttle=.75;await snapshot("setup-throttle")
 	app.controls_lesson.index=3;await snapshot("setup-yoke")
 	app.controls_lesson.index=5;app.vision.gun_trigger=false;await snapshot("setup-gun")

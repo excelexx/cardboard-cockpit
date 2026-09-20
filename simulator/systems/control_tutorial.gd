@@ -20,6 +20,7 @@ const STEPS := [
 ]
 var index := 0
 var calibrating := true
+var calibration_only := false
 var calibration_progress := 0.0
 var age := 0.0
 var held_ms := 0
@@ -31,7 +32,8 @@ var ready_ms := 0
 var can_start := false
 var status := "Waiting for the camera and tracker..."
 
-func reset() -> void:
+func reset(quick: bool = false) -> void:
+	calibration_only = quick
 	index = 0
 	calibrating = true
 	retry()
@@ -88,6 +90,7 @@ func tick(dt: float, v: VisionClient, picture: bool, now: int) -> void:
 			passed = true; feedback += clampf(dt, 0, .1)
 			if feedback >= FEEDBACK_SECONDS:
 				calibrating = false
+				if calibration_only:index=STEPS.size()
 				capture.stop()
 				retry()
 		else:

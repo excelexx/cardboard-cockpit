@@ -152,6 +152,32 @@ func run() -> void:
 	check(app.mode == "control_setup", "Camera Play also teaches physical controls first")
 	app.on_action("setup_keyboard")
 	check(app.mode == "flight" and not app.vision.enabled and app.flight_kind == "demo", "Explicit keyboard choice bypasses camera requirements")
+	app.route_id="sf"
+	for entry: String in ["fly","enter","badge_start","camera","training"]:
+		app.on_action("title")
+		if entry=="enter":
+			var start_key:=InputEventKey.new();start_key.pressed=true;start_key.keycode=KEY_ENTER;app._input(start_key)
+		elif entry=="badge_start":practice_badge.next_press=1<<8;app._physics_process(.016)
+		else:app.on_action(entry)
+		var quick: bool=entry in ["fly","enter","badge_start"]
+		check(app.mode=="control_setup" and app.controls_lesson.calibration_only==quick,"Entry %s chooses the intended calibration/tutorial flow" % entry)
+		v.connected=true;v.tracking=true;v.throttle_confidence=1;v.yoke_confidence=1
+		var current=app.controls_lesson
+		for frame_index in range(20):calibration_result(v,"complete",3);observe(current,v,1)
+		if quick:
+			check(current.complete() and not current.can_start,"Start completes calibration without requiring throttle, gun or badge exercises")
+			v.throttle=1;observe(current,v,40);check(not current.can_start,"Quick Start still requires idle throttle before takeoff")
+			v.throttle=0;v.gun_trigger=false;v.tracking=true;v.yoke=Vector2.ZERO;v.yoke_yaw=0
+			observe(current,v,40);v.last_received=Time.get_ticks_msec();app.finish_control_setup()
+			check(app.mode=="flight" and not app.tutorial.active,"Quick Start launches without the introductory tutorial")
+		else:
+			check(not current.complete() and current.index==0 and current.step()[0]=="idle","Cardboard and legacy Tutorial continue to the first throttle exercise")
+	app.start_flight("demo");app.vision.enabled=true;v.connected=true;v.tracking=true;v.yoke=Vector2.ZERO;v.yoke_yaw=0;v.throttle=0;v.throttle_confidence=1
+	app.badge_launch_remaining=3.0
+	check(app.flight.speed==0 and app.flight.engine==0 and app.flight.throttle==0,"SF flight starts fully stopped at zero power")
+	var start_position: Vector3=app.flight.position
+	for idle_frame in range(360):app._physics_process(1.0/60)
+	check(app.flight.speed==0 and app.flight.position.distance_to(start_position)<.01,"Idle remains stopped through the launch countdown and afterward")
 	app.queue_free(); await process_frame
 	print("CONTROL TUTORIAL: ", checks, " checks / ", failures.size(), " failures")
 	quit(0 if failures.is_empty() else 1)

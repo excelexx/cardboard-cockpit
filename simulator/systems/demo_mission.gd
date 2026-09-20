@@ -12,14 +12,14 @@ const GOOSE_FLIGHT_PATH := "res://systems/goose_flight.gd"
 const FLOCK_CROSS_DEGREES := 40.0
 const FLOCK_SPEED := 19.0
 const FLOCK_REGROUP_DISTANCE := 900.0
-const FLOCK_SPREAD := 130.0
-const FLOCK_CLOSE_RATE := 70.0
+const FLOCK_SPREAD := 600.0
+const FLOCK_CLOSE_RATE := 20.0
 const SECOND_WAVE_SIZE := 8
-const WAVE_SECONDS := 35.0
+const WAVE_SECONDS := 18.0
 const FIRST_WAVE_AIRBORNE_SECONDS := 6.0
 const MAX_WAVE_SIZE := 12
 const HISTORY_LIMIT := 32
-const WAVE_BREAK_SECONDS := 4.0
+const WAVE_BREAK_SECONDS := 3.0
 func route_points() -> Array[Vector3]: return SHOWCASE_POINTS if cinematic else SFRoute.POINTS if app.route_id=="sf" else CoastalRoute.POINTS
 func route_names() -> Array[String]: return SHOWCASE_NAMES if cinematic else SFRoute.NAMES if app.route_id=="sf" else CoastalRoute.NAMES
 # Scenic showcase: over the coast range to the Pacific cliffs, up Ocean Beach with the
@@ -43,6 +43,8 @@ var wave_number := 0
 var wave_size := 0
 var wave_ids: Array[int] = []
 var airborne_clock := 0.0
+var empty_view_clock := 0.0
+const EMPTY_VIEW_SECONDS := 4.0
 var observed_down := 0
 var sortie_kill_base := 0
 var wave_kill_base := 0
@@ -66,11 +68,11 @@ func reset(enabled: bool) -> void:
 	cinematic=enabled and app.route_id=="sf";act=0;skein_cleared_at=-1;roll_demo_done=false
 	skein_ids.clear();skein_alive.clear();skein_pending=0;skein_down=0;skein_success=false;skein_final=false;skein_size=0
 	wave_number=0;wave_size=0;wave_ids.clear();skein_killed.clear()
-	airborne_clock=0;observed_down=0;sortie_kill_base=app.combat.kills;wave_kill_base=sortie_kill_base;last_wave_cleared=false
+	airborne_clock=0;empty_view_clock=0;observed_down=0;sortie_kill_base=app.combat.kills;wave_kill_base=sortie_kill_base;last_wave_cleared=false
 	flock_course=Vector3.ZERO;flock_altitude=0.0;Outcome.cinematic_state={}
 	if cinematic:
 		app.combat.managed_mission=true;app.combat.spawn_clock=INF;app.combat.engagement_enabled=false
-		phase="opening";app.flight.speed=45;app.flight.engine=1;app.flight.throttle=1;app.flight.flaps=1
+		phase="opening";app.flight.speed=0;app.flight.engine=0;app.flight.throttle=0;app.flight.flaps=1
 	if enabled: history.append({"phase":phase,"time":0.0,"position":app.flight.position})
 func transition(next: String) -> void:
 	if phase==next: return
@@ -198,7 +200,9 @@ func _tick_showcase(dt: float) -> void:
 	if phase=="skein":
 		_drive_skein(c,dt)
 		if skein_spawned() and wave_remaining()==0:_finish_wave(c,true)
-		elif phase_clock>=WAVE_SECONDS:_finish_wave(c,false)
+		else:
+			empty_view_clock=0.0 if _flock_ahead(c) else empty_view_clock+dt
+			if phase_clock>=WAVE_SECONDS or (skein_spawned() and empty_view_clock>=EMPTY_VIEW_SECONDS):_finish_wave(c,false)
 	_publish_outcome()
 	c.engagement_enabled=phase=="skein"
 	var delta: Vector3=route_target()-app.flight.position
@@ -208,6 +212,14 @@ func _tick_showcase(dt: float) -> void:
 		roll_demo_done=app.flight.start_barrel_roll(1)
 		if roll_demo_done:c.event("roll",app.flight.position,1)
 	if app.world.has_method("update_showcase"):app.world.update_showcase(app.flight.position,act,c.intent.intensity,dt)
+
+func _flock_ahead(c: CombatDirector) -> bool:
+	var forward: Vector3=app.flight.forward()
+	for enemy: Dictionary in c.enemies:
+		if enemy.health<=0 or not wave_ids.has(int(enemy.id)):continue
+		var delta: Vector3=enemy.position-app.flight.position
+		if delta.length()<2600 and forward.dot(delta.normalized())>cos(deg_to_rad(55)):return true
+	return false
 
 ## Endless waves retain only current-wave IDs. Scalar totals count actual
 ## arrivals and actual kills; expired or missing birds never become takedowns.
@@ -233,6 +245,7 @@ func _open_skein(c: CombatDirector,number: int = 1) -> void:
 	for enemy: Dictionary in c.enemies:
 		if is_instance_valid(enemy.node):enemy.node.queue_free()
 	c.enemies.clear();c.target_id=-1;c.lock_progress=0;c.spawn_clock=INF
+	empty_view_clock=0
 	wave_number=number;wave_size=size_for_wave(number);wave_kill_base=c.kills
 	wave_ids.clear();skein_ids.clear();skein_alive.clear();skein_killed.clear();flock_altitude=0.0
 	flock_course=_flock_course(app.flight.heading)
@@ -295,7 +308,7 @@ func _flock_course(heading: float) -> Vector3:
 
 func _spawn_slice(c: CombatDirector) -> void:
 	var f: FlightDynamics=app.flight
-	var forward:=Vector3(sin(f.heading),0,-cos(f.heading))
+	var forward: Vector3=f.forward()
 	var lead_direction: Vector3=flock_course.normalized()
 	var wing:=Vector3(lead_direction.z,0,-lead_direction.x)
 	var anchor: Vector3=f.position+forward*Tune.SKEIN_SPAWN_DISTANCE+Vector3.UP*Tune.SKEIN_SPAWN_HEIGHT
@@ -313,6 +326,7 @@ func _spawn_slice(c: CombatDirector) -> void:
 		bird.position=place
 		bird.position.y=maxf(place.y,app.world.ground_height(place.x,place.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
 		bird.node.position=bird.position
+		bird.formation_altitude=bird.position.y
 		bird.course=flock_course
 		bird.velocity=flock_course
 		bird.retiring=false
@@ -370,7 +384,7 @@ func _hold_formation(c: CombatDirector,dt: float) -> void:
 		var pull: Vector3=centre-enemy.position;pull.y=0
 		var spacing: float=pull.length()
 		if spacing>FLOCK_SPREAD:enemy.position+=pull/spacing*minf(spacing-FLOCK_SPREAD,FLOCK_CLOSE_RATE*dt)
-		enemy.position.y=lerpf(enemy.position.y,flock_altitude,clampf(dt*.9,0,1))
+		enemy.position.y=lerpf(enemy.position.y,float(enemy.get("formation_altitude",flock_altitude)),clampf(dt*.4,0,1))
 		enemy.position.y=maxf(enemy.position.y,app.world.ground_height(enemy.position.x,enemy.position.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
 		enemy.node.position=enemy.position
 

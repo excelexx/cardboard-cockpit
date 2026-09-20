@@ -320,11 +320,11 @@ func apply_gameplay_settings() -> void:
 	flight.bank_agility=gameplay_settings.bank_agility
 	flight.yaw_agility=gameplay_settings.yaw_agility
 	if is_instance_valid(combat):combat.aim_strength=gameplay_settings.auto_aim;combat.assist=gameplay_settings.auto_aim>0
-func begin_control_setup(next_action: String = "training") -> void:
+func begin_control_setup(next_action: String = "training", calibration_only: bool = false) -> void:
 	setup_return_mode=mode
 	setup_next_action="fly" if next_action=="training" else next_action
 	mode="control_setup"
-	controls_lesson.reset();vision.yoke_calibration.start()
+	controls_lesson.reset(calibration_only);vision.yoke_calibration.start()
 	vision.enabled=true;mouse_yoke=false
 	settings_visible=false;help_visible=false;credits_visible=false;calibration_visible=false
 	control=Vector3.ZERO
@@ -350,10 +350,10 @@ func finish_control_setup() -> void:
 	start_flight("demo")
 	copilot=false;used_copilot=false;demo_auto_fire=false
 	flight.throttle=vision.throttle;flight.engine=vision.throttle
-	if mission.cinematic:tutorial.start()
+	if mission.cinematic and not controls_lesson.calibration_only:tutorial.start()
 
 func on_action(action: String) -> void:
-	if action=="training":action="fly"
+	if action=="training":begin_control_setup("fly");return
 	elif action=="keyboard_training":action="keyboard_play"
 	match action:
 		"settings":
@@ -366,7 +366,7 @@ func on_action(action: String) -> void:
 		"next_pilot":
 			pilot_number=pilot_number%9999+1;on_action("title")
 		"route": pass
-		"fly":begin_control_setup("fly")
+		"fly":begin_control_setup("fly",true)
 		"keyboard_play":
 			vision.enabled=false;start_flight();copilot=true;used_copilot=true;demo_auto_fire=false
 			if mission.cinematic:tutorial.start()
@@ -477,7 +477,7 @@ func _physics_process(dt: float) -> void:
 		elif mode=="paused":mode=resume_mode
 		else:resume_mode=mode;mode="paused"
 	if badge.tapped(0) and mode=="flight":toggle_gear()
-	if badge.tapped(1) and mode=="flight":begin_landing()
+	if badge.tapped(1) and mode in ["flight","rollout"]:begin_landing()
 	if badge.tapped(4) and mode=="flight":cockpit=not cockpit;camera_rig.reset()
 	if badge.tapped(5) and mode=="flight":badge.tactical=not badge.tactical
 	if badge.tapped(6) and mode=="flight":copilot=not copilot;assisted_yoke_reference=vision.yoke
@@ -486,7 +486,7 @@ func _physics_process(dt: float) -> void:
 	if hold_for_yoke(dt):return
 	if mode=="flight" and badge_launch_remaining>0:
 		badge_launch_remaining=maxf(0,badge_launch_remaining-dt)
-		flight.engine=clampf(1.0-badge_launch_remaining/3.0,0,1)
+		flight.engine=flight.throttle*clampf(1.0-badge_launch_remaining/3.0,0,1)
 		return
 	if mode=="ejected":
 		fighter_fx.tick_ejection(dt)
@@ -674,7 +674,8 @@ func in_landing_corridor() -> bool:
 	return route_id=="sf" and (landing_started or mission.phase=="approach")
 
 func begin_landing() -> void:
-	if mode!="flight" or landing_started:return
+	if mode not in ["flight","rollout"] or (mode=="rollout" and not landing_started):return
+	mode="flight";resume_mode="flight"
 	var prior_gear: bool=flight.gear;var prior_flaps: int=flight.flaps
 	landing_started=true;landing_transition=1.0;landed_early=false
 	tutorial.landing_begun()
@@ -682,15 +683,15 @@ func begin_landing() -> void:
 	combat.gun_firing_time=0;combat.beam_active=false;combat.beam_target_ids.assign([-1,-1]);combat.visuals.reset()
 	# Keep the camera controls connected: the judge flies this approach.
 	copilot=false;demo_auto_fire=false;control=Vector3.ZERO;pilot_ejected=false;eject_hold=0
-	flight.spawn_airborne(Vector3(0,85,2600) if route_id=="sf" else Vector3(0,85,-12300),78)
+	flight.spawn_airborne(Vector3(0,115,3400) if route_id=="sf" else Vector3(0,115,-11500),78)
 	flight.heading=0;flight.pitch=-.045;flight.roll=0
 	flight.pitch_velocity=0;flight.roll_velocity=0;flight.yaw_velocity=0;flight.barrel_remaining=0
 	flight.gear=prior_gear;flight.flaps=prior_flaps;gear_override=int(prior_gear);flaps_override=prior_flaps
 	flight.throttle=.18;flight.engine=.3;flight.afterburner=false;flight.power_input=0
-	if mission.active:mission.transition("approach")
+	if mission.active:mission.transition("approach");mission.phase_clock=0
 	else:flight_kind="approach"
 	fighter_fx.reset();camera_rig.reset();apply_aircraft_pose();camera_rig.update(.016)
-	toast="YOU HAVE CONTROL — A / G: GEAR + FLAPS DOWN · REDUCE THROTTLE";toast_time=5
+	toast="REDUCE SPEED — THROTTLE BACK · A / G: GEAR + FLAPS DOWN · B: RETRY APPROACH";toast_time=7
 	audio.radio.say("approach",2)
 
 func settle_demo_touchdown() -> void:
