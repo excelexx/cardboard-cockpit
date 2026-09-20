@@ -1,6 +1,6 @@
 # Goose Protocol — SPECTRE X-26
 
-Version **0.22.0** is one continuous San Francisco judge demo: take off, fly, shoot adaptive dual plasma and keep clearing new flocks for as long as you like. The HUD keeps the aiming area clear. Press **B** or **badge B** when you want to land, then fly the approach yourself.
+Version **0.22.1** is one continuous San Francisco judge demo: take off, fly, shoot adaptive dual plasma and keep clearing new flocks for as long as you like. The HUD keeps the aiming area clear. Press **B** or **badge B** when you want to land, then fly the approach yourself.
 
 Open **Launch Cardboard Cockpit.command** or the packaged **Cardboard Cockpit.app**. The demo uses excelex's cardboard controls and settings with the current graphics and aircraft presentation. **Watch demo** flies and shoots automatically. [Judge demo flow](docs/JUDGE_DEMO.md).
 
@@ -26,7 +26,7 @@ Choose **Play / Enter / badge Start** for calibration only, or **Set Up Cardboar
 
 Two plasma beams are the manual weapon. They split across two targets or focus together on one, with **SPLIT**, **FOCUS** or **FIRING** shown on the HUD. Automatic missile support fires two missiles together every five seconds during large flocks, when two eligible targets are available. [Adaptive plasma controls and feedback](docs/ADAPTIVE_PLASMA.md).
 
-Groups of **1–4 geese arrive every 200–500 metres of flight path**, with loose offsets and stable plasma target locks. Flocks continue with a visible **WAVE N** counter and live kills for the current wave. There is no countdown or fixed kill quota before landing. Only actual kills count. Yoke loss pauses the flight; a steady return resumes it. Sound starts enabled each launch; **M** mutes the current session. The steady camera keeps recoil and chase movement subdued for comfort.
+Groups of **1–4 geese arrive every 200–500 metres of flight path**, with loose offsets and stable plasma target locks. Flocks continue with a visible **WAVE N** counter and live kills for the current wave. There is no countdown or fixed kill quota before landing. Only actual kills count. Yoke loss pauses the flight; a steady return resumes it. Sound starts enabled each launch; **M** mutes the current session. **Settings → Audio** has independent Free Bird, engine/wind, effects and voice sliders. Defaults are music **200%**, other channels **50%**, and changes save automatically. The steady camera keeps recoil and chase movement subdued for comfort.
 
 After takeoff, **A / G** retracts gear and flaps. **B** starts or retries the manual landing approach. Touchdowns on dry airport ground are accepted; water or off-airport contact starts an automatic flight back to the runway.
 

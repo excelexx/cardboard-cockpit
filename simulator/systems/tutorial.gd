@@ -45,8 +45,8 @@ func landing_begun() -> void:
 	active=true;app.audio.radio.reset();app.audio.radio.enabled=false;show(6)
 func speak() -> void:
 	spoken_text=str(lesson().title)+". "+" ".join(lesson().lines)
-	if voice_id.is_empty() or app.audio.muted or app.mode=="paused" or app.overlay_visible() or app.yoke_recovery_visible():return
-	DisplayServer.tts_speak(spoken_text,voice_id,85,1.0,.96,index,true)
+	if voice_id.is_empty() or app.audio.muted or app.audio.voice_gain<=0 or app.mode=="paused" or app.overlay_visible() or app.yoke_recovery_visible():return
+	DisplayServer.tts_speak(spoken_text,voice_id,roundi(85*app.audio.voice_gain),1.0,.96,index,true)
 func speaking() -> bool:return active and not voice_id.is_empty() and DisplayServer.tts_is_speaking() and not DisplayServer.tts_is_paused()
 func tick(dt: float) -> void:
 	if not active:return

@@ -32,6 +32,8 @@ var engine_pitch := 1.0
 var beam_loop: AudioStreamPlayer
 var beam_wanted:=false
 var muted := false
+var voice_gain := .5
+const MIX_BUSES := {"music":"Cockpit Music","engine":"Cockpit Engine","effects":"Cockpit Effects","voice":"Cockpit Voice"}
 var effects: Dictionary = {}
 var effect_players: Array[AudioStreamPlayer] = []
 
@@ -130,6 +132,23 @@ func _ready() -> void:
 			var effect := AudioStreamPlayer.new()
 			add_child(effect)
 			effect_players.append(effect)
+
+func apply_mix(settings: RefCounted) -> void:
+	for channel: String in MIX_BUSES:
+		var bus: int=AudioServer.get_bus_index(MIX_BUSES[channel])
+		if bus<0:
+			AudioServer.add_bus();bus=AudioServer.bus_count-1;AudioServer.set_bus_name(bus,MIX_BUSES[channel]);AudioServer.set_bus_send(bus,"Master")
+		var level: float=settings.get(channel)
+		AudioServer.set_bus_mute(bus,level<=0)
+		AudioServer.set_bus_volume_db(bus,linear_to_db(maxf(level,.0001)))
+	music.bus=MIX_BUSES.music
+	for sound in [player,wind,burner,wheels,ambience]:sound.bus=MIX_BUSES.engine
+	for sound in [tone,beam_loop,gun_loop,geese]:sound.bus=MIX_BUSES.effects
+	for sound in effect_players:sound.bus=MIX_BUSES.effects
+	for sound in spatial_players:sound.bus=MIX_BUSES.effects
+	for sound in flock_players:sound.bus=MIX_BUSES.effects
+	radio.player.bus=MIX_BUSES.voice
+	voice_gain=float(settings.get("voice"))
 
 func play_effect(effect_name: String, volume: float = -12.0, pitch: float = 1.0) -> void:
 	if muted or not effects.has(effect_name):
@@ -394,7 +413,7 @@ func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> 
 			flock_alerted=false
 			if not flock_state.is_empty():_release_all_flock_voices()
 	if muted:spatial_queue.clear()
-	radio.tick(dt,context_paused,muted)
+	radio.tick(dt,context_paused,muted or voice_gain<=0)
 	if not context_paused: gun_envelope = move_toward(gun_envelope,1.0 if gun_wanted else 0.0,dt*(24 if gun_wanted else 7))
 	beam_loop.stream_paused=context_paused
 	beam_loop.volume_db=move_toward(beam_loop.volume_db,-24+duck_level*.4 if beam_wanted and not muted else -80,dt*220)

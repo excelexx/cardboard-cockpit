@@ -102,6 +102,7 @@ var toast_time := 0.0
 var near_obstacle_cooldown:=0.0
 var landing_transition:=0.0
 var landing_started:=false
+var audio_settings=preload("res://systems/audio_settings.gd").new()
 var landing_recovery:=false
 var recovery_final:=false
 func profile() -> Dictionary: return Catalog.PROFILE
@@ -128,10 +129,11 @@ func _ready() -> void:
 	cockpit_frame.set_presentation_visible(false)
 	audio = Audio.new(); add_child(audio); audio.set_aircraft(profile())
 	audio.muted=false # Each launch starts with sound; M still mutes the current session.
+	audio.apply_mix(audio_settings)
 	combat = Combat.new(); combat.app = self; add_child(combat)
 	fighter_fx = Effects.new(); fighter_fx.app = self; add_child(fighter_fx); fighter_fx.build()
 	var layer := CanvasLayer.new(); add_child(layer)
-	hud = Hud.new(); hud.app = self; layer.add_child(hud); hud.action.connect(on_action);hud.sensitivity_changed.connect(set_sensitivity)
+	hud = Hud.new(); hud.app = self; layer.add_child(hud); hud.action.connect(on_action);hud.sensitivity_changed.connect(set_sensitivity);hud.audio_changed.connect(set_audio_volume)
 	tutorial.configure(self)
 	apply_gameplay_settings()
 	set_quality(high_quality)
@@ -310,6 +312,11 @@ func take_manual_control(steering: bool) -> void:
 	if steering: mouse_yoke = false
 	if steering and vision.enabled and not vision.yoke_enabled:return
 	vision.enabled = false; vision.status = "KEYBOARD / MOUSE"
+func set_audio_volume(channel: String,value: float) -> void:
+	audio_settings.set_level(channel,value);audio.apply_mix(audio_settings)
+	if channel=="voice" and value<=0 and DisplayServer.get_name()!="headless":DisplayServer.tts_stop()
+	save_settings()
+
 func set_sensitivity(axis: String,value: float) -> void:
 	if axis in ["pitch","bank","yaw"]:
 		vision.set(axis+"_sensitivity",value);vision.sync_sensitivity()
@@ -360,6 +367,9 @@ func on_action(action: String) -> void:
 	match action:
 		"settings":
 			settings_visible=not settings_visible;help_visible=false;calibration_visible=false;credits_visible=false
+		"settings_audio":hud.settings_page="audio"
+		"settings_flight":hud.settings_page="flight"
+		"audio_reset":audio_settings.reset();audio.apply_mix(audio_settings);save_settings()
 		"sensitivity_reset":
 			vision.reset_sensitivity();vision.sync_sensitivity();gameplay_settings.reset();apply_gameplay_settings();save_settings()
 		"camera_previews":camera_previews=not camera_previews;save_settings()
@@ -453,6 +463,7 @@ func _process(dt: float) -> void:
 	audio.observe_flight(flight)
 	audio.update(flight.engine,flight.speed,active,dt)
 	audio.set_music_active(flight_kind in ["combat","demo","training"] and mode in ["flight","rollout","results","paused","crashed","ejected"])
+	if settings_visible and hud.settings_page=="audio":audio.music.stream_paused=false
 	if capture_at>0 and runtime>=capture_at and not pending_capture:
 		pending_capture = true; capture_frame()
 	if test_mode and flight.elapsed>(1200 if route_id=="sf" else 420) and not test_finished:
@@ -845,7 +856,7 @@ func load_settings() -> void:
 	if DisplayServer.get_name()=="headless" or has_meta("route_override") or OS.get_environment("COCKPIT_DISABLE_BADGE")=="1":return
 	var config := ConfigFile.new()
 	if config.load("user://settings.cfg")==OK:
-		vision.load_sensitivity(config);gameplay_settings.load_config(config)
+		vision.load_sensitivity(config);gameplay_settings.load_config(config);audio_settings.load_config(config)
 		camera_previews=bool(config.get_value("interface","camera_previews",true));badge_prompts=bool(config.get_value("interface","badge_prompts",true))
 		high_quality = bool(config.get_value("video","spectre_quality",true))
 		route_id = str(config.get_value("world","spectre_route_v10","sf"))
@@ -854,7 +865,7 @@ func save_settings() -> void:
 	if DisplayServer.get_name()=="headless" or OS.get_environment("COCKPIT_DISABLE_BADGE")=="1" or has_meta("route_override"): return
 	var config := ConfigFile.new()
 	config.load("user://settings.cfg")
-	vision.save_sensitivity(config);gameplay_settings.save_config(config)
+	vision.save_sensitivity(config);gameplay_settings.save_config(config);audio_settings.save_config(config)
 	config.set_value("interface","camera_previews",camera_previews);config.set_value("interface","badge_prompts",badge_prompts)
 	config.set_value("video","spectre_quality",high_quality)
 	config.set_value("arcade","best_score_v09",best_score)

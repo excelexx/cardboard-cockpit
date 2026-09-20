@@ -9,6 +9,10 @@ class_name CockpitHUD
 const Tune = preload("res://data/balance.gd")
 signal action(name: String)
 signal sensitivity_changed(axis: String,value: float)
+signal audio_changed(channel: String,value: float)
+const AUDIO_CHANNELS := ["music","engine","effects","voice"]
+var audio_sliders: Dictionary={}
+var settings_page := "flight"
 var sensitivity_sliders: Dictionary={}
 const SETTING_AXES:=["pitch","bank","yaw","pitch_agility","bank_agility","yaw_agility","auto_aim"]
 const GAMEPLAY_SETTINGS=preload("res://systems/gameplay_settings.gd")
@@ -71,8 +75,37 @@ func _ready() -> void:
 		slider.value_changed.connect(_on_sensitivity_slider.bind(axis))
 		slider.visible = false
 		add_child(slider); sensitivity_sliders[axis] = slider
+	for channel: String in AUDIO_CHANNELS:
+		var slider:=HSlider.new();slider.name=channel.capitalize()+"Volume"
+		slider.min_value=0;slider.max_value=2 if channel=="music" else 1;slider.step=.01;slider.scrollable=false
+		slider.tooltip_text={"music":"Free Bird music volume","engine":"Engine, wind and wheel volume","effects":"Weapons, geese and other effects","voice":"Radio and instructor voice volume"}[channel]
+		var track:=StyleBoxFlat.new();track.bg_color=GLASS.lightened(.12);track.content_margin_top=4;track.content_margin_bottom=4;track.set_corner_radius_all(4)
+		slider.add_theme_stylebox_override("slider",track)
+		var fill:=track.duplicate() as StyleBoxFlat;fill.bg_color=GREEN
+		slider.add_theme_stylebox_override("grabber_area",fill);slider.add_theme_stylebox_override("grabber_area_highlight",fill)
+		slider.value_changed.connect(_on_audio_slider.bind(channel));slider.visible=false
+		add_child(slider);audio_sliders[channel]=slider
+
 func _process(dt: float) -> void:
-	clock += dt; update_sensitivity_sliders(); queue_redraw()
+	clock += dt;update_sensitivity_sliders();update_audio_sliders();queue_redraw()
+
+func audio_slider_rect(channel: String) -> Rect2:
+	var card:=settings_rect()
+	return Rect2(card.position+Vector2(36,221+110*AUDIO_CHANNELS.find(channel)),Vector2(card.size.x-72,34))
+
+func update_audio_sliders() -> void:
+	if not is_instance_valid(app):return
+	for channel: String in audio_sliders:
+		var slider: HSlider=audio_sliders[channel]
+		slider.visible=app.settings_visible and settings_page=="audio"
+		if not slider.visible:
+			if slider.has_focus():slider.release_focus()
+			continue
+		var rect:=audio_slider_rect(channel);slider.position=rect.position;slider.size=rect.size
+		slider.set_value_no_signal(app.audio_settings.get(channel))
+
+func _on_audio_slider(value: float,channel: String) -> void:
+	audio_changed.emit(channel,value)
 
 func settings_rect() -> Rect2:
 	var extent := Vector2(minf(1040,size.x-64),850)
@@ -91,7 +124,7 @@ func setting_slider_rect(axis: String) -> Rect2:
 
 func update_sensitivity_sliders() -> void:
 	if not is_instance_valid(app): return
-	var shown: bool = app.settings_visible
+	var shown: bool = app.settings_visible and settings_page=="flight"
 	for axis: String in sensitivity_sliders:
 		var slider: HSlider = sensitivity_sliders[axis]
 		slider.visible = shown
@@ -605,6 +638,9 @@ func draw_help() -> void:
 	button("help",Rect2(990,824,240,52),"BACK",true)
 func draw_settings() -> void:
 	zones.clear();dim();var card:=settings_rect();panel(card,.95)
+	button("settings_flight",Rect2(card.position+Vector2(card.size.x-364,52),Vector2(150,44)),"FLIGHT",settings_page=="flight")
+	button("settings_audio",Rect2(card.position+Vector2(card.size.x-200,52),Vector2(164,44)),"AUDIO",settings_page=="audio")
+	if settings_page=="audio":draw_audio_settings(card);return
 	put(mono,card.position+Vector2(36,39),"SETTINGS / SAVED AUTOMATICALLY",16,GREEN)
 	put(display_bold,card.position+Vector2(33,93),"FLIGHT & AIMING",52,WHITE)
 	put(body,card.position+Vector2(36,126),"Input sensitivity and aircraft response are adjusted independently.",17,SOFT)
@@ -628,6 +664,22 @@ func draw_settings() -> void:
 	elif v.connected:sync="Applying camera settings…"
 	put(body,card.position+Vector2(36,732),sync,16,SOFT)
 	button("sensitivity_reset",Rect2(card.position+Vector2(36,763),Vector2(280,52)),"RESET DEFAULTS")
+	button("settings",Rect2(card.position+Vector2(card.size.x-236,763),Vector2(200,52)),"DONE",true,"HOME")
+
+func draw_audio_settings(card: Rect2) -> void:
+	put(mono,card.position+Vector2(36,39),"SETTINGS / SAVED AUTOMATICALLY",16,GREEN)
+	put(display_bold,card.position+Vector2(33,93),"AUDIO",52,WHITE)
+	put(body,card.position+Vector2(36,126),"Balance Free Bird, the aircraft, effects and voices.",17,SOFT)
+	var labels: Dictionary={"music":"FREE BIRD / MUSIC","engine":"ENGINE / WIND","effects":"WEAPONS / EFFECTS","voice":"RADIO / INSTRUCTOR"}
+	for channel: String in AUDIO_CHANNELS:
+		var rect:=audio_slider_rect(channel)
+		put(body,rect.position+Vector2(0,-15),labels[channel],18,WHITE)
+		put(mono,rect.position+Vector2(rect.size.x-90,-15),"%d%%" % roundi(float(app.audio_settings.get(channel))*100),19,GREEN)
+		put(mono,rect.position+Vector2(0,53),"SILENT",14,SOFT)
+		put(mono,rect.position+Vector2(rect.size.x-60,53),"200%" if channel=="music" else "100%",14,SOFT)
+	button("mute",Rect2(card.position+Vector2(36,650),Vector2(270,46)),"UNMUTE ALL" if app.audio.muted else "MUTE ALL",false,"M")
+	put(body,card.position+Vector2(36,732),"Defaults: Free Bird 200% · other sounds 50%.",16,SOFT)
+	button("audio_reset",Rect2(card.position+Vector2(36,763),Vector2(280,52)),"RESET AUDIO")
 	button("settings",Rect2(card.position+Vector2(card.size.x-236,763),Vector2(200,52)),"DONE",true,"HOME")
 
 func camera_card(rect: Rect2,title: String,preview,tracking: bool,compact: bool = false) -> void:
@@ -682,7 +734,7 @@ func draw_camera_setup() -> void:
 func draw_credits() -> void:
 	zones.clear(); dim(); panel(Rect2(330,150,940,700),.9)
 	put(display_bold,Vector2(384,236),"CREDITS",64,WHITE)
-	var lines: Array[String] = ["The SPECTRE is a made-up jet, tuned for fun.","Jet model: FlightGear F-35B community, GPL (source included).","Goose: Poly by Google, CC BY 3.0.","Sound effects and voices: Kenney, CC0.","Music: MintoDog, CC0. Goose calls: British Library, CC BY-SA.","Ground and sky: USGS, FlightGear, Poly Haven.","Fonts: Saira Condensed and IBM Plex Mono, SIL OFL.","Title art: image generation.","Engine: Godot, MIT. Full notices ship with the game."]
+	var lines: Array[String] = ["The SPECTRE is a made-up jet, tuned for fun.","Jet model: FlightGear F-35B community, GPL (source included).","Goose: Poly by Google, CC BY 3.0.","Sound effects and voices: Kenney, CC0.","Music: user-provided Free Bird solo. Goose calls: British Library, CC BY-SA.","Ground and sky: USGS, FlightGear, Poly Haven.","Fonts: Saira Condensed and IBM Plex Mono, SIL OFL.","Title art: image generation.","Engine: Godot, MIT. Full notices ship with the game."]
 	for i in range(lines.size()): put(body,Vector2(388,296+i*40),lines[i],18,WHITE if i==0 else SOFT)
 	button("credits",Rect2(990,770,240,52),"BACK",true)
 func context_coach() -> Dictionary:
