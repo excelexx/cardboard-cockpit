@@ -30,7 +30,7 @@ Aim near a visible contact. Intent scoring, prediction, hysteresis and smoothly 
 
 ## Cardboard and badge
 
-The **cardboard yoke** owns steering and both latched weapon switches. The **cardboard throttle** owns power, boost and braking. The **wireless badge** supplies occasional secondary controls: START start/replay, HOME pause, A gear, B assisted landing, LEFT view, RIGHT missile inset, UP route assist, DOWN text visibility. See [switch construction, mapping and evidence](docs/WEAPON_SWITCHES.md) and [printable switch faces](vision/markers/weapon-switches.html).
+The **cardboard yoke** owns steering and both latched weapon switches. The **cardboard throttle** owns power, boost and braking. The **wireless badge** supplies occasional secondary controls: START start/replay, HOME pause, A gear, B assisted landing, LEFT view, RIGHT missile inset, UP route assist, DOWN short press text visibility / hold tactical view. See [switch construction, mapping and evidence](docs/WEAPON_SWITCHES.md) and [printable switch faces](vision/markers/weapon-switches.html).
 
 Use [vision setup](docs/vision-setup.md) and [construction guide](docs/cardboard-build-guide.md) for yoke ID 7 and throttle IDs 0 (idle), 1 (slider), and 2 (full). Flip-tab faces use 31/32 and 41/42 in the same `DICT_4X4_50` dictionary.
 
@@ -46,7 +46,7 @@ For the **laptop yoke + phone throttle**, connect the phone through Apple Contin
 
 Each camera has its own tracker and preview connection. Phone loss holds power while laptop steering continues. W/S takes over power and disables tracking; C opens setup to enable it again. To play the ordinary mission with two cameras, run `./tools/dual_camera_tracker.sh` and, separately, `./tools/run.sh -- --dual-cameras --stickers`. The packaged app must be rebuilt to include these source changes.
 
-Controls and preview images stay on localhost; no camera images are saved or uploaded. Automated marker, role-isolation, preview, dropout/reconnect and game integration tests cover the input path. Physical tag placement still determines tracking quality. The release app includes an offline BLE helper and reconnects to the existing badge firmware automatically. All eight physical badge buttons and simultaneous A+B were measured live. Phase feedback was written and read back. No badge firmware was flashed.
+Controls and preview images stay on localhost; no camera images are saved or uploaded. Automated marker, role-isolation, preview, dropout/reconnect and game integration tests cover the input path. Physical tag placement still determines tracking quality. The release app includes an offline BLE helper and reconnects to the existing badge firmware automatically. All eight physical badge buttons and simultaneous A+B were measured live. Phase feedback was written and read back. The badge now runs the verified live-instrument firmware; see [display, protocol and wireless handoff](hardware/badge-controller/INSTRUMENT.md).
 
 ## World, audio and performance
 

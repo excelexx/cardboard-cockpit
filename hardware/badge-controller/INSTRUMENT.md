@@ -4,8 +4,9 @@ The existing 320×240 ST7789 now renders a flight instrument locally. Bluetooth 
 
 ## Display states
 
-- **Ready:** pilot/callsign, rotating wireframe jet, READY FOR TAKEOFF and START hint.
-- **Flight:** interpolated bank/pitch artificial horizon, airspeed in knots, altitude in feet, true SF heading and a heading-up 3 km radar. Geese are green, the boss amber, friendly missiles white and hostile missiles red. The selected contact has a square bracket. Bank scale markings, a moving compass strip, normalized numeric bank/pitch, and gear/flap/assist/fire annunciators support precise reading. Contacts outside the scale stay at the edge.
+- **Ready:** large projected and shaded fighter model, contextual connection status, SPECTRE identity and START hint.
+- **Launch:** synchronized three-second 03/02/01 departure sequence, perspective runway illustration, blue bloom, progressive LEDs and laptop cues. Flight physics waits during this native demo introduction.
+- **Flight:** interpolated bank/pitch artificial horizon, airspeed in knots, altitude in feet, true SF heading and a heading-up 3 km radar. Geese are green, the boss amber, friendly missiles white and hostile missiles red. The selected contact uses acquiring corner marks. Proportional type, a moving compass, actual velocity flight-path marker, G-load, engine/afterburner state and weapon readiness support the full-screen HUD. Contacts outside the scale stay at the edge.
 - **Action:** brief TARGET LOCKED cue, actual hostile-missile warning, weapon status, B - LAND AT SFO, and landing-assistance status. A warning is never invented just for decoration.
 - **Paused:** frozen flight data with FLIGHT PAUSED.
 - **Results:** score, geese cleared and actual landing/mission result. Safe landing without the boss remains MISSION INCOMPLETE.
@@ -32,7 +33,11 @@ Binary version 1 has a 44-byte little-endian header, zero to twelve 6-byte conta
 
 Each GATT write starts with `a7`, frame ID, offset and total size, then payload. The relay fragments to the negotiated write size, including 20-byte payload compatibility. The receiver rejects malformed lengths, CRC, value ranges, out-of-order fragments and expired assemblies. An 118-byte snapshot at 20 Hz is **18.9 kbit/s before fragment/link overhead**. This is a design payload rate, not a measured radio maximum.
 
-The display targets a steady 15 FPS at 40 MHz SPI, using a 76,800-byte indexed framebuffer plus a 5,120-byte RGB565 transfer stripe. Attitude is interpolated independently from telemetry updates. Changed 32×8 tiles select bounded stripe spans for bulk SPI writes, with no intermediate display clear. A continuous opaque navy/cobalt bezel and cyan corner marks frame the instruments. Actual rate is exposed as `fps10` in 0004; do not infer physical frame rate from the target alone.
+Hold DOWN for 0.65 seconds to toggle the expanded tactical view; a short press toggles the laptop text HUD on release. Tilt controls are not enabled. Tactical contacts carry actual relative velocity vectors and altitude offsets; real hostile missiles take priority over ordinary contacts in the 12-track budget. Threat overlays dominate the HUD and point toward the nearest hostile missile. `CLOSE ~` is a straight-line range/closing-speed estimate, not a guaranteed impact time.
+
+Debriefs animate the real score, reveal a landing grade derived from the game’s landing score, and display a sampled real flight trace with intercept markers, gun accuracy, flight duration and peak reported G-load. Samples are retained in RAM for the current sortie; no invented geography or heat values are drawn.
+
+The display targets a steady 15 FPS at 40 MHz SPI, using a 76,800-byte indexed framebuffer plus a 5,120-byte RGB565 transfer stripe. Attitude is interpolated independently from telemetry updates. Changed 32×8 tiles select bounded stripe spans for bulk SPI writes, with no intermediate display clear. A thin navy perimeter leaves the interior free of decorative frames; large primary text uses Adafruit’s proportional FreeSans fonts. Small machine labels retain the compact bitmap face. Actual rate is exposed as `fps10` in 0004; do not infer physical frame rate from the target alone.
 
 ## Reproduce the build
 
@@ -53,3 +58,9 @@ For a later update, stop the game/helper and any serial/JTAG owner, make a fresh
 ## Wireless handoff
 
 After the final application flash/readback and Bluetooth acceptance test, USB is no longer needed for gameplay data. Keep the battery switch **off while USB is connected**, as the maker instructs. Unplug USB-C, then turn on the badge's two-AA battery supply. Leave laptop Bluetooth enabled and the game running; its helper scans again and reconnects automatically. Battery runtime and operation at low battery voltage have not been measured. No speaker, microphone, gyroscope, touchscreen or vibration motor has been identified on this board; audio cues can be played by the laptop. Accelerometer measurements are verified, while NFC tag reading remains an experiment.
+
+## Extended telemetry (binary version 2)
+
+Version 1 remains accepted. Version 2 retains the 44-byte base header and uses its former reserved byte for presentation detail: low four bits are lock quality, bit 4 requests tactical view, bits 5–6 identify the launch stage. In results mode that byte is the actual 0–100 landing score instead. A 26-byte `<BBhhhHBBiihhh` extension adds engine percent, afterburner/countermeasure/missile-ready flags, relative flight-path yaw/pitch in centidegrees, climb rate in feet/minute, flight seconds, gun accuracy (255 means unavailable), throttle percent, world X/Z metres G-load in hundredths, and the actual game targeting solution’s relative yaw/pitch in centidegrees. Each contact expands to 12 bytes `<hhBBhhh`: relative right/forward metres, kind, selection, relative right/forward velocity in m/s, and altitude offset in metres. The maximum frame is 216 bytes including CRC, fragmented across negotiated GATT writes. The bridge reads the firmware protocol capability and falls back to version 1 for older badges.
+
+Automated cross-language tests compile the actual C++ receiver and feed it Python-encoded legacy and maximum-size extended frames. They check byte offsets, CRC failures, truncation, unknown versions and semantic bounds without accessing hardware.

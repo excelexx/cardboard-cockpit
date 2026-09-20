@@ -22,7 +22,7 @@ Use the existing `DICT_4X4_50` tracker. A face must remain stable for 90 ms to s
 | LEFT | Cockpit / chase view |
 | RIGHT | Missile camera inset |
 | UP | Route assistance |
-| DOWN | Text HUD on / off |
+| DOWN | Short press: text HUD on/off; hold 0.65 s: badge tactical view |
 
 The release app starts its bundled BLE relay automatically. Turn on the existing **HTN Badge Buttons** firmware and wait for **BADGE CONNECTED** on the flight deck. There is no OS-wide keyboard injection. Badge loss releases its buttons; reconnect requires neutral buttons before another action. The relay retries automatically and exits with the app. One relay owns Bluetooth; another copy exits if the local phase port is occupied.
 

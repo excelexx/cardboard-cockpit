@@ -13,6 +13,24 @@ class InstrumentTests(unittest.TestCase):
   self.assertEqual(struct.unpack_from('<H',b,len(b)-2)[0],binascii.crc_hqx(b[:-2],0xffff))
   parts=p.fragments(b,1,20);self.assertTrue(all(len(x)<=20 for x in parts));self.assertEqual(b''.join(x[4:] for x in parts),b)
   self.assertEqual([x[2] for x in parts],list(range(0,len(b),16)))
+ def test_presentation_detail_crc_and_legacy_default(self):
+  d=p.disconnected();self.assertEqual(p.encode(d,1)[43],0)
+  for value in (0,15,16,47,79,111,100,255):
+   d['detail']=value;b=p.encode(d,1);self.assertEqual(b[43],value)
+   self.assertEqual(int.from_bytes(b[-2:],'little'),binascii.crc_hqx(b[:-2],0xffff))
+  for value in (-1,256,1.5,True):
+   d['detail']=value
+   with self.assertRaises(ValueError):p.encode(d,1)
+ def test_extended_sensor_frame_at_maximum_contacts(self):
+  d=p.disconnected();d.update(version=2,aim_yaw=18,aim_pitch=3,engine=98,systems=7,fpa_yaw=1.2,fpa_pitch=-1.3,climb=600,seconds=147,accuracy=76,throttle=100,world_x=1234,world_z=-5678,g_load=1.4,contacts=[dict(x=600,y=1100,kind=4,selected=0,vx=-80,vy=-200,altitude=100) for _ in range(12)])
+  b=p.encode(d,9);self.assertEqual(len(b),216);self.assertEqual(b[2],2)
+  self.assertEqual(p.EXTENDED.unpack_from(b,44),(98,7,120,-130,600,147,76,100,1234,-5678,140,1800,300))
+  self.assertEqual(p.CONTACT_V2.unpack_from(b,70),(600,1100,4,0,-80,-200,100))
+  for mtu in (20,180,182):
+   parts=p.fragments(b,9,mtu);self.assertTrue(all(len(part)<=mtu for part in parts));self.assertEqual(b''.join(part[4:] for part in parts),b)
+  for key,value in [('systems',8),('fpa_yaw',181),('accuracy',254),('world_x',10000001),('g_load',float('inf'))]:
+   bad=dict(d);bad[key]=value
+   with self.subTest(key=key),self.assertRaises(ValueError):p.encode(bad,1)
  def test_invalid_inputs(self):
   for key,value in [('roll',float('nan')),('pitch',91),('mode',1.5),('score',-1),('name','a'*13),('pilot',0),('contacts',[dict(x=0,y=0,kind=9,selected=0)])]:
    d=p.disconnected();d[key]=value

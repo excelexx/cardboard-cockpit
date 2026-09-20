@@ -26,6 +26,7 @@ var result_code:=""
 var landed_early:=false
 const Approach = preload("res://systems/approach_guidance.gd")
 var badge: BadgeLink=Badge.new()
+var badge_launch_remaining:=0.0
 var pilot_number:=1
 var cv_weapon_revision:=-1
 var primary_latched:=false
@@ -155,6 +156,8 @@ func _ready() -> void:
 		world.visible = false; aircraft.visible = false; fighter_fx.visible = false
 
 func start_flight(kind: String = "demo") -> void:
+	badge_launch_remaining=3.0 if kind=="demo" and DisplayServer.get_name()!="headless" else 0.0
+	badge.reset_presentation()
 	paper_throttle_seen = false
 	tutorial.stop();result_headline="";result_advice="";result_code="";landed_early=false
 	flight_kind = kind
@@ -180,6 +183,7 @@ func start_flight(kind: String = "demo") -> void:
 	combat.engagement_enabled = kind=="combat"
 	if kind=="demo": flight.flaps = 1
 	mission.reset(kind=="demo")
+	if badge_launch_remaining>0:flight.engine=0.0
 	audio.reset_flight(); audio.radio.say("countdown" if kind=="demo" else "intro" if kind=="combat" else "cleared")
 	aircraft_visuals.reset()
 	if not flight.gear: aircraft_visuals.update_visuals(2.1,flight,Vector3.ZERO)
@@ -379,12 +383,16 @@ func _physics_process(dt: float) -> void:
 	if badge.tapped(4) and mode=="flight":cockpit=not cockpit;camera_rig.reset()
 	if badge.tapped(5) and mode=="flight":camera_rig.missile_requested=not camera_rig.missile_requested
 	if badge.tapped(6) and mode=="flight":copilot=not copilot;assisted_yoke_reference=vision.yoke
-	if badge.tapped(3):text_hud=not text_hud
+	if badge.hud_toggle:text_hud=not text_hud
 	# Paper testing must not fly away while centering or while the card is hidden.
 	if paper_test and vision.enabled and not vision.tracking:
 		control = Vector3.ZERO
 		return
 	if overlay_visible() or mode=="paused": return
+	if mode=="flight" and badge_launch_remaining>0:
+		badge_launch_remaining=maxf(0,badge_launch_remaining-dt)
+		flight.engine=clampf(1.0-badge_launch_remaining/3.0,0,1)
+		return
 	if mode=="ejected":
 		fighter_fx.tick_ejection(dt)
 		flight.position += flight.velocity*dt
