@@ -30,6 +30,13 @@ func run() -> void:
 	for index in range(2):
 		var muzzle: Vector3=app.fighter_fx.plasma_muzzle_position(Vector3.ZERO,index)
 		check(app.combat.visuals.beams[index*3].position.distance_to((muzzle+app.combat.beam_ends[index])*.5)<.001,"Moving and banking updates both emitter anchors without stale trails")
+	app.cockpit=true;app.camera_rig.reset();app.camera_rig.update(.016);app.combat.visuals.draw_plasma()
+	for index in range(2):
+		var muzzle: Vector3=app.fighter_fx.plasma_muzzle_position(Vector3.ZERO,index)
+		check((muzzle-app.camera.global_position).dot(-app.camera.global_basis.z)>1.0,"Both plasma emitters are physically ahead of the cockpit camera")
+	for material in app.combat.visuals.plasma_materials:check(is_equal_approx(float(material.get_shader_parameter("width_scale")),.32),"Every cockpit plasma layer is thinner")
+	app.cockpit=false;app.combat.visuals.draw_plasma()
+	check(is_equal_approx(float(app.combat.visuals.plasma_materials[0].get_shader_parameter("width_scale")),1.0),"Chase view keeps its original beam width")
 	app.combat.gun_firing_time=0;app.combat.update_beam(.1);app.combat.visuals.draw_plasma()
 	for beam in app.combat.visuals.beams:check(not beam.visible,"Release hides every plasma layer")
 	check(not app.combat.beam_active,"Release clears plasma activity")

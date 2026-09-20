@@ -99,8 +99,8 @@ func _ready() -> void:
 	add_child(geese)
 	# Headless regression runs have no audio device or presentation to render.
 	if DisplayServer.get_name() != "headless":
-		if ResourceLoader.exists("res://assets/audio/music.ogg"):
-			music.stream = load("res://assets/audio/music.ogg")
+		if ResourceLoader.exists("res://assets/audio/runway_music.mp3"):
+			music.stream = load("res://assets/audio/runway_music.mp3")
 			music.stream.loop = true
 		if ResourceLoader.exists("res://assets/audio/geese.ogg"):
 			geese.stream = load("res://assets/audio/geese.ogg")
@@ -193,6 +193,7 @@ func set_context(mode: String, cockpit_view: bool, contact: String, paused_value
 	context_contact = contact
 	context_paused = paused_value
 func reset_flight() -> void:
+	music.stop() # Each runway start cues the supplied track from its trimmed beginning.
 	radio.reset()
 	# Queued bangs must not fire across a replay boundary.
 	spatial_queue.clear()

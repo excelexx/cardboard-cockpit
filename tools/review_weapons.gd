@@ -13,7 +13,7 @@ func run() -> void:
 	app.flight.flaps=0;app.flight.gear=false;app.apply_aircraft_pose();app.combat.spawn_clock=999;app.camera_rig.reset();app.fire_guard=0
 	for index in range(12):
 		app.combat.spawn_contact();var enemy: Dictionary=app.combat.enemies.back()
-		enemy.position=app.flight.position+app.flight.forward()*900+Vector3((index-5.5)*25,25*(index%2),0)
+		enemy.position=app.flight.position+app.flight.forward()*900+Vector3((index-5.5)*25,25*(index%2),0)+app.flight.pose_basis().x*float(OS.get_environment("COCKPIT_CAPTURE_SIDE"))*200
 		enemy.node.position=enemy.position;enemy.fade=1;enemy.course=app.flight.forward()*20;enemy.right=Vector3.ZERO
 	app.get_window().title="Offline weapon review — simulated firing, badge disabled"
 	for i in range(20):app._process(1.0/60);await process_frame

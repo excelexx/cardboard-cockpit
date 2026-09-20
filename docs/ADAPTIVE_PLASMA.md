@@ -24,3 +24,5 @@ Sound starts enabled each launch, with M available to mute. Camera movement and 
 Missiles deal 110 direct damage and up to 25 splash damage to at most two neighbours within 35 metres. Healthy neighbours survive for the plasma cannons. Support launches two missiles every five seconds, alternating the inner and outer hardpoint pairs; it stops below six visible geese. Flocks grow from 6 to 8, 10 and then a maximum of 12 geese.
 
 Weapon presentation adds a brief missile ignition flash, longer tapered motor exhaust, continuous turbulent smoke wakes and a hot exhaust core. Plasma streams carry travelling energy pulses with muzzle coronas and blooms at confirmed hit points. These effects preserve the existing automatic launch cadence, damage and kill-only shake.
+
+Cockpit beams use 32% of the chase-view width. Both emitters are mounted ahead of the cockpit camera and their rendered origins refresh after aircraft motion. Plasma retains valid targets rather than switching between nearby alternatives.

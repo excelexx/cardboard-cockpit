@@ -42,6 +42,8 @@ var runway_lights = null
 var bridge_lights = null
 # 48 m cells covering the inland lakes and reservoirs, so no tree stands in one.
 var lake_cells: Dictionary = {}
+var airport_cells: Dictionary = {}
+var airport_outline := PackedVector2Array()
 
 func _ready() -> void: build()
 func build() -> void:
@@ -118,6 +120,7 @@ func build() -> void:
 	# headless too and the asset test can assert on it.
 	runway_lights = RunwayLights.new(); runway_lights.build(self); add_child(runway_lights)
 	_aim_water_at_sun()
+	_load_airport_footprint()
 	if DisplayServer.get_name()=="headless": return
 	_build_marine_layer()
 	# Airport and terrain are ready before takeoff. City chunks stream ahead.
@@ -210,6 +213,40 @@ func _note_inland_water(mesh: MeshInstance3D,surface: int) -> void:
 			for gz in range(floori(lo.y/48.0),floori(hi.y/48.0)+1):
 				var cell := Vector2i(gx,gz)
 				lake_cells[cell] = maxf(float(lake_cells.get(cell,-1e9)),surface_y)
+
+func _load_airport_footprint() -> void:
+	var scene: Node=load(ROOT+"terrain_KSFO.scn").instantiate();add_child(scene)
+	for mesh in scene.find_children("*","MeshInstance3D",true,false):
+		for surface in range(mesh.mesh.get_surface_count()):
+			var material=mesh.get_active_material(surface)
+			if material is StandardMaterial3D and material.roughness>=.4:_note_airport_surface(mesh,surface)
+	remove_child(scene);scene.free()
+	airport_outline=Geometry2D.convex_hull(airport_outline)
+
+func _note_airport_surface(mesh: MeshInstance3D,surface: int) -> void:
+	var arrays: Array=mesh.mesh.surface_get_arrays(surface)
+	var vertices: PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
+	var indices: PackedInt32Array=arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX]!=null else PackedInt32Array()
+	var count: int=indices.size() if not indices.is_empty() else vertices.size()
+	for i in range(0,count-2,3):
+		var triangle:=PackedVector2Array()
+		for j in range(3):
+			var at: Vector3=mesh.global_transform*vertices[indices[i+j] if not indices.is_empty() else i+j]
+			triangle.append(Vector2(at.x,at.z));airport_outline.append(Vector2(at.x,at.z))
+		var lo:=triangle[0].min(triangle[1]).min(triangle[2]);var hi:=triangle[0].max(triangle[1]).max(triangle[2])
+		for x in range(floori(lo.x/128),floori(hi.x/128)+1):
+			for z in range(floori(lo.y/128),floori(hi.y/128)+1):
+				var key:=Vector2i(x,z)
+				if not airport_cells.has(key):airport_cells[key]=[]
+				airport_cells[key].append(triangle)
+
+func is_airport_surface(x: float,z: float) -> bool:
+	var point:=Vector2(x,z)
+	# Grass gaps between the authored paving surfaces are still airport land.
+	if airport_outline.size()>2 and Geometry2D.is_point_in_polygon(point,airport_outline) and (is_runway(x,z) or ground_height(x,z)>.35):return true
+	for triangle: PackedVector2Array in airport_cells.get(Vector2i(floori(x/128),floori(z/128)),[]):
+		if Geometry2D.is_point_in_polygon(point,triangle):return true
+	return false
 
 func standing_in_water(at: Vector3) -> bool:
 	var level = lake_cells.get(Vector2i(floori(at.x/48.0),floori(at.z/48.0)))

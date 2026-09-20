@@ -568,11 +568,11 @@ func _plasma_targets() -> Array[int]:
 		var cb: float=forward().angle_to(db.normalized())*700+db.length()*.15
 		if assigned.has(int(a.id)):ca+=5000
 		if assigned.has(int(b.id)):cb+=5000
-		if beam_target_ids.has(int(a.id)):ca-=150
-		if beam_target_ids.has(int(b.id)):cb-=150
+		if beam_target_ids.has(int(a.id)):ca-=50000
+		if beam_target_ids.has(int(b.id)):cb-=50000
 		return ca<cb)
 	var first: Dictionary=candidates[0]
-	if candidates.size()==1 or float(first.health)>Tune.PLASMA_FOCUS_HEALTH or first.get("kind","")=="boss":
+	if candidates.size()==1 or (beam_target_ids[0]==int(first.id) and beam_target_ids[1]==int(first.id)) or float(first.health)>Tune.PLASMA_FOCUS_HEALTH or first.get("kind","")=="boss":
 		ids.assign([int(first.id),int(first.id)]);return ids
 	ids.assign([int(first.id),int(candidates[1].id)])
 	# Keep two retained targets on their original emitters instead of flickering swaps.

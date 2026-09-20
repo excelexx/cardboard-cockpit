@@ -9,6 +9,8 @@ var combat: Node
 var projectile_pool := {"missile":[]}
 var beams: Array[MeshInstance3D]=[]
 var beam_lights: Array[OmniLight3D] = []
+var plasma_materials: Array[ShaderMaterial]=[]
+var plasma_view_width := -1.0
 var plasma_muzzle_blooms: Array[MeshInstance3D]=[]
 var plasma_impact_blooms: Array[MeshInstance3D]=[]
 var sprites: Array[Dictionary] = []
@@ -52,7 +54,11 @@ func _ready() -> void:
 		add_child(light); beam_lights.append(light)
 		plasma_muzzle_blooms.append(Art.beam_bloom(self,true))
 		plasma_impact_blooms.append(Art.beam_bloom(self,false))
-	for beam in beams: beam.visible = false
+	for beam in beams:
+		beam.visible=false
+		plasma_materials.append(beam.material_override)
+		for child in beam.find_children("*","MeshInstance3D",true,false):
+			if child.material_override is ShaderMaterial:plasma_materials.append(child.material_override)
 	lead_mesh=MeshInstance3D.new();lead_mesh.mesh=ImmediateMesh.new();lead_mesh.material_override=Art.emissive(Color(.08,.55,.8),1.3,.15);lead_mesh.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;add_child(lead_mesh)
 	for i in range(96):
 		var sprite:=Sprite3D.new();sprite.texture=flash_texture;sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.shaded=false;sprite.visible=false;sprite.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;add_child(sprite);sprite_pool.append(sprite)
@@ -468,6 +474,10 @@ func update_projectile(shot: Dictionary,dt: float) -> void:
 		# cyan puff that used to be here.
 		puff(shot.position,Color(.67,.67,.64,.22),clampf(distance*.008,1.3,7),.28)
 func draw_plasma() -> void:
+	var width: float=.32 if combat.app.cockpit else 1.0
+	if width!=plasma_view_width:
+		for material in plasma_materials:material.set_shader_parameter("width_scale",width)
+		plasma_view_width=width
 	var live: bool = combat.beam_active and combat.app.mode == "flight" and not combat.app.overlay_visible() and not combat.app.yoke_recovery_visible()
 	for index in range(2):
 		var enabled: bool = live and index < combat.beam_ends.size()
@@ -481,7 +491,7 @@ func draw_plasma() -> void:
 		beam_lights[index].global_position = start
 		beam_lights[index].light_energy = 1.2
 		plasma_muzzle_blooms[index].global_position=start
-		Art.drive_bloom(plasma_muzzle_blooms[index],.8,0,.72)
+		Art.drive_bloom(plasma_muzzle_blooms[index],.6 if combat.app.cockpit else .8,0,.32 if combat.app.cockpit else .72)
 		if combat.beam_target_ids[index]>=0:
 			var end: Vector3=combat.beam_ends[index]
 			plasma_impact_blooms[index].global_position=end

@@ -35,7 +35,7 @@ func run()->void:
 	for sample in [Vector3(220,-180,1.2),Vector3(90,-35,-.8),Vector3(40,-90,2.0)]:
 		app.on_action("keyboard_play");app.begin_landing()
 		app.vision.enabled=true;app.vision.tracking=true;app.vision.yoke=Vector2(1,-1);app.vision.throttle=1;app.vision.throttle_confidence=1
-		app.flight.position=Vector3(100,app.surface_height(100,2000)+3.1,2000)
+		app.flight.position=Vector3(100,app.surface_height(100,0)+3.1,0)
 		app.flight.speed=sample.x;app.flight.pitch=-1;app.flight.roll=sample.z;app.flight.vertical_speed=sample.y;app.flight.velocity=Vector3(0,sample.y,-sample.x)
 		app.flight.gear=false;app.flight.flaps=0;app.gear_override=0;app.flaps_override=0
 		app._physics_process(1.0/30)

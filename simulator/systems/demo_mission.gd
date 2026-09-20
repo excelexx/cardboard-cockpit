@@ -12,7 +12,7 @@ const GOOSE_FLIGHT_PATH := "res://systems/goose_flight.gd"
 const FLOCK_CROSS_DEGREES := 40.0
 const FLOCK_SPEED := 19.0
 const FLOCK_REGROUP_DISTANCE := 900.0
-const FLOCK_SPREAD := 600.0
+const FLOCK_SPREAD := 1000.0
 const FLOCK_CLOSE_RATE := 20.0
 const SECOND_WAVE_SIZE := 8
 const WAVE_SECONDS := 18.0
@@ -44,6 +44,12 @@ var wave_size := 0
 var wave_ids: Array[int] = []
 var airborne_clock := 0.0
 var empty_view_clock := 0.0
+const STREAM_MIN_DISTANCE := 200.0
+const STREAM_MAX_DISTANCE := 500.0
+var stream_gap := 350.0
+var stream_distance := 0.0
+var stream_position := Vector3.ZERO
+var wave_tail_clock := 0.0
 const EMPTY_VIEW_SECONDS := 4.0
 var observed_down := 0
 var sortie_kill_base := 0
@@ -195,14 +201,16 @@ func _tick_showcase(dt: float) -> void:
 		c.event("skein_signature",signature,4);c.event("scan",signature,1)
 	elif phase=="gather" and app.flight.airborne and airborne_clock>=FIRST_WAVE_AIRBORNE_SECONDS:
 		act=3;transition("skein");_open_skein(c,1)
-	elif phase=="wave_break" and phase_clock>=WAVE_BREAK_SECONDS and app.flight.airborne:
-		transition("skein");_open_skein(c,wave_number+1)
+	elif phase=="wave_break" and app.flight.airborne:
+		stream_distance+=app.flight.position.distance_to(stream_position);stream_position=app.flight.position
+		if stream_distance>=stream_gap:transition("skein");_open_skein(c,wave_number+1)
 	if phase=="skein":
 		_drive_skein(c,dt)
 		if skein_spawned() and wave_remaining()==0:_finish_wave(c,true)
 		else:
 			empty_view_clock=0.0 if _flock_ahead(c) else empty_view_clock+dt
-			if phase_clock>=WAVE_SECONDS or (skein_spawned() and empty_view_clock>=EMPTY_VIEW_SECONDS):_finish_wave(c,false)
+			if skein_spawned():wave_tail_clock+=dt
+			if wave_tail_clock>=WAVE_SECONDS or (skein_spawned() and (empty_view_clock>=EMPTY_VIEW_SECONDS or stream_distance>=stream_gap)):_finish_wave(c,false)
 	_publish_outcome()
 	c.engagement_enabled=phase=="skein"
 	var delta: Vector3=route_target()-app.flight.position
@@ -218,7 +226,7 @@ func _flock_ahead(c: CombatDirector) -> bool:
 	for enemy: Dictionary in c.enemies:
 		if enemy.health<=0 or not wave_ids.has(int(enemy.id)):continue
 		var delta: Vector3=enemy.position-app.flight.position
-		if delta.length()<2600 and forward.dot(delta.normalized())>cos(deg_to_rad(55)):return true
+		if delta.length()<5000 and forward.dot(delta.normalized())>cos(deg_to_rad(55)):return true
 	return false
 
 ## Endless waves retain only current-wave IDs. Scalar totals count actual
@@ -245,7 +253,7 @@ func _open_skein(c: CombatDirector,number: int = 1) -> void:
 	for enemy: Dictionary in c.enemies:
 		if is_instance_valid(enemy.node):enemy.node.queue_free()
 	c.enemies.clear();c.target_id=-1;c.lock_progress=0;c.spawn_clock=INF
-	empty_view_clock=0
+	empty_view_clock=0;stream_gap=randf_range(STREAM_MIN_DISTANCE,STREAM_MAX_DISTANCE);stream_distance=stream_gap;stream_position=app.flight.position;wave_tail_clock=0
 	wave_number=number;wave_size=size_for_wave(number);wave_kill_base=c.kills
 	wave_ids.clear();skein_ids.clear();skein_alive.clear();skein_killed.clear();flock_altitude=0.0
 	flock_course=_flock_course(app.flight.heading)
@@ -283,7 +291,11 @@ func request_landing() -> void:
 	end_waves();transition("approach")
 
 func _drive_skein(c: CombatDirector,dt: float) -> void:
-	if skein_pending>0:_spawn_slice(c)
+	stream_distance+=app.flight.position.distance_to(stream_position)
+	stream_position=app.flight.position
+	if skein_pending>0 and stream_distance>=stream_gap:
+		_spawn_slice(c);stream_distance=fmod(stream_distance,stream_gap)
+		stream_gap=randf_range(STREAM_MIN_DISTANCE,STREAM_MAX_DISTANCE)
 	_tally_skein(c)
 	if not _combat_flock():_hold_formation(c,dt)
 
@@ -309,16 +321,13 @@ func _flock_course(heading: float) -> Vector3:
 func _spawn_slice(c: CombatDirector) -> void:
 	var f: FlightDynamics=app.flight
 	var forward: Vector3=f.forward()
-	var lead_direction: Vector3=flock_course.normalized()
-	var wing:=Vector3(lead_direction.z,0,-lead_direction.x)
-	var anchor: Vector3=f.position+forward*Tune.SKEIN_SPAWN_DISTANCE+Vector3.UP*Tune.SKEIN_SPAWN_HEIGHT
-	for i in range(mini(Tune.SKEIN_SPAWN_PER_FRAME,skein_pending)):
+	var wing:=Vector3(cos(f.heading),0,sin(f.heading))
+	var count: int=mini(skein_pending,randi_range(1,4))
+	var anchor: Vector3=f.position+forward*1200+Vector3.UP*90
+	for i in range(count):
 		if c.enemies.size()>=MAX_WAVE_SIZE:break
-		var index: int=wave_ids.size()
-		var slot: int=(index+1)/2
-		var side: float=-1.0 if index%2==0 else 1.0
-		var place: Vector3=anchor-lead_direction*(slot*Tune.SKEIN_SLOT_BACK)+wing*(side*slot*Tune.SKEIN_SLOT_SIDE)+Vector3.UP*(slot*Tune.SKEIN_SLOT_RISE)
-		place+=wing*randf_range(-Tune.SKEIN_SLOT_JITTER,Tune.SKEIN_SLOT_JITTER)+Vector3.UP*randf_range(-Tune.SKEIN_SLOT_JITTER,Tune.SKEIN_SLOT_JITTER)
+		var along: float=(float(i)+.5)*minf(stream_gap*.5,180.0)/float(count)+randf_range(-8,8)
+		var place: Vector3=anchor+forward*along+wing*randf_range(-130,130)+Vector3.UP*randf_range(-40,60)
 		var previous_count: int=c.enemies.size()
 		c.spawn_contact("goose")
 		if c.enemies.size()<=previous_count:break
@@ -378,12 +387,7 @@ func _hold_formation(c: CombatDirector,dt: float) -> void:
 			var spread: float=course.angle_to(wanted)
 			if spread>0.0001:course=course.slerp(wanted,clampf(turn/spread,0,1))
 		enemy.course=course.normalized()*clampf(course.length(),16.0,24.0)
-		# Cohesion. While the jet is past them the director pushes stray contacts
-		# sideways and up; the flock closes that gap back up instead of smearing
-		# across the sky, and holds the altitude band it arrived on.
-		var pull: Vector3=centre-enemy.position;pull.y=0
-		var spacing: float=pull.length()
-		if spacing>FLOCK_SPREAD:enemy.position+=pull/spacing*minf(spacing-FLOCK_SPREAD,FLOCK_CLOSE_RATE*dt)
+		# Each encounter keeps its own lane and height along the flight path.
 		enemy.position.y=lerpf(enemy.position.y,float(enemy.get("formation_altitude",flock_altitude)),clampf(dt*.4,0,1))
 		enemy.position.y=maxf(enemy.position.y,app.world.ground_height(enemy.position.x,enemy.position.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
 		enemy.node.position=enemy.position

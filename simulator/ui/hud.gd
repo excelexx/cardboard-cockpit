@@ -204,11 +204,9 @@ func _draw() -> void:
 		if app.camera_previews and app.vision.enabled and not app.settings_visible and not app.calibration_visible:draw_camera_previews()
 	if app.mode=="results": draw_results()
 	if app.toast_time>0 and app.mode=="flight": centered(176,app.toast.to_upper(),18,GREEN)
-	if app.mode=="flight" and app.flight.airborne and not app.landing_started and not app.overlay_visible():button("land",Rect2(600,706,352,48),"LAND NOW",true,"B")
 	if app.landing_transition>0:
 		draw_rect(Rect2(0,0,1600,1000),Color(0.01,.02,.03,clampf(app.landing_transition/1.2,0,1)))
 		centered(496,"YOUR LANDING APPROACH",40,WHITE,display_bold)
-	if app.mode in ["flight","rollout"] and not app.overlay_visible() and not app.yoke_recovery_visible():draw_context_coach()
 	if app.help_visible: draw_help()
 	if app.calibration_visible: draw_camera_setup()
 	if app.credits_visible: draw_credits()
@@ -309,13 +307,6 @@ func draw_flight() -> void:
 	var f: FlightDynamics = app.flight
 	var c: CombatDirector = app.combat
 	var show: bool = not hidden_in_flight()
-	# Top left: what to do. Top right: time.
-	var objective: String = mission_line()
-	if not objective.is_empty():
-		text(Vector2(56,58),"MISSION",18,GREEN,true)
-		var objective_lines: PackedStringArray=tutorial_lines(objective,420,18)
-		for i in range(mini(objective_lines.size(),2)):text(Vector2(56,86+i*22),objective_lines[i],18,WHITE)
-	if c.hull<=65: text(Vector2(56,116),"DAMAGED",18,AMBER,true)
 	var time_left: String = clock_text()
 	if show and not time_left.is_empty():
 		put(mono,Vector2(1244,58),"ELAPSED",18,GREEN,HORIZONTAL_ALIGNMENT_RIGHT,300)
@@ -355,7 +346,6 @@ func draw_flight() -> void:
 	if app.developer_mode: text(Vector2(620,990),"%d FPS · %.0f M/S · %s" % [Engine.get_frames_per_second(),f.speed,"HIGH" if app.high_quality else "BALANCED"],14,SOFT,true)
 func draw_heading_compass(f: FlightDynamics) -> void:
 	var heading: float=fposmod(f.get_heading_degrees()+(298 if app.route_id=="sf" else 0),360)
-	panel(Rect2(520,22,560,88),.42)
 	var nearest: int=int(floor(heading/5))*5
 	for offset in range(-7,9):
 		var degree: int=nearest+offset*5
@@ -367,14 +357,11 @@ func draw_heading_compass(f: FlightDynamics) -> void:
 		if major and absf(x-800)>58:
 			var label: String=["N","E","S","W"][normalized/90] if normalized%90==0 else "%03d" % normalized
 			put(mono,Vector2(x-25,61),label,15,GREEN,HORIZONTAL_ALIGNMENT_CENTER,50)
-	panel(Rect2(749,28,102,48),.85,GREEN)
 	put(display,Vector2(749,65),"%03d°" % int(heading),32,WHITE,HORIZONTAL_ALIGNMENT_CENTER,102)
 	draw_colored_polygon(PackedVector2Array([Vector2(800,82),Vector2(793,96),Vector2(807,96)]),GREEN)
 
 func draw_attitude_altitude(f: FlightDynamics) -> void:
-	var nose: Vector2=app.camera.unproject_position(f.position+f.forward()*2000)
-	var center: Vector2=Vector2(nose.x+240,nose.y).clamp(Vector2(1030,290),Vector2(1110,525))
-	panel(Rect2(center-Vector2(93,133),Vector2(186,266)),.24)
+	var center: Vector2=app.camera.unproject_position(app.combat.reticle_point()).clamp(Vector2(150,180),Vector2(1330,700))
 	var pitch: float=rad_to_deg(f.pitch)
 	for degrees in range(-90,91,10):
 		var y: float=(pitch-degrees)*3.0
@@ -424,17 +411,11 @@ func draw_flight_path(f: FlightDynamics) -> void:
 		var tip: Vector2 = at+Vector2(-22,side*gap)
 		line(tip,tip+Vector2(-9,side*6),faint,1.5)
 func draw_sight(f: FlightDynamics,c: CombatDirector) -> void:
-	draw_flight_path(f)
-	var nose: Vector2 = app.camera.unproject_position(f.position+c.forward()*2000)
-	var ring_edge: Vector3 = c.forward().rotated(app.camera.global_basis.x,deg_to_rad(c.acquire_angle()))
-	var ring_radius: float = clampf(nose.distance_to(app.camera.unproject_position(f.position+ring_edge*1200)),38,115)
 	var tracking: bool = c.target_id>=0 and c.assist
 	var locked: bool = tracking and c.lock_progress>=1
 	# Where the nose points: a quiet ring. Where the guns point: the cross.
-	for i in range(4): ring(nose,ring_radius,i*PI/2+.2,i*PI/2+PI/2-.2,Color(GREEN.r,GREEN.g,GREEN.b,0.55),2)
 	var center: Vector2 = app.camera.unproject_position(c.reticle_point())
 	var sight: Color = RED if locked else AMBER if tracking else GREEN
-	ring(center,14,0,TAU,sight,2)
 	for direction in [Vector2.LEFT,Vector2.RIGHT,Vector2.UP,Vector2.DOWN]: line(center+direction*20,center+direction*34,sight,2)
 	draw_circle(center,2.5,sight)
 	for enemy: Dictionary in c.enemies:
@@ -650,6 +631,14 @@ func draw_settings() -> void:
 	button("settings",Rect2(card.position+Vector2(card.size.x-236,763),Vector2(200,52)),"DONE",true,"HOME")
 
 func camera_card(rect: Rect2,title: String,preview,tracking: bool,compact: bool = false) -> void:
+	if compact:
+		if preview.texture!=null:
+			var image_size: Vector2=preview.texture.get_size()
+			image_size*=minf(rect.size.x/image_size.x,rect.size.y/image_size.y)
+			draw_texture_rect(preview.texture,Rect2(rect.position+(rect.size-image_size)/2,image_size),false)
+		else:put(body,rect.position+Vector2(8,rect.size.y*.5),"Waiting for camera",14,SOFT)
+		put(mono,rect.position+Vector2(7,17),title,11,WHITE)
+		return
 	panel(rect,.88,GREEN if preview.texture!=null and tracking else HAIRLINE)
 	put(mono,rect.position+Vector2(7 if compact else 12,17 if compact else 21),title,12 if compact else 14,GREEN)
 	var picture:=Rect2(rect.position+Vector2(3,23),rect.size-Vector2(6,42)) if compact else Rect2(rect.position+Vector2(6,31),rect.size-Vector2(12,60))
@@ -660,8 +649,7 @@ func camera_card(rect: Rect2,title: String,preview,tracking: bool,compact: bool 
 		put(body,picture.position+Vector2(10,picture.size.y/2),"Waiting for camera",16,SOFT)
 	put(mono,rect.position+Vector2(7 if compact else 12,rect.size.y-(6 if compact else 10)),"TRACKING" if tracking and preview.texture!=null else "LIVE / TAG NOT FOUND" if preview.texture!=null else "DISCONNECTED",13,GREEN if tracking and preview.texture!=null else AMBER)
 func draw_pilot_readouts(f: FlightDynamics) -> void:
-	panel(Rect2(32,838,536,146),.82)
-	var top: float=838
+	var top: float=882
 	put(mono,Vector2(50,top+25),"SPEED",14,GREEN)
 	put(display,Vector2(50,top+69),"%d" % int(cas_knots(f)),44,WHITE)
 	put(mono,Vector2(142,top+65),"KTS",14,SOFT)
@@ -672,8 +660,8 @@ func draw_pilot_readouts(f: FlightDynamics) -> void:
 	put(mono,Vector2(390,top+103),"BANK %+.1f°" % rad_to_deg(f.roll),15,GREEN)
 
 func draw_camera_previews() -> void:
-	camera_card(Rect2(976,772,296,212),"LAPTOP / YOKE + ID 4",app.yoke_preview,app.vision.tracking,true)
-	camera_card(Rect2(1288,772,296,212),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4,true)
+	camera_card(Rect2(992,831,300,169),"LAPTOP / YOKE + ID 4",app.yoke_preview,app.vision.tracking,true)
+	camera_card(Rect2(1300,831,300,169),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4,true)
 func draw_camera_setup() -> void:
 	zones.clear();dim();panel(Rect2(180,90,1240,820),.95)
 	put(display_bold,Vector2(218,166),"TWO-CAMERA COCKPIT",56,WHITE)
