@@ -18,21 +18,19 @@ const SECTIONS: Array = [
 	[-1.22,.230,.225,.070],[-0.95,.360,.345,.020],[-0.55,.500,.470,-.015],[-0.10,.560,.520,-.030],[0.40,.545,.495,-.020],
 	[0.85,.455,.400,.000],[1.20,.330,.255,.020],[1.50,.215,.115,.035],[1.78,.120,.040,.050],[1.92,.015,.010,.055]]
 
-## Detail ladder. 0 is the hero bird, 1 is indistinguishable past ~500 m,
-## 2 is a silhouette for the far end of the skein.
+## Lightweight detail ladder: 512, 240, and 152 triangles per bird.
 const LOD_LEVELS: Array = [
-	{"rings":96,"sides":24,"spans":40,"chords":10},
-	{"rings":28,"sides":14,"spans":14,"chords":4},
-	{"rings":14,"sides":10,"spans":6,"chords":2}]
+	{"rings":24,"sides":8,"spans":8,"chords":2},
+	{"rings":16,"sides":6,"spans":6,"chords":1},
+	{"rings":10,"sides":6,"spans":4,"chords":1}]
 ## Swap down past these distances, swap back up at LOD_UP: the gap is the
 ## hysteresis that stops a bird flickering between levels on the boundary.
 const LOD_DOWN: Array = [500.0,1200.0]
 const LOD_UP: Array = [420.0,1050.0]
-## Shadows are the expensive half of a bird; past this it casts nothing.
+## Kept for distance-policy compatibility; low-detail birds never cast shadows.
 const SHADOW_DISTANCE := 500.0
 const WING_SPAN := 3.30
 
-static var _grain: NoiseTexture2D
 static var _body_lod: Array[ArrayMesh] = []
 static var _wing_lod: Array = []            # [lod][0]=left wing, [1]=right wing
 static var _body_material: ShaderMaterial
@@ -69,7 +67,7 @@ static func create(lod: int = 0) -> Node3D:
 		surface.material_override = _wing_material
 		wing.add_child(surface); root.add_child(wing)
 	root.set_meta("lod",level)
-	_apply_shadows(root,level==0)
+	_apply_shadows(root,false)
 	return root
 
 ## Swap a live bird between detail levels. A mesh pointer swap, nothing rebuilt.
@@ -86,7 +84,7 @@ static func set_lod(root: Node3D, lod: int) -> bool:
 		var surface := pivot.get_node_or_null("Feathers") as MeshInstance3D
 		if surface!=null: surface.mesh = _wing_lod[level][0 if side<0 else 1]
 	root.set_meta("lod",level)
-	_apply_shadows(root,level==0)
+	_apply_shadows(root,false)
 	return true
 
 static func current_lod(root: Node3D) -> int:
@@ -109,9 +107,6 @@ static func _apply_shadows(root: Node3D, on: bool) -> void:
 			geometry.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if on else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 static func _ensure_materials() -> void:
-	if _grain==null:
-		var noise := FastNoiseLite.new(); noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH; noise.frequency = 0.035; noise.fractal_octaves = 4
-		_grain = NoiseTexture2D.new(); _grain.width = 256; _grain.height = 256; _grain.seamless = true; _grain.generate_mipmaps = true; _grain.noise = noise
 	if _body_material==null: _body_material = _material(false)
 	if _wing_material==null: _wing_material = _material(true)
 
@@ -123,7 +118,7 @@ static func wing_material() -> ShaderMaterial:
 
 static func _material(wing: bool) -> ShaderMaterial:
 	var material := ShaderMaterial.new(); material.shader = PLUMAGE
-	material.set_shader_parameter("grain",_grain); material.set_shader_parameter("wing",wing)
+	material.set_shader_parameter("wing",wing)
 	return material
 
 ## Resample the hand-placed sections with Catmull-Rom so the loft is smooth.

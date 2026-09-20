@@ -425,6 +425,15 @@ func draw_sight(_f: FlightDynamics,c: CombatDirector) -> void:
 	var sight: Color = RED if locked else AMBER if tracking else GREEN
 	for direction in [Vector2.LEFT,Vector2.RIGHT,Vector2.UP,Vector2.DOWN]: line(center+direction*20,center+direction*34,sight,2)
 	draw_circle(center,2.5,sight)
+	# Red boxes identify geese without adding target labels or distances.
+	for enemy: Dictionary in c.enemies:
+		if not c.active:break
+		if enemy.health<=0 or app.camera.is_position_behind(enemy.position):continue
+		var point: Vector2=app.camera.unproject_position(enemy.position)
+		if point.x<25 or point.x>1575 or point.y<115 or point.y>810:continue
+		var distance: float=_f.position.distance_to(enemy.position)
+		var radius: float=clampf(22000.0/maxf(distance,1.0),18,70)
+		brackets(point,radius,RED)
 func plasma_status(active: bool, ids: Variant) -> String:
 	if not active:return "OFF"
 	if ids is Array and ids.size()>=2:

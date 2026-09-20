@@ -1,6 +1,6 @@
 # Goose Protocol — SPECTRE X-26
 
-Version **0.22.3** is one continuous San Francisco judge demo: take off, fly, shoot adaptive dual plasma and keep clearing new flocks for as long as you like. The HUD keeps the aiming area clear. Press **B** or **badge B** when you want to land, then fly the approach yourself.
+Version **0.22.4** is one continuous San Francisco judge demo: take off, fly, shoot adaptive dual plasma and keep clearing new flocks for as long as you like. The HUD keeps the aiming area clear. Press **B** or **badge B** when you want to land, then fly the approach yourself.
 
 Open **Launch Cardboard Cockpit.command** or the packaged **Cardboard Cockpit.app**. The demo uses excelex's cardboard controls and settings with the current graphics and aircraft presentation. **Watch demo** flies and shoots automatically. [Judge demo flow](docs/JUDGE_DEMO.md).
 

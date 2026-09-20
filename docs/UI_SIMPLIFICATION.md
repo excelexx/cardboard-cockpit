@@ -15,3 +15,7 @@ Verification: directional wave spacing (34 checks), endless waves (253), HUD rea
 The flight aiming area now contains only the crosshair and its hit confirmation. Target labels, distances, brackets, guide lines, waypoint overlays, and reward popups are removed. Alerts and captions are moved to the left; landing guidance and a three-mark pitch ladder with altitude are on the right. Goose model scale increases from 3 to 6 (twice the linear size). Flock counts and spacing are unchanged.
 
 Validation: HUD readouts (75 checks) and combat feel (16 checks) pass; native flight screenshot inspected.
+
+## Low-detail geese
+
+Goose meshes now use 512 / 240 / 152 triangles, down from 7,808 / 1,232 / 376. Plumage uses vertex colors with simple lighting, no noise texture, feather shading, rim effects, or goose shadows. Size and animation are preserved. Red target brackets are restored without labels or distances. Geometry budget and combat checks pass; this verifies rendering workload reduction, not a measured whole-game FPS gain.
