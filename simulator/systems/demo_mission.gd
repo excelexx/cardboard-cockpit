@@ -16,8 +16,8 @@ const FLOCK_SPREAD := 1000.0
 const FLOCK_CLOSE_RATE := 20.0
 const SECOND_WAVE_SIZE := 2
 const WAVE_SECONDS := 18.0
-const FIRST_WAVE_AIRBORNE_SECONDS := 10.0
-const MAX_WAVE_SIZE := 2
+const FIRST_WAVE_AIRBORNE_SECONDS := 8.0
+const MAX_WAVE_SIZE := 3
 const HISTORY_LIMIT := 32
 const WAVE_BREAK_SECONDS := 3.0
 func route_points() -> Array[Vector3]: return SHOWCASE_POINTS if cinematic else SFRoute.POINTS if app.route_id=="sf" else CoastalRoute.POINTS
@@ -46,7 +46,7 @@ var airborne_clock := 0.0
 var empty_view_clock := 0.0
 const STREAM_MIN_DISTANCE := 600.0
 const STREAM_MAX_DISTANCE := 1500.0
-const SPAWN_INTERVAL := 10.0
+const SPAWN_INTERVAL := 8.0
 var next_spawn_at := 0.0
 var stream_gap := 1050.0
 var stream_distance := 0.0
@@ -245,7 +245,7 @@ func wave_down() -> int:
 func wave_remaining() -> int: return maxi(0,wave_size-wave_down())
 func wave_label() -> String: return "WAVE %d" % wave_number if wave_number>0 else "ENDLESS GEESE"
 func size_for_wave(number: int) -> int:
-	return 1 if number%2==1 else 2
+	return 2 if number%2==1 else 3
 
 func _open_skein(c: CombatDirector,number: int = 1) -> void:
 	if skein_final or app.landing_started or phase in ["approach","rollout"]:return

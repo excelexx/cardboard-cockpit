@@ -1,6 +1,6 @@
 shader_type spatial;
 // Low-detail plumage: colors evaluated per vertex, no feather texture or sheen.
-render_mode diffuse_lambert, specular_disabled, vertex_lighting, shadows_disabled;
+render_mode unshaded, shadows_disabled;
 uniform bool wing = false;
 instance uniform float damage : hint_range(0.0, 1.0) = 0.0;
 instance uniform float flex = 0.0;

@@ -31,3 +31,9 @@ Validation: directional wave checks (72), mixer/settings checks (32), and Python
 Waves alternate between one and two geese. Arrivals are one at a time, ten seconds apart (including between waves), starting ten seconds after takeoff. This replaces distance-based arrival spacing. Each living goose has a health ring outside its red brackets. Both plasma emitters focus one goose and deal 100 health over 1.5 seconds; ordinary hits do not trigger camera shake.
 
 Validation: 49 timed/altitude checks, 253 endless-wave checks, 28 plasma checks (including survival before 1.5 seconds and death at 1.5 seconds), and 19 combat checks pass.
+
+## Eight-second arrivals and lighter rendering
+
+Waves now alternate between two and three geese with one arrival every eight seconds. Goose scale doubles again to 24. Mesh detail is 176 / 96 / 64 triangles; shared meshes prewarm at startup. The transparent spectral overlay formerly allocated per spawn is removed, and goose colors use unshaded rendering. Laser widths double in cockpit and chase views. Calibration replaces the existing heading with “Set throttle to 0%” while throttle is nonzero, and restores the three-second progress bar without another text line.
+
+Validation: 64 arrival/altitude checks, 253 endless-wave checks, 75 calibration checks, 19 combat checks, and actual mesh triangle budgets pass.

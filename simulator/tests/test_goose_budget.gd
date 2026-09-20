@@ -8,7 +8,7 @@ func _initialize() -> void:
 		for path in ["Body","WingL/Feathers","WingR/Feathers"]:
 			var mesh: MeshInstance3D=goose.get_node(path)
 			triangles+=mesh.mesh.surface_get_array_index_len(0)/3
-		if triangles>512:failures+=1
+		if triangles>176:failures+=1
 		print("GOOSE LOD ",lod," triangles=",triangles)
 		goose.free()
 	print("GOOSE BUDGET failures=",failures)

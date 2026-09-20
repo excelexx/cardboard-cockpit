@@ -420,11 +420,9 @@ func event(kind: String,at: Vector3,weight: float) -> void:
 			impact_emphasis=.055;combat.app.camera_rig.impulse(.22 if big else .10)
 	elif kind=="boss_signature":scan_time=1.0;puff(at,Color(.06,.6,1,.25),180,2.0)
 func add_target(enemy: Dictionary) -> void:
-	var shell: ShaderMaterial
-	if DisplayServer.get_name()!="headless":
-		shell=ShaderMaterial.new();shell.shader=load("res://assets/vfx/spectral_target.gdshader")
-		for geometry in enemy.node.find_children("*","MeshInstance3D",true,false):geometry.material_overlay=shell
-	enemy.spectral_material=shell
+	# HUD brackets and health rings replace the per-goose transparent glow pass.
+	enemy.spectral_material=null
+	if enemy.kind!="boss":return
 	var root:=Node3D.new();root.name="SpectralTracking";enemy.node.add_child(root)
 	var material:=Art.emissive(Color(.12,.75,1),2,.12)
 	# The three rotating cyan arcs that used to live here are gone: the HUD
@@ -474,7 +472,7 @@ func update_projectile(shot: Dictionary,dt: float) -> void:
 		# cyan puff that used to be here.
 		puff(shot.position,Color(.67,.67,.64,.22),clampf(distance*.008,1.3,7),.28)
 func draw_plasma() -> void:
-	var width: float=.32 if combat.app.cockpit else 1.0
+	var width: float=.64 if combat.app.cockpit else 2.0
 	if width!=plasma_view_width:
 		for material in plasma_materials:material.set_shader_parameter("width_scale",width)
 		plasma_view_width=width

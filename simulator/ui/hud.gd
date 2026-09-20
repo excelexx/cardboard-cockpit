@@ -829,7 +829,9 @@ func draw_control_setup() -> void:
 	var info_y: float=camera_y+500.0
 	panel(Rect2(64,info_y,1472,132),.95)
 	var heading: String="Hold yoke upright for 3 seconds" if lesson.calibrating else "Ready to fly" if done else str(step[2])
+	if (lesson.calibrating or done) and roundi(v.throttle*100)>0:heading="Set throttle to 0%"
 	put(display_bold,Vector2(90,info_y+46),heading,32,WHITE)
+	if lesson.calibrating:bar(Rect2(90,info_y+59,1420,8),clampf(lesson.calibration_progress,0,1),GREEN)
 	var values: String="THROTTLE %3d%%   BANK %+.0f%%   PITCH %+.0f%%   YAW %+.0f%%" % [roundi(v.throttle*100),v.steering().x*100,v.steering().y*100,v.steering().z*100]
 	put(mono,Vector2(90,info_y+98),values,18,GREEN)
 	if not v.connected:put(body,Vector2(64,894),"Start Launch Two-Camera Cockpit with your phone connected, then return here.",15,AMBER)

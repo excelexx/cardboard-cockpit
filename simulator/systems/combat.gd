@@ -14,6 +14,7 @@ var primary_used := false
 var near_miss_clock := 0.0
 var event_log: Array[Dictionary] = []
 func _ready() -> void:
+	GooseModel.prewarm()
 	visuals=load("res://systems/combat_visuals.gd").new();visuals.combat=self;add_child(visuals)
 func event(kind: String,at: Vector3=Vector3.ZERO,weight: float=1.0) -> void:
 	event_log.append({"event":kind,"time":elapsed})
@@ -219,7 +220,7 @@ func tick(dt: float) -> void:
 	message_time = maxf(0,message_time-dt)
 	if engagement_enabled: spawn_clock -= dt
 	attack_spacing = maxf(0,attack_spacing-dt)
-	var desired_contacts: int=2
+	var desired_contacts: int=3
 	if boss_id>=0:desired_contacts=1
 	if engagement_enabled and spawn_clock<=0 and enemies.size()<desired_contacts:
 		spawn_contact(); arrival_index += 1

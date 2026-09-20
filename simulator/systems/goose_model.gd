@@ -18,11 +18,11 @@ const SECTIONS: Array = [
 	[-1.22,.230,.225,.070],[-0.95,.360,.345,.020],[-0.55,.500,.470,-.015],[-0.10,.560,.520,-.030],[0.40,.545,.495,-.020],
 	[0.85,.455,.400,.000],[1.20,.330,.255,.020],[1.50,.215,.115,.035],[1.78,.120,.040,.050],[1.92,.015,.010,.055]]
 
-## Lightweight detail ladder: 512, 240, and 152 triangles per bird.
+## Lightweight detail ladder: 176, 96, and 64 triangles per bird.
 const LOD_LEVELS: Array = [
-	{"rings":24,"sides":8,"spans":8,"chords":2},
-	{"rings":16,"sides":6,"spans":6,"chords":1},
-	{"rings":10,"sides":6,"spans":4,"chords":1}]
+	{"rings":12,"sides":6,"spans":4,"chords":1},
+	{"rings":8,"sides":4,"spans":4,"chords":1},
+	{"rings":6,"sides":4,"spans":2,"chords":1}]
 ## Swap down past these distances, swap back up at LOD_UP: the gap is the
 ## hysteresis that stops a bird flickering between levels on the boundary.
 const LOD_DOWN: Array = [500.0,1200.0]
