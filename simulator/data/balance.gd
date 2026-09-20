@@ -165,8 +165,8 @@ const FEATHER_DOWN_LIFETIME := 3.5
 
 # Readable primary bursts and slow individual guided missiles.
 const MISSILE_STORES := -1
-const MISSILE_DAMAGE := 130.0
-const MISSILE_INTERVAL := 3.0
+const MISSILE_DAMAGE := 180.0
+const MISSILE_INTERVAL := 1.0
 const MISSILE_SPEED := 600.0
 const MISSILE_ACCELERATION_TIME := .5
 const MISSILE_IGNITION_DELAY := .18
@@ -190,5 +190,16 @@ const MISSILE_SMOKE_TIME := 3.0
 const BEAM_DPS := 100.0
 const BEAM_RANGE := 1900.0
 const SALVO_STAGGER := .085
-const MAX_MISSILES := 8
+const MAX_MISSILES := 24
 const MISSILE_VISUAL_SCALE := 3.2
+
+# Adaptive primary beams and automatic swarm support.
+const PLASMA_HALF_ANGLE := 16.0
+const PLASMA_FOCUS_HEALTH := 150.0
+const SWARM_MIN_TARGETS := 6
+const SWARM_RANGE := 2400.0
+const SWARM_HALF_ANGLE := 70.0
+
+const SWARM_BURST_SIZE := 4
+const MISSILE_BLAST_RADIUS := 120.0
+const MISSILE_SPLASH_DAMAGE := 180.0

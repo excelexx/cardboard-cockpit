@@ -18,24 +18,26 @@ func run():
 	app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
 	var target: Dictionary = target_at(400)
-	check(target.health==100 and Balance.GUN_ROUNDS_PER_PACKET==4 and Balance.GUN_DAMAGE_PER_ROUND==5 and is_equal_approx(Balance.GUN_INTERVAL,.10),"Four-round cannon packets retain damage with the new slower cadence")
-	var gun_ttk := 0.0
+	check(target.health==100 and Balance.BEAM_DPS==100,"Normal contact durability and per-beam damage are explicit")
+	var plasma_ttk:=0.0
 	for i in range(600):
-		app.combat.tick(1.0/120); app.combat.fire_gun()
-		gun_ttk += 1.0/120
-		if app.combat.kills>0: break
-	check(app.combat.kills==1 and app.combat.rounds_hit>0 and app.combat.beam_active,"Combined minigun and plasma clear the target with recorded cannon hits")
-	check(gun_ttk>.1 and gun_ttk<1,"At 400 metres the current branch keeps gun travel visible and the kill responsive")
-	target = target_at(600)
-	app.combat.hurt_enemy(target,Balance.GUN_ROUNDS_PER_PACKET*Balance.GUN_DAMAGE_PER_ROUND,"cannon",target.position)
-	check(target.health==80 and app.combat.kills==0,"One four-round packet damages but does not kill a fresh goose")
-	for i in range(4):app.combat.hurt_enemy(target,20,"cannon",target.position)
-	check(app.combat.kills==1 and app.combat.missiles_fired==0,"Five cannon packets clear a target without secondary ordnance")
+		app.combat.fire_primary();app.combat.update_beam(1.0/120)
+		plasma_ttk+=1.0/120
+		if app.combat.kills>0:break
+	check(app.combat.kills==1 and app.combat.rounds_fired==0,"Focused plasma clears the target without cannon rounds")
+	check(absf(plasma_ttk-.5)<.02,"Two focused100DPS emitters clear100 health in half a second")
+	target=target_at(600)
+	app.combat.spawn_contact();var second: Dictionary=app.combat.enemies.back()
+	second.position=app.flight.position+Vector3(30,0,-600);second.fade=1;second.health=100
+	app.combat.fire_primary();app.combat.update_beam(.1)
+	check(is_equal_approx(target.health,90) and is_equal_approx(second.health,90),"Split beams deal one emitter's damage to each separate target")
+	app.combat.gun_firing_time=0;app.combat.update_beam(.2)
+	check(is_equal_approx(target.health,90) and is_equal_approx(second.health,90),"Released plasma stops target damage")
 	var speeds: Array[float] = []
 	for hz in [60,120]:
 		app.start_flight("combat"); app.flight.position.y = 800; app.flight.power_input = 1; app.flight.throttle = 1
 		for i in range(hz*2): app.flight.step(1.0/hz,Vector3.ZERO,false,0,false)
 		speeds.append(app.flight.speed)
 	check(absf(speeds[0]-speeds[1])<1,"Speed response is consistent at 60 and 120 Hz")
-	print("BALANCE PROFILE: ",checks," checks / ",failures.size()," failures / gun TTK 400m=",gun_ttk," / speed at 2s=",speeds)
+	print("BALANCE PROFILE: ",checks," checks / ",failures.size()," failures / plasma TTK400m=",plasma_ttk," / speed at 2s=",speeds)
 	app.queue_free(); await process_frame; quit(0 if failures.is_empty() else 1)

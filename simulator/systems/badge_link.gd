@@ -157,7 +157,7 @@ func instrument_snapshot(app: Node) -> Dictionary:
 		for enemy: Dictionary in c.enemies:
 			if enemy.health<=0 or enemy.get("retiring",false):continue
 			var delta: Vector3=enemy.position-f.position
-			contacts.append({"x":clampf(delta.dot(right),-32767,32767),"y":clampf(delta.dot(forward),-32767,32767),"vx":clampf(Vector3(enemy.get("velocity",Vector3.ZERO)-f.velocity).dot(right),-32767,32767),"vy":clampf(Vector3(enemy.get("velocity",Vector3.ZERO)-f.velocity).dot(forward),-32767,32767),"altitude":clampf(delta.y,-32767,32767),"kind":2 if _objective_contact(app,enemy) else 1,"selected":1 if enemy.id==c.target_id else 0})
+			contacts.append({"x":clampf(delta.dot(right),-32767,32767),"y":clampf(delta.dot(forward),-32767,32767),"vx":clampf(Vector3(enemy.get("velocity",Vector3.ZERO)-f.velocity).dot(right),-32767,32767),"vy":clampf(Vector3(enemy.get("velocity",Vector3.ZERO)-f.velocity).dot(forward),-32767,32767),"altitude":clampf(delta.y,-32767,32767),"kind":2 if _objective_contact(app,enemy) else 1,"selected":1 if (c.beam_target_ids.has(int(enemy.id)) if c.beam_active else enemy.id==c.target_id) else 0})
 	# Threats and selected targets must not disappear behind the 12-contact limit.
 	contacts.sort_custom(func(a: Dictionary,b: Dictionary) -> bool:
 		var pa: int=0 if a.kind==4 else 1 if a.selected else 2 if a.kind==2 else 3

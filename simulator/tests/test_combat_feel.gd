@@ -40,13 +40,11 @@ func run():
 	check(app.combat.target_id==-1 and app.combat.lock_progress<1,"A target outside the XLX release cone releases immediately")
 	for i in range(24): app.combat.update_aim(1.0/120)
 	check(app.combat.assisted_direction().angle_to(app.flight.forward())<deg_to_rad(.5),"Gun sight returns to the nose after losing the target")
-	app.combat.fire_gun()
-	check(not app.combat.shots.is_empty(),"An unlocked pilot can still fire the cannon")
-	var shot: Dictionary = app.combat.shots.back()
-	check(shot.kind=="cannon" and shot.target==-1,"Off-centre contacts do not secretly steer a released cannon sight")
-	var velocity: Vector3=shot.velocity
-	app.combat.update_shots(.1)
-	check(shot.velocity.y<velocity.y and shot.velocity.length()<velocity.length(),"Unlocked cannon flight follows gravity and drag")
+	app.combat.assist=false;app.combat.aim_strength=0;app.combat.fire_primary();app.combat.update_beam(.1)
+	check(app.combat.beam_active and app.combat.shots.is_empty(),"An unlocked pilot can fire plasma without hidden bullet projectiles")
+	check(app.combat.beam_target_ids==[-1,-1],"Disabled assistance cannot steer plasma onto an off-axis target")
+	var start: Vector3=app.fighter_fx.plasma_muzzle_position(Vector3.ZERO,0)
+	check((app.combat.beam_ends[0]-start).normalized().is_equal_approx(app.flight.forward()),"Unassisted plasma points straight ahead")
 	app.start_flight("combat"); app.flight.position.y = 600; app.flight.power_input = 1; app.flight.throttle = 1
 	var speed: float = app.flight.speed
 	for i in range(240): app.flight.step(1.0/120,Vector3.ZERO,false,0,false)

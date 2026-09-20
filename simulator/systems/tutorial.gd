@@ -2,12 +2,12 @@ extends RefCounted
 class_name FlightTutorial
 ## Coaching happens inside Play. It never stops simulation or requires a menu.
 const LESSONS: Array[Dictionary]=[
- {"title":"FIRST THREE GEESE","lines":["We will shoot down your first three geese together.","After that: shoot down 12 geese, then land at SFO."]},
+ {"title":"FIRST THREE GEESE","lines":["We will shoot down your first three geese together.","After that: clear twelve geese, then twenty more, and land at SFO."]},
  {"title":"HOW TO FLY","lines":["Turn the yoke to bank. Tilt it toward you to climb, away to dive.","Push the throttle to speed up, pull to slow down. Arrow keys and W / S work too."]},
- {"title":"THE GUN","lines":["Show the printed gun tag ID 4, or hold Space or left mouse, to fire.","Put the ring on a goose. Cover the tag or release the button to stop."]},
- {"title":"AIM AND RELEASE","lines":["Keep the aiming ring on a goose while you fire.","Now cover the gun tag or release Space and left mouse to stop firing."]},
+ {"title":"DUAL PLASMA","lines":["Show plasma gun tag ID 4, or hold Space or left mouse, to fire both beams.","Put the ring on a goose. Cover the tag or release the button to stop."]},
+ {"title":"AIM AND RELEASE","lines":["The beams split across two geese or focus together on one.","Now cover the gun tag or release Space and left mouse to stop firing."]},
  {"title":"KEEP GOING","lines":["Keep geese near the ring and shoot down three.","Badge LEFT changes the view, HOME pauses, UP turns auto-fly on or off."]},
- {"title":"YOU ARE READY","lines":["Three geese down. The rest is up to you.","A big flock comes in at the end. Clear it, then press badge B or L to land."]},
+ {"title":"YOU ARE READY","lines":["Three geese down. The rest is up to you.","Missiles fire automatically in large flocks: four every second. Clear both waves, then press B or L to land."]},
  {"title":"LANDING AT SFO","lines":["Gear and flaps are down and the weapons are off.","The jet lands and brakes by itself. Enjoy the view."]}
 ]
 var app: Node

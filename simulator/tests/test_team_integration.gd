@@ -44,7 +44,7 @@ func run() -> void:
 	app.start_flight("combat");app.vision.enabled=true;app.vision.tracking=true;app.fire_guard=0
 	var camera_packet: Dictionary={"version":1,"sequence":10,"timestamp":100,"tracking":true,"yoke":{"roll":0,"pitch":0,"yaw":0,"confidence":1},"throttle":{"value":.4,"confidence":1},"weapons":{"gun":true}}
 	check(app.vision._accept_packet(JSON.stringify(camera_packet).to_utf8_buffer(),100),"Visible gun tag accepted")
-	check(app.gun_requested(),"Visible tag directly requests combined primary firing")
+	check(app.gun_requested(),"Visible tag directly requests adaptive dual plasma")
 	camera_packet.sequence=11;camera_packet.weapons={"gun":false}
 	check(app.vision._accept_packet(JSON.stringify(camera_packet).to_utf8_buffer(),110),"Covered gun tag accepted")
 	check(not app.gun_requested(),"Covering the tag immediately stops the firing request")

@@ -16,7 +16,7 @@ func run() -> void:
 	app.mode="flight";app.fire_guard=0
 	app.vision.enabled=true;app.vision.tracking=true;app.vision.gun_trigger=true
 	app.combat.primary_used=true;app.tutorial.show(2);app.tutorial.tick(4)
-	check(app.tutorial.index==3,"Gun activity advances to aim and release coaching")
+	check(app.tutorial.index==3,"Plasma activity advances to aim and release coaching")
 	app.tutorial.tick(4)
 	check(app.tutorial.index==3,"Release coaching waits while the gun tag is visible")
 	app.vision.gun_trigger=false;app.combat.gun_firing_time=0;app.tutorial.tick(.1)

@@ -1,3 +1,5 @@
+> Superseded by [adaptive dual plasma](ADAPTIVE_PLASMA.md): the minigun is now removed, and four-missile salvos launch automatically with area damage.
+
 # Weapon readability and two flocks — 0.17.0
 
 Primary input remains excelex's visible gun tag (ID4), or held Space/left mouse. It now fires minigun and plasma together, as requested. T/right mouse independently fires slow guided missiles. There are no latched switches. The latest request supersedes the earlier gun-only direction; the camera setup, sensitivity/agility menu, two flight modes and tracking recovery remain.

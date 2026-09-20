@@ -12,17 +12,16 @@ const USE_SPECTRE_AIRFRAME := true
 const SPECTRE_SCALE := Vector3.ONE
 const F35_SCALE := Vector3(1.06, 1.0, 1.07)
 const SCALE := SPECTRE_SCALE if USE_SPECTRE_AIRFRAME else F35_SCALE
-## Exhaust exit plane and gun muzzle in aircraft space; the effects layer hangs
-## the plume, nozzle glow and muzzle flash off these.
+## Exhaust exit plane and paired emitter origins in aircraft space.
 const NOZZLE := Vector3(0, -0.30, 7.28) if USE_SPECTRE_AIRFRAME else Vector3(0, -0.782, 7.32)
-# Forward chine pods: the barrel cluster and accelerator sit outside the hull,
-# while the tapered rear fairings blend into the shoulder behind them.
-const GUN_SCALE := 1.45
+# Matching plasma accelerators sit clear of both forward chines.
 const PLASMA_SCALE := 1.65
-const GUN_MOUNT := Vector3(-1.70, 0.30, -4.00) if USE_SPECTRE_AIRFRAME else Vector3(-1.25, 0.30, -3.70)
 const PLASMA_MOUNT := Vector3(1.72, 0.30, -3.65) if USE_SPECTRE_AIRFRAME else Vector3(1.25, 0.30, -3.70)
-const MUZZLE := GUN_MOUNT + Vector3(0, 0, Weapons.MUZZLE_Z * GUN_SCALE)
-const PLASMA_MUZZLE := PLASMA_MOUNT + Vector3(0, 0, -0.52 * PLASMA_SCALE)
+const PLASMA_LEFT_MOUNT := Vector3(-PLASMA_MOUNT.x, PLASMA_MOUNT.y, PLASMA_MOUNT.z)
+const PLASMA_MUZZLE := PLASMA_LEFT_MOUNT + Vector3(0, 0, -0.52 * PLASMA_SCALE)
+const PLASMA_RIGHT_MUZZLE := PLASMA_MOUNT + Vector3(0, 0, -0.52 * PLASMA_SCALE)
+const PLASMA_MUZZLES: Array[Vector3] = [PLASMA_MUZZLE, PLASMA_RIGHT_MUZZLE]
+const MUZZLE := PLASMA_MUZZLE # Legacy primary-origin callers resolve the left emitter.
 
 static func _paint(livery: Texture2D) -> ShaderMaterial:
 	var material := Spectre.paint_material()
@@ -36,29 +35,18 @@ static func create() -> Node3D:
 	model.scale = SCALE
 	for geometry: Node in model.find_children("*", "GeometryInstance3D", true, false):
 		geometry.layers = 2
-	# Keep the authored graphite, machined edges, gold trim and heat shaders.
-	# The gimbal translates for recoil; only GatlingRotor rotates.
-	_hardpoint(model, GUN_MOUNT, -1.0, 3.30)
-	var gun_mount := Node3D.new()
-	gun_mount.name = "GunMount"
-	gun_mount.position = GUN_MOUNT
-	model.add_child(gun_mount)
-	var gimbal := Node3D.new()
-	gimbal.name = "GunGimbal"
-	gun_mount.add_child(gimbal)
-	var gun := Weapons.rotary_cannon()
-	gun.scale = Vector3.ONE * GUN_SCALE
-	gimbal.add_child(gun)
-
-	_hardpoint(model, PLASMA_MOUNT, 1.0, 1.85)
-	var plasma := Weapons.plasma_cannon()
-	plasma.position = PLASMA_MOUNT
-	plasma.scale = Vector3.ONE * PLASMA_SCALE
-	model.add_child(plasma)
+	for index in range(2):
+		var position: Vector3 = PLASMA_LEFT_MOUNT if index == 0 else PLASMA_MOUNT
+		_hardpoint(model, position, -1.0 if index == 0 else 1.0, 1.85)
+		var plasma := Weapons.plasma_cannon()
+		plasma.name = "PC26Left" if index == 0 else "PC26Right"
+		plasma.position = position
+		plasma.scale = Vector3.ONE * PLASMA_SCALE
+		model.add_child(plasma)
 	return model
 
 ## A low swept mounting shoe carries each pod back into the chine. The socket
-## stays fixed to the airframe while the rotary cannon recoils above it.
+## stays fixed to the airframe below the accelerator.
 static func _hardpoint(model: Node3D, origin: Vector3, side: float, length: float) -> void:
 	var mount := Node3D.new()
 	mount.name = "PortWeaponHardpoint" if side < 0 else "StarboardWeaponHardpoint"
