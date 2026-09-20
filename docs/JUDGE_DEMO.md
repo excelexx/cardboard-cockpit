@@ -10,13 +10,13 @@ The laptop and phone panels are equally sized at 724 × 480 layout pixels. Each 
 
 Increase throttle and pull up as speed builds. After takeoff, press **badge A / G** to retract gear and flaps together. Keyboard A performs the same action; F changes flaps alone. Comma and period control keyboard rudder.
 
-Show plasma gun tag ID 4 or hold Space/left mouse for two adaptive beams. Cover the tag or release the input to stop. During large flocks, four automatic missiles can launch together each second when suitable targets are available. The electronic badge handles secondary controls, not weapons or steering.
+Show plasma gun tag ID 4 or hold Space/left mouse for two adaptive beams. Cover the tag or release the input to stop. During large flocks, two automatic missiles can launch together every five seconds when suitable targets are available. The electronic badge handles secondary controls, not weapons or steering.
 
-New waves keep arriving. The HUD shows **WAVE N**, actual kills in the current wave and elapsed flight time. There is no countdown, fixed number of waves or landing kill quota.
+New waves keep arriving: 6, then 8, then 10, and then 12 geese per wave. The HUD shows **WAVE N**, actual kills in the current wave and elapsed flight time. There is no countdown, fixed number of waves or landing kill quota.
 
 ## Landing on your terms
 
-Press **D / badge B** or the **LAND NOW** button. Landing mode prepares the landing opportunity while leaving steering, pitch and throttle under your control. Press **badge A / G** to put gear and flaps down, reduce power, and fly your approach. The coach continually shows actual gear, flap and power state.
+Press **B / badge B** or the **LAND NOW** button. Landing mode prepares the landing opportunity while leaving steering, pitch and throttle under your control. Press **badge A / G** to put gear and flaps down, reduce power, and fly your approach. The coach continually shows actual gear, flap and power state.
 
 Touchdown stays planted while you slow down. The demo does not demand a scored precision landing or make you clear a fixed target quota before you can finish.
 

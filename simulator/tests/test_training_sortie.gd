@@ -16,13 +16,13 @@ func run() -> void:
 		departed=departed or app.flight.airborne
 		if app.mission.phase=="wave_break" and not requested:
 			first_clear=app.mission.wave_down()
-			var key:=InputEventKey.new();key.keycode=KEY_D;key.physical_keycode=KEY_D;key.pressed=true;app._input(key)
+			var key:=InputEventKey.new();key.keycode=KEY_B;key.physical_keycode=KEY_B;key.pressed=true;app._input(key)
 			requested=app.landing_started;manual=not app.copilot
 			if not app.flight.gear:app.toggle_gear()
 		app._physics_process(1.0/60)
 		if app.mode=="results":break
 		if frame%120==0:await process_frame
-	check(departed and first_clear==12,"Common demo takes off and clears its real first wave")
+	check(departed and first_clear==6,"Common demo takes off and clears its real first wave")
 	check(requested and manual,"D switches the ongoing demo to a pilot-controlled landing")
 	check(app.mode=="results" and app.mission_success and app.flight.contact=="landed" and app.flight.speed<=.1,"Legacy entry can land and stop without completing a fixed course")
 	check("opening" in phases and "skein" in phases and "approach" in phases,"Shared flight follows the SF encounter and the chosen landing")

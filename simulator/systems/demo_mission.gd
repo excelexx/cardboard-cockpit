@@ -14,10 +14,10 @@ const FLOCK_SPEED := 19.0
 const FLOCK_REGROUP_DISTANCE := 900.0
 const FLOCK_SPREAD := 130.0
 const FLOCK_CLOSE_RATE := 70.0
-const SECOND_WAVE_SIZE := 20
+const SECOND_WAVE_SIZE := 8
 const WAVE_SECONDS := 35.0
 const FIRST_WAVE_AIRBORNE_SECONDS := 6.0
-const MAX_WAVE_SIZE := 40
+const MAX_WAVE_SIZE := 12
 const HISTORY_LIMIT := 32
 const WAVE_BREAK_SECONDS := 4.0
 func route_points() -> Array[Vector3]: return SHOWCASE_POINTS if cinematic else SFRoute.POINTS if app.route_id=="sf" else CoastalRoute.POINTS
@@ -108,13 +108,13 @@ func label() -> String:
 ## "TITLE|words|[KEY]|words": the HUD draws the title in colour and [KEY] as a keycap.
 func instruction() -> String:
 	if cinematic:
-		if phase=="aftermath":return "LAND WHEN READY|Press badge|[B]|or|[D]"
+		if phase=="aftermath":return "LAND WHEN READY|Press badge|[B]"
 		if phase=="approach":return "LANDING|Follow the runway and brake after touchdown"
 		if phase=="rollout":return "LANDED|Braking"
-		if phase=="gather":return "FIRST FLOCK INCOMING|Twelve geese ahead"
+		if phase=="gather":return "FIRST FLOCK INCOMING|Six geese ahead"
 		if phase=="wave_break":return ("WAVE %d CLEAR|" % wave_number if last_wave_cleared else "NEXT WAVE|")+"%d fresh geese incoming" % size_for_wave(wave_number+1)
 		if app.flight.airborne and app.flight.gear and not app.demo_auto_fire:return "GEAR UP|Press badge|[A]|or|[G]"
-		if phase=="skein":return "%s|%d geese — aim and hold primary|Land any time with|[D]" % [wave_label(),wave_size] if phase_clock<4 else ""
+		if phase=="skein":return "%s|%d geese — aim and hold primary|Land any time with|[B]" % [wave_label(),wave_size] if phase_clock<4 else ""
 
 		return ""
 	if app.route_id in ["coast","sf"] and phase in ["combat","return"]: return "GO TO|"+route_names()[mini(route_index,route_names().size()-1)].capitalize()+"|Follow the diamond"
@@ -223,7 +223,7 @@ func wave_down() -> int:
 func wave_remaining() -> int: return maxi(0,wave_size-wave_down())
 func wave_label() -> String: return "WAVE %d" % wave_number if wave_number>0 else "ENDLESS GEESE"
 func size_for_wave(number: int) -> int:
-	return Tune.SKEIN_SIZE if number<=1 else SECOND_WAVE_SIZE if number==2 else 32 if number==3 else MAX_WAVE_SIZE
+	return Tune.SKEIN_SIZE if number<=1 else SECOND_WAVE_SIZE if number==2 else 10 if number==3 else MAX_WAVE_SIZE
 
 func _open_skein(c: CombatDirector,number: int = 1) -> void:
 	if skein_final or app.landing_started or phase in ["approach","rollout"]:return

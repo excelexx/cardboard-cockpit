@@ -245,7 +245,7 @@ func _input(event: InputEvent) -> void:
 			if event.keycode==KEY_ESCAPE or event.keycode==KEY_C:cancel_control_setup()
 			elif event.keycode==KEY_ENTER:finish_control_setup()
 			elif event.keycode in [KEY_A,KEY_G]:controls_lesson.press("gear")
-			elif event.keycode in [KEY_D,KEY_L]:controls_lesson.press("landing")
+			elif event.keycode in [KEY_B]:controls_lesson.press("landing")
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode==KEY_ESCAPE:
@@ -260,7 +260,7 @@ func _input(event: InputEvent) -> void:
 		if event.keycode==KEY_F1: help_visible = not help_visible; calibration_visible = false; credits_visible = false;settings_visible=false; return
 		if event.keycode==KEY_C: on_action("camera"); return
 		if event.keycode==KEY_M: audio.muted = not audio.muted; save_settings(); return
-		if overlay_visible() or (yoke_recovery_visible() and event.keycode not in [KEY_D,KEY_L]): return
+		if overlay_visible() or (yoke_recovery_visible() and event.keycode not in [KEY_B]): return
 		match event.keycode:
 			KEY_ENTER:
 				if mode in ["title","results"]: on_action("fly")
@@ -274,11 +274,9 @@ func _input(event: InputEvent) -> void:
 				if mode in ["flight","rollout","paused","results"]: cockpit = not cockpit; camera_rig.reset()
 			KEY_H:
 				if mode=="flight": copilot = not copilot; used_copilot = used_copilot or copilot
-			KEY_B:
-				if mode=="flight": mouse_yoke = not mouse_yoke
 			KEY_A, KEY_G:
 				if mode=="flight":toggle_gear()
-			KEY_D, KEY_L:
+			KEY_B:
 				begin_landing()
 			KEY_F:
 				if mode=="flight": flight.flaps = (flight.flaps+1)%3;flaps_override=flight.flaps

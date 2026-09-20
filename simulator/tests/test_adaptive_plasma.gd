@@ -8,7 +8,7 @@ func check(ok: bool,label: String) -> void:
 	checks+=1
 	if not ok:failures.append(label);push_error(label)
 func fresh() -> void:
-	app.start_flight("combat");app.flight.spawn_airborne(Vector3(0,3000,0),180);app.apply_aircraft_pose();app.combat.spawn_clock=999;app.fire_guard=0
+	app.start_flight("combat");app.flight.spawn_airborne(Vector3(0,3000,0),180);app.apply_aircraft_pose();app.combat.spawn_clock=999;app.fire_guard=0;app.combat.aim_strength=1;app.combat.assist=true
 func bird(offset: Vector3,health: float=100) -> Dictionary:
 	app.combat.spawn_contact();var enemy: Dictionary=app.combat.enemies.back()
 	enemy.position=app.flight.position+offset;enemy.node.position=enemy.position;enemy.course=Vector3(0,0,-5);enemy.right=Vector3.ZERO;enemy.fade=1;enemy.health=health;enemy.max_health=health
@@ -45,17 +45,17 @@ func run() -> void:
 	for i in range(12):bird(Vector3((i-3.5)*30,0,-700-i*35))
 	app.combat.fire_primary();app.combat.update_beam(0)
 	app.combat.update_swarm_missiles()
-	check(app.combat.swarm_active and app.combat.launch_queue.size()==4,"A large visible flock automatically schedules four missiles")
+	check(app.combat.swarm_active and app.combat.launch_queue.size()==2,"A large visible flock automatically schedules two missiles")
 	var ids: Array=[]
 	for request: Dictionary in app.combat.launch_queue:ids.append(request.target)
 	check(ids[0]!=ids[1] and not app.combat.beam_target_ids.has(ids[0]) and not app.combat.beam_target_ids.has(ids[1]),"The missile burst selects distinct targets that plasma is not already handling")
-	app.combat.update_swarm_missiles();check(app.combat.launch_queue.size()==4,"Repeated render calls cannot bypass the one-second pair cadence")
+	app.combat.update_swarm_missiles();check(app.combat.launch_queue.size()==2,"Repeated render calls cannot bypass the five-second pair cadence")
 	app.combat.update_launches(.06)
-	check(app.combat.missiles_fired==4,"All four automatic missiles launch together")
-	for i in range(54):app.combat.tick(1.0/60)
-	check(app.combat.missiles_fired==4,"No extra pair launches before one second")
+	check(app.combat.missiles_fired==2,"Both automatic missiles launch together")
+	for i in range(294):app.combat.tick(1.0/60)
+	check(app.combat.missiles_fired==2,"No extra pair launches before five seconds")
 	for i in range(12):app.combat.tick(1.0/60)
-	check(app.combat.missiles_fired==8,"A sustained swarm receives the next burst after one second")
+	check(app.combat.missiles_fired==4,"A sustained swarm receives the next burst after five seconds")
 	var reserved: Dictionary={};var duplicates:=false
 	for shot: Dictionary in app.combat.shots:
 		if shot.kind=="missile":
@@ -69,9 +69,17 @@ func run() -> void:
 	fresh()
 	for i in range(8):bird(Vector3((i-2.5)*35,0,-800))
 	app.combat.update_swarm_missiles()
-	check(not app.combat.beam_active and app.combat.launch_queue.size()==4,"Swarm support does not require the pilot to hold the plasma trigger")
+	check(not app.combat.beam_active and app.combat.launch_queue.size()==2,"Swarm support does not require the pilot to hold the plasma trigger")
 	app.combat.engagement_enabled=false;app.combat.update_launches(.2)
 	check(app.combat.missiles_fired==0,"Leaving combat cancels pending autonomous launches")
+	fresh()
+	for i in range(6):bird(Vector3((i-2.5)*45,0,-700))
+	for frame in range(360):app.combat.tick(1.0/60)
+	check(app.combat.kills<=2 and app.combat.enemies.filter(func(e: Dictionary)->bool:return e.health>0).size()>=4,"Missiles alone leave most of a six-goose flock for the pilot")
+	fresh()
+	for i in range(6):bird(Vector3((i-2.5)*45,0,-700))
+	for frame in range(480):app.combat.spawn_clock=INF;app.combat.fire_primary();app.combat.tick(1.0/60)
+	check(app.combat.kills==6,"The same flock is feasible to clear with dual plasma in eight seconds")
 	fresh()
 	var key:=InputEventKey.new();key.pressed=true;key.keycode=KEY_T;app._input(key)
 	var mouse:=InputEventMouseButton.new();mouse.pressed=true;mouse.button_index=MOUSE_BUTTON_RIGHT;app._input(mouse)

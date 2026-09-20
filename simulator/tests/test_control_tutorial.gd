@@ -118,12 +118,12 @@ func run() -> void:
 	check(app.flight.position == position and not app.combat.primary_used and not app.combat.beam_active and app.combat.shots.is_empty(), "Setup freezes flight and prevents plasma or automatic missile firing")
 	app.controls_lesson.calibrating=false;app.controls_lesson.index=6;app.controls_lesson.retry()
 	var gear: bool=app.flight.gear;var flaps: int=app.flight.flaps
-	press.keycode=KEY_D;app._input(press)
+	press.keycode=KEY_B;app._input(press)
 	check(not app.controls_lesson.passed,"Keyboard landing cannot skip gear practice")
 	press.keycode=KEY_A;app._input(press)
 	check(app.controls_lesson.passed and app.flight.gear==gear and app.flight.flaps==flaps,"Keyboard A confirms gear practice without changing the aircraft")
-	app.controls_lesson.index=7;app.controls_lesson.retry();press.keycode=KEY_D;app._input(press)
-	check(app.controls_lesson.passed and not app.landing_started and app.mode=="control_setup","Keyboard D confirms landing practice without starting an approach")
+	app.controls_lesson.index=7;app.controls_lesson.retry();press.keycode=KEY_B;app._input(press)
+	check(app.controls_lesson.passed and not app.landing_started and app.mode=="control_setup","Keyboard B confirms landing practice without starting an approach")
 	var practice_badge=PracticeBadge.new();app.badge=practice_badge
 	app.controls_lesson.index=6;app.controls_lesson.retry();practice_badge.next_press=1;app._physics_process(.016)
 	check(app.controls_lesson.passed and app.flight.gear==gear,"Badge A confirms gear practice without actuating gear")
