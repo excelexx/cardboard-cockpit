@@ -1,12 +1,12 @@
 # Goose Protocol — SPECTRE X-26
 
-Version **0.18.0** combines the current San Francisco visuals and gameplay with the team’s two-camera controls, settings and pause screens, plus a separate badge-guided **Tutorial**. Normal Play retains the current flock encounter and assisted SFO landing. Tutorial takes off, clears sixteen targets and follows a longer route to land. Both have unlimited ammunition and forgiving flight assistance.
+Version **0.19.0** is one continuous San Francisco judge demo: take off, fly, shoot adaptive dual plasma and keep clearing new flocks for as long as you like. Coaching stays visible throughout. Press **D** or **badge B** when you want to land, then fly the approach yourself.
 
-Open **Launch Cardboard Cockpit.command** or the packaged **Cardboard Cockpit.app**. Both flight modes use excelex's cardboard controls and settings, with the current graphics and aircraft presentation. **Watch demo** flies and shoots automatically.
+Open **Launch Cardboard Cockpit.command** or the packaged **Cardboard Cockpit.app**. The demo uses excelex's cardboard controls and settings with the current graphics and aircraft presentation. **Watch demo** flies and shoots automatically. [Judge demo flow](docs/JUDGE_DEMO.md).
 
 ## Controls
 
-**Play** and **Tutorial** both begin with excelex's cardboard calibration and control checks. Choose **Use keyboard** in setup to fly without cameras. Play keeps the current SF flock route; Tutorial keeps the sixteen-target takeoff/combat/landing route.
+Choose **Play**, complete cardboard calibration and control checks, or choose **Use keyboard** in setup. Older Tutorial entry points open the same demo. Both live setup previews are equally large and preserve the complete camera image without cropping.
 
 | Input | Action |
 |---|---|
@@ -15,16 +15,20 @@ Open **Launch Cardboard Cockpit.command** or the packaged **Cardboard Cockpit.ap
 | Large-flock support | Missiles launch automatically, four every second |
 | Yoke rotation, tilt, swivel | Bank, pitch, yaw |
 | Relative throttle tags 0 / 1 / 2 | Idle endpoint / moving handle / full endpoint |
-| Arrows / A D | Pitch and bank / rudder |
+| Arrows / comma and period | Pitch and bank / rudder |
 | W / S / Shift | Keyboard power / brake / afterburner |
 | Q / V | Barrel roll / cockpit or chase view |
-| G / F / L | Gear / flaps / landing assistance |
+| Badge A / keyboard A or G | Gear and flaps together: retract after takeoff, deploy for landing |
+| F | Flaps only |
+| D / badge B | Enter landing mode; retain manual approach control |
 | H / hold E / Z | Route assist / eject / cosmetic flares |
 | C / Escape / R / M | Cardboard setup / pause / replay / mute |
 
 Two plasma beams are the manual weapon. They split across two targets or focus together on one, with **SPLIT**, **FOCUS** or **FIRING** shown on the HUD. Automatic missile support fires four missiles together at up to one burst per second during large flocks, when four eligible targets are available. [Adaptive plasma controls and feedback](docs/ADAPTIVE_PLASMA.md).
 
-Normal SF Play has a **twelve-goose wave**, a brief clear beat, then **twenty more**. The objective counts all 32 actual kills and the two waves separately. Tutorial still has sixteen route targets. Yoke loss pauses the flight; a steady return resumes it. Sound starts enabled each launch; **M** mutes the current session. The steady camera keeps recoil and chase movement subdued for comfort.
+Flocks continue with a visible **WAVE N** counter and live kills for the current wave. There is no countdown or fixed kill quota before landing. Only actual kills count. Yoke loss pauses the flight; a steady return resumes it. Sound starts enabled each launch; **M** mutes the current session. The steady camera keeps recoil and chase movement subdued for comfort.
+
+After takeoff, the coach prompts **BADGE A / G: RETRACT GEAR + FLAPS**. During landing, it shows live gear, flap and throttle state and reminds you to reduce power and steer/pitch your own approach. Touchdown stays planted instead of bouncing into another takeoff.
 
 ## Cardboard and badge
 
@@ -32,7 +36,7 @@ Open **Launch Two-Camera Cockpit.command** (or **Launch Cardboard Tracker.comman
 
 Settings retains separate pitch, bank and yaw sensitivity and agility, plus aim assistance. excelex defaults are restored: agility **1.30×** per axis and aim assistance **1.40×**; saved pilot preferences remain intact until Reset defaults is selected. Sensitivity changes apply live to the tracker, with no double gain.
 
-The electronic badge remains a secondary instrument: START start/replay, HOME pause/back, A gear, B landing assistance, LEFT cockpit/chase, RIGHT tactical view, UP route assist, short DOWN text visibility / held DOWN tactical view. It never fires or steers the aircraft. The packaged app includes its Bluetooth helper. [Badge instrument and wireless handoff](hardware/badge-controller/INSTRUMENT.md).
+The electronic badge remains a secondary instrument: START start/replay, HOME pause/back, A gear + flaps, B manual landing mode, LEFT cockpit/chase, RIGHT tactical view, UP route assist, short DOWN text visibility / held DOWN tactical view. It never fires or steers the aircraft. The packaged app includes its Bluetooth helper. [Badge instrument and wireless handoff](hardware/badge-controller/INSTRUMENT.md).
 
 ## World, audio and performance
 

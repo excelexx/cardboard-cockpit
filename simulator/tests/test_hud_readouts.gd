@@ -19,10 +19,16 @@ class FakeMission extends RefCounted:
 	var cinematic := true
 	var phase := "combat"
 	var clock := 0.0
+class FakeTutorial extends RefCounted:
+	var active:=false
 class FakeApp extends Node:
 	var mission := FakeMission.new()
 	var combat: CombatDirector
-	var flight_kind := "combat"
+	var flight_kind := "demo"
+	var flight: FlightDynamics
+	var landing_started:=false
+	var mode:="flight"
+	var tutorial:=FakeTutorial.new()
 ## Stands in for the skein bookkeeping the combat package publishes.
 class SkeinDirector extends CombatDirector:
 	var skein_total := 12
@@ -84,12 +90,13 @@ func copy() -> void:
 	var hud: CockpitHUD = HUD.new()
 	var app := FakeApp.new()
 	app.combat = CombatDirector.new()
+	app.flight=flight(180,400)
 	hud.app = app
 	root.add_child(app)
 	app.mission.phase = "gather"
-	check(hud.mission_line()=="A skein is inbound","The gather phase tells the player a skein is inbound")
+	check(hud.mission_line().contains("Endless"),"The mission describes the continuous judge demo")
 	app.mission.phase = "skein"
-	check(hud.mission_line()=="Clear the skein","The skein phase tells the player to clear it")
+	check(hud.mission_line().contains("land whenever"),"The flight prompt makes landing a player choice")
 	for phase: String in ["opening","combat","gather","skein","aftermath","approach","rollout","anticipation","boss","takeoff","return",""]:
 		app.mission.phase = phase
 		var line: String = hud.mission_line().to_lower()
@@ -99,9 +106,17 @@ func copy() -> void:
 		app.mission.cinematic = true
 	app.mission.phase = "skein"
 	app.mission.clock = 30.0
-	check(hud.clock_text()=="%d:%02d" % [int(Tune.DEMO_LIMIT-30)/60,int(Tune.DEMO_LIMIT-30)%60],"The mission clock counts the showcase down")
-	app.mission.active = false
-	check(hud.clock_text()!="","A free-flight sortie still shows time left")
+	check(hud.clock_text()=="0:30","The mission clock shows elapsed time instead of a deadline")
+	app.mission.active = false;app.flight.elapsed=95
+	check(hud.clock_text()=="1:35","Free flight shows elapsed flight time")
+	app.flight.gear=true;app.flight.flaps=1
+	check(hud.context_coach().title.contains("RETRACT"),"Airborne gear-down coaching calls for retraction")
+	app.landing_started=true
+	check(hud.context_coach().body.contains("Keep them down") and hud.mission_line().contains("Your approach"),"Configured landing coaches manual control without asking for a wrong toggle")
+	app.flight.gear=false;app.flight.flaps=0
+	check(hud.context_coach().body.contains("BADGE A / G"),"Landing with gear up prompts the correct configuration control")
+	app.mode="rollout"
+	check(hud.context_coach().title.contains("LANDED"),"Rollout coaching follows live flight state")
 	check(hud.thousands(23400)=="23,400" and hud.thousands(-940)=="-940","Altitudes group in thousands")
 	check(hud.has_method("draw_objective") and not hud.has_method("draw_boss"),"The objective bar replaced the boss bar")
 	app.combat.free()

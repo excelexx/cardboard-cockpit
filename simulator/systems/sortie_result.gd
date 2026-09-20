@@ -9,6 +9,7 @@ static func make(code: String,success: bool,headline: String,summary: String,adv
 	return {"code":code,"success":success,"headline":headline,"summary":summary,"advice":advice,"radio":"success" if success else "failure"}
 static func assess(s: Dictionary,requested_success: bool,reason: String) -> Dictionary:
 	var landed: bool=s.get("contact","")=="landed" and s.get("stopped",false)
+	if s.get("judge_demo",false) and landed:return make("demo_complete",true,"DEMO COMPLETE","%d geese cleared. Aircraft safely landed." % int(s.get("kills",0)),"Nice flying. Play again whenever you want.")
 	if s.get("ejected",false):return make("ejected",false,"YOU EJECTED","You are safe. The jet is gone.","Try again. Press H for auto-fly before you lose control.")
 	if s.get("contact","") in ["overrun","excursion"]:return make("runway_excursion",false,"OFF THE RUNWAY","The jet left the runway.","Press badge B and the jet lands itself. Stay on the centre line while braking.")
 	if s.get("contact","")=="crash":

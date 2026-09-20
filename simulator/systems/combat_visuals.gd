@@ -491,6 +491,9 @@ func tick(dt: float) -> void:
 		if e.life<=0:e.node.visible=false;light_pool.append(e.node);lights.remove_at(i)
 		else:e.node.light_energy=e.energy*e.life/e.duration
 	var target: Dictionary=combat.target()
+	# Endless waves release enemy-owned tracking nodes; drop their stale handles.
+	for index in range(rings.size()-1,-1,-1):
+		if not is_instance_valid(rings[index].node):rings.remove_at(index)
 	for entry in rings:
 		if not is_instance_valid(entry.node):continue
 		var enemy: Dictionary={}

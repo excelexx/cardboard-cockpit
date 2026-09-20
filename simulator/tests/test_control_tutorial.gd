@@ -104,7 +104,7 @@ func run() -> void:
 	for i in range(90): app._physics_process(1.0/60)
 	var press := InputEventKey.new(); press.pressed = true; press.keycode = KEY_SPACE
 	app._input(press)
-	check(app.flight.position == position and app.combat.rounds_fired == 0, "Setup freezes flight and prevents test firing from spawning shots")
+	check(app.flight.position == position and not app.combat.primary_used and not app.combat.beam_active and app.combat.shots.is_empty(), "Setup freezes flight and prevents plasma or automatic missile firing")
 	app.controls_lesson = lesson; app.vision = v
 	var frame := Image.create(20,20,false,Image.FORMAT_RGB8)
 	app.yoke_preview.texture = ImageTexture.create_from_image(frame)
@@ -114,8 +114,8 @@ func run() -> void:
 	app.throttle_preview.texture = ImageTexture.create_from_image(frame)
 	observe(lesson, v, 40); v.last_received = Time.get_ticks_msec(); lesson.last_sample = v.last_received
 	app.update_control_setup(.016)
-	check(app.mode == "flight" and app.flight_kind == "training" and not app.copilot and app.flight.throttle == 0, "Completed checks enter the sixteen-target tutorial at idle")
-	check(not app.flight.airborne and app.flight.speed == 0, "The tested tutorial starts on the runway")
+	check(app.mode == "flight" and app.flight_kind == "demo" and not app.copilot and app.flight.throttle == 0, "Completed checks enter the shared judge demo at idle")
+	check(not app.flight.airborne and app.flight.speed == 0, "The shared demo starts on the runway")
 	app.on_action("camera")
 	check(app.mode == "control_setup", "C/setup can retest controls during a flight")
 	press.keycode = KEY_ESCAPE; app._input(press)
@@ -123,7 +123,7 @@ func run() -> void:
 	app.on_action("title");app.vision.enabled=false;app.on_action("keyboard_play")
 	check(app.mode == "flight" and app.flight_kind == "demo", "Keyboard Play retains the existing route without camera setup")
 	app.on_action("title");app.vision.enabled=true;app.on_action("training")
-	check(app.mode == "control_setup" and app.controls_lesson.calibrating, "Camera Tutorial starts with fresh calibration")
+	check(app.mode == "control_setup" and app.controls_lesson.calibrating, "Legacy Tutorial entry starts the same camera calibration")
 	app.on_action("setup_cancel");app.on_action("fly")
 	check(app.mode == "control_setup", "Camera Play also teaches physical controls first")
 	app.on_action("setup_keyboard")

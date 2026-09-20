@@ -54,8 +54,8 @@ func run() -> void:
 	app.vision.enabled=true;app.vision.tracking=false;app.vision.yoke_enabled=true
 	app.on_action("keyboard");check(not app.vision.enabled and not app.yoke_recovery_visible(),"Recovery keyboard button resumes without a camera")
 	app.vision.enabled=false;app.on_action("keyboard_play")
-	check(app.flight_kind=="demo" and not app.mission is TrainingMission,"Normal Play remains a separate mode")
-	app.on_action("keyboard_training");check(app.flight_kind=="training" and app.mission is TrainingMission,"Sixteen-target Tutorial remains selectable")
+	check(app.flight_kind=="demo" and not app.mission is TrainingMission,"Play opens the common judge demo")
+	app.on_action("keyboard_training");check(app.flight_kind=="demo" and not app.mission is TrainingMission and app.combat.training_target_limit==-1,"Legacy Tutorial selects the same unlimited judge demo")
 	var snapshot: Dictionary=app.badge.instrument_snapshot(app)
 	check(not snapshot.systems&4,"Badge remains a secondary-controls display without a missile-ready bit")
 	app.queue_free();await process_frame

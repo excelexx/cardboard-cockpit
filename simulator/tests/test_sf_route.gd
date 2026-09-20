@@ -19,14 +19,21 @@ func run() -> void:
 	var coast_frames:=0
 	var seen_waves: Dictionary={}
 	var plasma_seen:=false
-	var first_wave_down:=-1
-	for frame in range(60*211):
+	var cleared_waves: Dictionary={}
+	var requested_landing:=false
+	var manual_landing:=false
+	for frame in range(60*420):
+		if app.mission.phase=="wave_break":
+			cleared_waves[app.mission.wave_number]=app.mission.wave_down()
+			if app.mission.wave_number>=3 and not requested_landing:
+				var land:=InputEventKey.new();land.keycode=KEY_D;land.physical_keycode=KEY_D;land.pressed=true;app._input(land)
+				requested_landing=app.landing_started;manual_landing=not app.copilot
+				if not app.flight.gear:app.toggle_gear()
 		var previous: Vector3 = app.flight.position
 		app._physics_process(1.0/60.0)
 		peak = maxf(peak,app.flight.position.y)
 		if app.mission.wave_number>0:seen_waves[app.mission.wave_number]=app.mission.wave_size
 		plasma_seen=plasma_seen or app.combat.beam_active
-		if app.mission.phase=="wave_break":first_wave_down=app.mission.wave_down()
 		var at: Vector3=app.flight.position
 		# Scenic showcase: Pacific cliffs, Ocean Beach, Lands End, Golden Gate, Marin Headlands.
 		if at.x> -5500 and at.x<19000 and at.z< -9000 and at.z> -27000:
@@ -46,18 +53,23 @@ func run() -> void:
 				root.get_texture().get_image().save_png(destination+"/route-%02d.png" % previous_index)
 		if app.mode=="results": break
 		if frame%600==0: await process_frame
-	if not app.mission_success or app.skein_down()<ceili(app.skein_total()*.75) or app.flight.contact!="landed" or app.flight.speed>.1: failures.append("Demo failed the current branch's flock-and-safe-landing outcome")
-	if first_wave_down!=12 or app.skein_down()!=32 or not app.mission.skein_success:failures.append("Guided flight did not clear both complete waves: first=%d/12 total=%d/32" % [first_wave_down,app.skein_down()])
-	if app.mission.clock>210: failures.append("Demo exceeded 210 second two-wave limit")
-	if seen_waves.get(1)!=12 or seen_waves.get(2)!=20 or app.skein_total()!=32:failures.append("SF did not present the twelve and twenty bird waves with aggregate objective32")
-	if app.mission.visited_route.size()<2: failures.append("Demo did not reach the coast waypoints")
+	if not requested_landing or not manual_landing or not app.mission_success or app.flight.contact!="landed" or app.flight.speed>.1:failures.append("Explicit D did not complete a pilot-controlled stopped landing")
+	if cleared_waves.get(1)!=12 or cleared_waves.get(2)!=20 or cleared_waves.get(3)!=32 or app.skein_down()!=64:failures.append("Three live waves were not actually cleared: "+str(cleared_waves)+" total="+str(app.skein_down()))
+	if seen_waves.get(1)!=12 or seen_waves.get(2)!=20 or seen_waves.get(3)!=32 or app.skein_total()!=64:failures.append("Endless progression did not present 12,20,32 targets")
+	var route_names: Array[String]=app.mission.route_names()
+	if not route_names.has("OCEAN BEACH") or not route_names.has("GOLDEN GATE") or not route_names.has("MARIN HEADLANDS") or app.mission.route_points().size()!=route_names.size():failures.append("The SF coastal route and landmark waypoints are unavailable")
+	for point: Vector3 in app.mission.route_points():
+		if not point.is_finite():failures.append("The SF route contains an invalid waypoint")
 	if peak<350: failures.append("Did not reach the Bay Area touring altitude")
 	if floor_corrections>0: failures.append("Route relied on terrain safety correction: "+str(floor_corrections))
 	if app.profile().name!="SPECTRE X-26": failures.append("Current fighter was replaced")
 	if app.combat.hostile_launches!=0 or app.combat.ammo!=-1: failures.append("Current arcade rules were replaced")
-	if coast_frames<1800: failures.append("Route did not spend at least thirty simulated seconds along the Pacific coast and Golden Gate")
+	var world_assets: Array[String]=[]
+	for chunk: Dictionary in app.world.region.chunks:world_assets.append(str(chunk.file))
+	for landmark: String in ["landmark_ggb-fb.scn","landmark_transamerica-fb.scn","landmark_KSFO_InternationalTerminal.scn"]:
+		if not world_assets.has(landmark) or not ResourceLoader.exists("res://assets/san_francisco/"+landmark):failures.append("Original SF landmark unavailable: "+landmark)
 	if app.combat.kills<1 or app.combat.rounds_fired!=0 or app.combat.missiles_fired<4 or not plasma_seen: failures.append("Demo did not demonstrate dual plasma, automatic four-missile bursts and actual hits")
-	print("SF COMBAT: wave1=",first_wave_down,"/12 objective=",app.skein_down(),"/32 kills=",app.combat.kills," rounds=",app.combat.rounds_fired," missiles=",app.combat.missiles_fired)
+	print("SF COMBAT: waves=",cleared_waves," objective=",app.skein_down(),"/64 kills=",app.combat.kills," rounds=",app.combat.rounds_fired," missiles=",app.combat.missiles_fired)
 	print("COAST SECONDS: ",coast_frames/60.0)
 	print("SF ROUTE RESULT: ","PASS" if failures.is_empty() else "FAIL"," seconds=",app.flight.elapsed," peak=",peak," landmarks=",app.mission.visited_route.size()," corrections=",floor_corrections)
 	for failure in failures: printerr(failure)
