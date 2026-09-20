@@ -106,9 +106,13 @@ func copy() -> void:
 		app.mission.cinematic = true
 	app.mission.phase = "skein"
 	app.mission.clock = 30.0
-	check(hud.clock_text()=="0:30","The mission clock shows elapsed time instead of a deadline")
+	check(hud.clock_text().is_empty(),"Normal flying and combat hide the timer")
+	app.landing_started=true
+	check(hud.clock_text()=="0:30","Landing can still show elapsed mission time")
 	app.mission.active = false;app.flight.elapsed=95
-	check(hud.clock_text()=="1:35","Free flight shows elapsed flight time")
+	check(hud.clock_text()=="1:35","Landing without an active mission shows flight time")
+	app.landing_started=false;app.mission.phase="combat"
+	check(hud.clock_text().is_empty(),"Leaving landing hides the timer again")
 	app.flight.gear=true;app.flight.flaps=1
 	check(hud.context_coach().title.contains("RETRACT"),"Airborne gear-down coaching calls for retraction")
 	app.landing_started=true

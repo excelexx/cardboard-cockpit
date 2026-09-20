@@ -9,7 +9,7 @@ func run()->void:
 		while app.mission.skein_pending>0:
 			var before: int=app.combat.next_id
 			var gap: float=app.mission.stream_gap-app.mission.stream_distance
-			check(app.mission.stream_gap>=200 and app.mission.stream_gap<=500,"Next swarm spacing is randomly bounded between 200 and 500 metres")
+			check(app.mission.stream_gap>=600 and app.mission.stream_gap<=1500,"Next swarm spacing is randomly bounded between 600 and 1500 metres")
 			app.flight.position+=app.flight.forward()*(gap-.2);app.mission.tick(.01)
 			check(app.combat.next_id==before,"Birds do not bunch up before the next sampled gap")
 			app.flight.position+=app.flight.forward()*.3;app.mission.tick(.01)

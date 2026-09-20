@@ -254,15 +254,13 @@ func draw_title() -> void:
 	text(Vector2(96,150),"CARDBOARD COCKPIT",18,GREEN,true)
 	big(Vector2(92,268),"WILD GOOSE",124,WHITE,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
 	big(Vector2(92,376),"CHASE",124,WHITE,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
-	text(Vector2(96,436),"Fly, shoot and keep going. Coaching stays with you.",20,WHITE)
-	text(Vector2(96,466),"Endless flocks. Press B or badge B when you want to land.",20,WHITE)
+	text(Vector2(96,436),"Fly and shoot Geese Gods in this cardboard cockpit simulator.",20,WHITE)
 	button("fly",Rect2(96,520,420,72),"PLAY",true,"ENTER · START")
 	button("guided",Rect2(96,604,420,52),"WATCH DEMO")
 	button("camera",Rect2(96,672,420,52),"SET UP CARDBOARD")
 	button("settings",Rect2(96,742,205,48),"SETTINGS")
 	button("help",Rect2(311,742,205,48),"CONTROLS")
 	button("credits",Rect2(1390,922,154,44),"CREDITS")
-	button("next_pilot",Rect2(96,810,420,48),"NEXT PILOT",false,"SPECTRE-%02d" % app.pilot_number)
 	status_dot(Vector2(96,930),"YOKE READY" if app.vision.tracking else "YOKE NOT FOUND",app.vision.tracking)
 	status_dot(Vector2(330,930),"BADGE CONNECTED" if app.badge.connected else "BADGE NOT FOUND",app.badge.connected)
 func status_dot(at: Vector2,label: String,ok: bool) -> void:
@@ -331,6 +329,7 @@ func mission_line() -> String:
 	if not app.flight.airborne:return "Take off · increase power and pull up"
 	return "Endless judge demo · land whenever you like"
 func clock_text() -> String:
+	if not app.landing_started and app.mode!="rollout" and app.mission.phase not in ["approach","rollout"]:return ""
 	var elapsed: int=maxi(0,int(app.mission.clock if app.mission.active else app.flight.elapsed))
 	return "%d:%02d" % [elapsed/60,elapsed%60]
 func draw_flight() -> void:
@@ -488,8 +487,7 @@ func draw_weapons(c: CombatDirector) -> void:
 	put(mono,Vector2(56,943),"AUTO MISSILES",18,GREEN)
 	put(mono,Vector2(240,943),("READY" if c.missile_cooldown<=0 else "%.1fs" % c.missile_cooldown) if swarm else "STANDBY",17,GREEN if swarm else SOFT)
 	put(body,Vector2(370,941),"FLOCK SUPPORT / TWO EVERY FIVE SECONDS" if swarm else "ACTIVATE AUTOMATICALLY IN LARGE FLOCKS",15,WHITE)
-## How much of the skein is down, in the span the old health bar used to hold:
-## one pip per bird, amber as it goes down. No named individual, no health bar.
+## Compact wave and kill count. No progress bar or per-goose pips.
 func draw_objective(c: CombatDirector) -> void:
 	if hidden_in_flight() or not c.active or not c.engagement_enabled: return
 	var tally: Vector2 = skein_tally(c)
@@ -499,15 +497,8 @@ func draw_objective(c: CombatDirector) -> void:
 		tally=Vector2(app.mission.wave_down(),app.mission.wave_size)
 		wave_title="WAVE %d" % app.mission.wave_number
 	if tally.y<=0.0: return
-	put(mono,Vector2(540,118),"GEESE %d / %d" % [int(tally.x),int(tally.y)],20,AMBER)
-	put(mono,Vector2(540,118),wave_title,20,AMBER,HORIZONTAL_ALIGNMENT_RIGHT,520)
-	var pips: int = clampi(int(tally.y),1,26)
-	var width: float = (526.0-float(pips-1)*4.0)/float(pips)
-	draw_rect(Rect2(536,124,534,22),Color(GLASS.r,GLASS.g,GLASS.b,0.66))
-	for index in range(pips):
-		var slot := Rect2(540.0+float(index)*(width+4.0),128,width,14)
-		if index<int(tally.x): draw_rect(slot,AMBER)
-		else: draw_rect(slot,Color(AMBER.r,AMBER.g,AMBER.b,0.18)); draw_rect(slot,Color(AMBER.r,AMBER.g,AMBER.b,0.35),false,1)
+	put(mono,Vector2(540,118),"%s  ·  %d/%d" % [wave_title,int(tally.x),int(tally.y)],20,AMBER,HORIZONTAL_ALIGNMENT_CENTER,520)
+
 func draw_alerts(f: FlightDynamics,c: CombatDirector) -> void:
 	var y := 662.0
 	if f.stall_time>.6: banner(y,"NOSE TOO HIGH",["Ease off, add power"],RED); y -= 62
@@ -608,9 +599,6 @@ func draw_pause() -> void:
 	button("quality",Rect2(812,532,242,54),"GRAPHICS",false,"HIGH" if app.high_quality else "BALANCED")
 	button("restart",Rect2(546,608,242,54),"RESTART DEMO")
 	button("title",Rect2(812,608,242,54),"RETURN TO DECK")
-	put(mono,Vector2(546,718),"BADGE A GEAR + FLAPS · B LAND · LEFT VIEW",15,SOFT)
-	put(mono,Vector2(546,749),"HOME RESUME  ·  HOLD DOWN TACTICAL",15,SOFT)
-	status_dot(Vector2(546,791),"BADGE LINKED" if app.badge.connected else "BADGE OFFLINE",app.badge.connected)
 func draw_results() -> void:
 	zones.clear(); dim()
 	var c: CombatDirector = app.combat
@@ -862,36 +850,25 @@ func draw_control_setup() -> void:
 	var step: Array=lesson.step()
 	var group: String=lesson.focus()
 	draw_rect(Rect2(0,0,1600,1000),GLASS)
-	put(display_bold,Vector2(64,73),"CALIBRATE AND FLY" if lesson.calibration_only else "SET UP YOUR CARDBOARD COCKPIT",46,WHITE)
-	put(mono,Vector2(1132,62),"LIVE CAMERA CHECKS",16,GREEN)
-	var labels: Array[String]=["01 / CALIBRATE","02 / THROTTLE","03 / YOKE","04 / PLASMA","05 / BUTTONS"]
-	if lesson.calibration_only:labels.assign(["YOKE CALIBRATION"])
-	var groups: Array[String]=["calibrate","throttle","yoke","weapons","buttons"]
-	if lesson.calibration_only:groups.assign(["calibrate"])
-	for i in range(groups.size()):
-		var selected: bool=lesson.calibration_only or (i==0 if lesson.calibrating else group==groups[i] or done and i==4)
-		var rect:=Rect2(64+i*298,101,1472 if lesson.calibration_only else 280,43)
-		panel(rect,.9,GREEN if selected else HAIRLINE)
-		put(mono,rect.position+Vector2(14,28),labels[i],17,GREEN if selected else SOFT)
-	camera_card(Rect2(64,164,724,480),"LAPTOP / YOKE + ID 4",app.yoke_preview,v.tracking)
-	camera_card(Rect2(812,164,724,480),"PHONE / THROTTLE",app.throttle_preview,v.throttle_confidence>.4)
-	panel(Rect2(64,664,1472,208),.95)
-	var heading: String=("CALIBRATION COMPLETE" if lesson.calibration_only else "CONTROLS CHECKED") if done else str(step[2]).to_upper()
-	put(display_bold,Vector2(90,702),heading,32,WHITE)
-	var instruction: String="Centre the yoke, set 0% throttle and keep the plasma gun tag covered." if done else str(step[3])
-	var lines: PackedStringArray=tutorial_lines(instruction,1418,18)
-	for i in range(mini(lines.size(),2)):put(body,Vector2(90,733+i*23),lines[i],18,WHITE)
-	var hint: String=("Hold steady for one second to resume your flight." if app.setup_next_action.is_empty() else "Hold steady for one second to start the judge demo.") if done else str(step[4])
-	put(body,Vector2(90,785),hint,17,SOFT)
-	var values: String="THROTTLE %3d%%   BANK %+.0f%%   PITCH %+.0f%%   YAW %+.0f%%   PLASMA %s" % [roundi(v.throttle*100),v.steering().x*100,v.steering().y*100,v.steering().z*100,"ON" if v.gun_trigger else "OFF"]
-	put(mono,Vector2(90,820),values,16,GREEN)
-	var status: String=lesson.status
-	if group!="buttons" and not app.control_setup_picture():status="Waiting for both live cameras." if done else "Waiting for the phone camera." if group=="throttle" else "Waiting for the laptop camera."
-	put(body,Vector2(90,850),status,17,GREEN if lesson.passed or lesson.can_start else AMBER)
-	var progress: float=clampf(float(lesson.ready_ms)/lesson.READY_HOLD_MS,0,1) if done else lesson.progress()
-	draw_rect(Rect2(90,863,1418,5),HAIRLINE);draw_rect(Rect2(90,863,1418*progress,5),GREEN)
+	if not lesson.calibration_only:
+		put(display_bold,Vector2(64,73),"SET UP YOUR CARDBOARD COCKPIT",46,WHITE)
+		var labels: Array[String]=["01 / CALIBRATE","02 / THROTTLE","03 / YOKE","04 / PLASMA","05 / BUTTONS"]
+		var groups: Array[String]=["calibrate","throttle","yoke","weapons","buttons"]
+		for i in range(groups.size()):
+			var selected: bool=i==0 if lesson.calibrating else group==groups[i] or done and i==4
+			var rect:=Rect2(64+i*298,101,280,43)
+			panel(rect,.9,GREEN if selected else HAIRLINE)
+			put(mono,rect.position+Vector2(14,28),labels[i],17,GREEN if selected else SOFT)
+	var camera_y: float=64.0 if lesson.calibration_only else 164.0
+	camera_card(Rect2(64,camera_y,724,480),"LAPTOP / YOKE + ID 4",app.yoke_preview,v.tracking)
+	camera_card(Rect2(812,camera_y,724,480),"PHONE / THROTTLE",app.throttle_preview,v.throttle_confidence>.4)
+	var info_y: float=camera_y+500.0
+	panel(Rect2(64,info_y,1472,132),.95)
+	var heading: String="Hold yoke upright for 3 seconds" if lesson.calibrating else "Ready to fly" if done else str(step[2])
+	put(display_bold,Vector2(90,info_y+46),heading,32,WHITE)
+	var values: String="THROTTLE %3d%%   BANK %+.0f%%   PITCH %+.0f%%   YAW %+.0f%%" % [roundi(v.throttle*100),v.steering().x*100,v.steering().y*100,v.steering().z*100]
+	put(mono,Vector2(90,info_y+98),values,18,GREEN)
 	if not v.connected:put(body,Vector2(64,894),"Start Launch Two-Camera Cockpit with your phone connected, then return here.",15,AMBER)
-	else:put(body,Vector2(64,894),"Checks advance from live camera actions or button presses. Flight stays paused while you test.",15,SOFT)
 	button("setup_cancel",Rect2(64,916,288,56),"BACK",false,"ESC / HOME")
 	button("setup_keyboard",Rect2(370,916,300,56),"USE KEYBOARD")
 	button("setup_retry",Rect2(1236,916,300,56),"RETRY THIS STEP",true)

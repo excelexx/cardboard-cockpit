@@ -1,0 +1,11 @@
+# Demo spacing and UI cleanup — 0.22.2
+
+- Flock spacing is now 600–1,500 metres, exactly three times the previous 200–500 metres. Per-flock and per-wave counts are unchanged.
+- The objective is a single `WAVE N · kills/total` readout, without a progress bar.
+- The top-right clock is hidden during ordinary flight/combat and remains available during landing/rollout.
+- Main-menu subtitle: “Fly and shoot Geese Gods in this cardboard cockpit simulator.” The main-menu Next Pilot button is removed.
+- Pause no longer shows the badge shortcut/footer text.
+- Quick calibration removes the top headings, Live Camera Checks label, explanatory paragraphs, status/progress strip and Checks Advance footer. Its card retains the upright-yoke instruction and throttle/bank/pitch/yaw values.
+- Full setup retains its step navigation and one necessary instruction per step; its duplicate explanatory copy is removed. Calibration and input validation behavior are unchanged.
+
+Verification: directional wave spacing (34 checks), endless waves (253), HUD readouts (75), control tutorial (75): **437 checks passed**. Native UI captures use simulated camera images with badge communication disabled; no new physical camera/badge acceptance is claimed.
