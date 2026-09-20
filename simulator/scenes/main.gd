@@ -170,10 +170,11 @@ func _ready() -> void:
 	if setup_requested and not start:begin_control_setup("training")
 
 func start_flight(kind: String = "demo") -> void:
+	if kind=="training":kind="demo" # Tutorial and Play are the same judge demo.
 	vision.yoke_calibration.stop()
 	yoke_recovery=false;yoke_return_time=0;paper_throttle_seen=false
 	if mission.has_method("cleanup_visuals"):mission.cleanup_visuals()
-	mission=Training.new() if kind=="training" else Mission.new();mission.app=self
+	mission=Mission.new();mission.app=self
 	settings_visible=false
 	badge_launch_remaining=3.0 if kind in ["demo","training"] and DisplayServer.get_name()!="headless" else 0.0
 	badge.reset_presentation()
@@ -189,6 +190,7 @@ func start_flight(kind: String = "demo") -> void:
 	flight.reset(profile())
 	if route_id=="sf": flight.position.y += surface_height(flight.position.x,flight.position.z)
 	if kind=="approach":
+		landing_started=true
 		flight.spawn_airborne(Vector3(0,160,4200) if route_id=="sf" else Vector3(0,155,-11200),75)
 		flight.gear = true; flight.flaps = 2; flight.pitch = -atan(Approach.GLIDESLOPE)
 		flight.throttle = 0.3; flight.engine = 0.3
@@ -212,7 +214,7 @@ func start_flight(kind: String = "demo") -> void:
 
 func overlay_visible() -> bool: return mode=="control_setup" or help_visible or calibration_visible or credits_visible or settings_visible
 func yoke_required() -> bool:
-	return vision.enabled and vision.yoke_enabled and mode in ["flight", "rollout"]
+	return vision.enabled and vision.yoke_enabled and mode=="flight"
 func yoke_recovery_visible() -> bool:
 	return yoke_required() and (yoke_recovery or not vision.tracking)
 func hold_for_yoke(dt: float) -> bool:
@@ -256,7 +258,7 @@ func _input(event: InputEvent) -> void:
 		if event.keycode==KEY_F1: help_visible = not help_visible; calibration_visible = false; credits_visible = false;settings_visible=false; return
 		if event.keycode==KEY_C: on_action("camera"); return
 		if event.keycode==KEY_M: audio.muted = not audio.muted; save_settings(); return
-		if overlay_visible() or yoke_recovery_visible(): return
+		if overlay_visible() or (yoke_recovery_visible() and event.keycode not in [KEY_D,KEY_L]): return
 		match event.keycode:
 			KEY_ENTER:
 				if mode in ["title","results"]: on_action("fly")
@@ -272,9 +274,9 @@ func _input(event: InputEvent) -> void:
 				if mode=="flight": copilot = not copilot; used_copilot = used_copilot or copilot
 			KEY_B:
 				if mode=="flight": mouse_yoke = not mouse_yoke
-			KEY_G:
+			KEY_A, KEY_G:
 				if mode=="flight":toggle_gear()
-			KEY_L:
+			KEY_D, KEY_L:
 				begin_landing()
 			KEY_F:
 				if mode=="flight": flight.flaps = (flight.flaps+1)%3;flaps_override=flight.flaps
@@ -293,7 +295,7 @@ func _input(event: InputEvent) -> void:
 					combat.fire_primary()
 		if mode=="flight":
 			var physical: int = event.physical_keycode if event.physical_keycode else event.keycode
-			if physical in [KEY_LEFT,KEY_RIGHT,KEY_UP,KEY_DOWN,KEY_A,KEY_D,KEY_W,KEY_S]: take_manual_control(physical not in [KEY_W,KEY_S])
+			if physical in [KEY_LEFT,KEY_RIGHT,KEY_UP,KEY_DOWN,KEY_COMMA,KEY_PERIOD,KEY_W,KEY_S]: take_manual_control(physical not in [KEY_W,KEY_S])
 	if overlay_visible() or yoke_recovery_visible() or mode!="flight": return
 	if event is InputEventMouseMotion and (Input.is_key_pressed(KEY_ALT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)):
 		look.x = clampf(look.x-event.relative.x*0.003,-1.4,1.4)
@@ -320,7 +322,7 @@ func apply_gameplay_settings() -> void:
 	if is_instance_valid(combat):combat.aim_strength=gameplay_settings.auto_aim;combat.assist=gameplay_settings.auto_aim>0
 func begin_control_setup(next_action: String = "training") -> void:
 	setup_return_mode=mode
-	setup_next_action=next_action
+	setup_next_action="fly" if next_action=="training" else next_action
 	mode="control_setup"
 	controls_lesson.reset();vision.yoke_calibration.start()
 	vision.enabled=true;mouse_yoke=false
@@ -345,12 +347,14 @@ func finish_control_setup() -> void:
 	if not controls_lesson.live(vision,control_setup_picture(),Time.get_ticks_msec()) or not controls_lesson.ready_pose(vision):return
 	vision.yoke_calibration.stop()
 	if setup_next_action.is_empty():mode=setup_return_mode;return
-	start_flight("training" if setup_next_action=="training" else "demo")
+	start_flight("demo")
 	copilot=false;used_copilot=false;demo_auto_fire=false
 	flight.throttle=vision.throttle;flight.engine=vision.throttle
-	if setup_next_action=="fly" and mission.cinematic:tutorial.start()
+	if mission.cinematic:tutorial.start()
 
 func on_action(action: String) -> void:
+	if action=="training":action="fly"
+	elif action=="keyboard_training":action="keyboard_play"
 	match action:
 		"settings":
 			settings_visible=not settings_visible;help_visible=false;calibration_visible=false;credits_visible=false
@@ -362,10 +366,7 @@ func on_action(action: String) -> void:
 		"next_pilot":
 			pilot_number=pilot_number%9999+1;on_action("title")
 		"route": pass
-		"training":begin_control_setup("training")
 		"fly":begin_control_setup("fly")
-		"keyboard_training":
-			vision.enabled=false;start_flight("training");copilot=true;used_copilot=true;demo_auto_fire=false
 		"keyboard_play":
 			vision.enabled=false;start_flight();copilot=true;used_copilot=true;demo_auto_fire=false
 			if mission.cinematic:tutorial.start()
@@ -474,9 +475,7 @@ func _physics_process(dt: float) -> void:
 		elif mode=="paused":mode=resume_mode
 		else:resume_mode=mode;mode="paused"
 	if badge.tapped(0) and mode=="flight":toggle_gear()
-	if badge.tapped(1) and mode=="flight":
-		if flight_kind=="training" or mission.cinematic or tutorial.active:begin_landing()
-		else:flight.flaps=(flight.flaps+1)%3;flaps_override=flight.flaps
+	if badge.tapped(1) and mode=="flight":begin_landing()
 	if badge.tapped(4) and mode=="flight":cockpit=not cockpit;camera_rig.reset()
 	if badge.tapped(5) and mode=="flight":badge.tactical=not badge.tactical
 	if badge.tapped(6) and mode=="flight":copilot=not copilot;assisted_yoke_reference=vision.yoke
@@ -505,21 +504,25 @@ func _physics_process(dt: float) -> void:
 		return
 	if mode=="rollout":
 		if mission.active: mission.tick(dt)
-		var steer: float = float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
-		flight.rollout_step(dt,landing_started or copilot or Input.is_physical_key_pressed(KEY_SPACE),steer,is_on_runway(flight.position))
-		if not is_on_runway(flight.position): flight.contact = "overrun"
+		var steer: float = float(Input.is_physical_key_pressed(KEY_PERIOD))-float(Input.is_physical_key_pressed(KEY_COMMA))
+		if vision.enabled and vision.tracking:steer=vision.steering().z
+		flight.rollout_step(dt,landing_started or copilot or Input.is_physical_key_pressed(KEY_SPACE),steer,landing_started or is_on_runway(flight.position))
+		if landing_started:
+			flight.contact="landed";flight.airborne=false;flight.position.y=surface_height(flight.position.x,flight.position.z)+float(profile().clearance)
+			flight.vertical_speed=0;flight.velocity.y=0;flight.update_pose(dt,Vector3.ZERO,surface_height(flight.position.x,flight.position.z))
+		elif not is_on_runway(flight.position):flight.contact="overrun"
 		apply_aircraft_pose()
 		if flight.contact=="overrun":
 			if route_id=="sf":recover_flight()
 			else:finish_sortie(false,"Runway excursion. Brake earlier and hold centerline.")
 		elif flight.speed==0:
-			var success: bool=combat.kills>=mission.TARGET_COUNT if mission is Training else skein_cleared() if mission.cinematic else true
-			finish_sortie(success,("TUTORIAL COMPLETE — 16 TARGETS CLEARED AND LANDED" if flight_kind=="training" else "SFO LANDING COMPLETE — AIRCRAFT SECURED") if success else "SAFE LANDING — INTERCEPT INCOMPLETE")
+			var success: bool=landing_started or flight_kind=="demo" or skein_cleared() if mission.cinematic else true
+			finish_sortie(success,"DEMO COMPLETE — AIRCRAFT SECURED" if success else "SAFE LANDING — INTERCEPT INCOMPLETE")
 		return
 	if mode!="flight": return
 	landing_transition=maxf(0,landing_transition-dt)
 	fire_guard = maxf(0,fire_guard-dt)
-	eject_hold = eject_hold+dt if not test_mode and Input.is_physical_key_pressed(KEY_E) else 0
+	eject_hold = eject_hold+dt if not test_mode and not landing_started and Input.is_physical_key_pressed(KEY_E) else 0
 	if eject_hold>0.9 and flight.airborne:
 		mode = "ejected"; pilot_ejected = true; combat.active = false; vision.enabled = false
 		flight.afterburner = false; fighter_fx.begin_ejection(); audio.play_effect("eject",-10); return
@@ -528,16 +531,16 @@ func _physics_process(dt: float) -> void:
 		combat.tick(dt)
 		if mode!="flight": return
 		if gun_requested():combat.fire_primary()
-	var input := Vector3(float(Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_UP))-float(Input.is_physical_key_pressed(KEY_DOWN)),float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)))
+	var input := Vector3(float(Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_UP))-float(Input.is_physical_key_pressed(KEY_DOWN)),float(Input.is_physical_key_pressed(KEY_PERIOD))-float(Input.is_physical_key_pressed(KEY_COMMA)))
 	input.x *= Tune.KEYBOARD_SCALE; input.y *= Tune.KEYBOARD_SCALE
 	var power: float = float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
 	if test_mode: input = Vector3.ZERO; power = 0
 	if input.length()>0 or power!=0: take_manual_control(input.length()>0 and power==0)
 	if vision.enabled and vision.tracking:
-		if not landing_started:copilot=false
+		copilot=false
 		var steering: Vector3=vision.steering()
 		input.x=steering.x;input.y=steering.y;input.z=steering.z
-	if vision.enabled and vision.throttle_confidence>.4 and not landing_started:copilot=false
+	if vision.enabled and vision.throttle_confidence>.4:copilot=false
 	flight.power_input = 0
 	if copilot:
 		input = mission.controls() if mission.active else combat.pilot_controls() if combat.active else approach_controls()
@@ -587,8 +590,12 @@ func _physics_process(dt: float) -> void:
 	if flaps_override>=0:flight.flaps=flaps_override
 	flight.step(dt,control,not mission.active and Input.is_physical_key_pressed(KEY_SPACE),surface_height(flight.position.x,flight.position.z),is_on_runway(flight.position),false)
 	flight.resolve_contact(surface_height(flight.position.x,flight.position.z),is_on_runway(flight.position))
+	if landing_started and (flight.contact!="" or flight.position.y<=surface_height(flight.position.x,flight.position.z)+float(profile().clearance)+.05):
+		settle_demo_touchdown()
 	if flight.airborne and not was_airborne: audio.radio.say("cleared")
-	if flight.airborne and world.obstacle_collision(flight.position,2.5): flight.contact = "crash"
+	if flight.airborne and world.obstacle_collision(flight.position,2.5):
+		if landing_started:settle_demo_touchdown()
+		else:flight.contact="crash"
 	if flight.contact=="landed":
 		mode = "rollout"; combat.active = false; flight.throttle = 0
 		if mission.active: mission.transition("rollout")
@@ -599,7 +606,12 @@ func _physics_process(dt: float) -> void:
 		audio.play_effect("touchdown_tires",-17); audio.play_effect("touchdown_thump",-16); audio.radio.say("touchdown")
 	elif flight.contact!="": begin_crash()
 	if flight_kind!="training" and ((absf(flight.position.x)>60000 or absf(flight.position.z)>60000) if route_id=="sf" else (absf(flight.position.x)>14500 or flight.position.z < -24500 or flight.position.z>8500)):
-		finish_sortie(false,"Operational sector exited. Turn back earlier.","sector")
+		if landing_started:
+			landing_started=false;begin_landing()
+		elif flight_kind=="demo" and route_id=="sf":
+			flight.position.x=clampf(flight.position.x,-55000,55000);flight.position.z=clampf(flight.position.z,-55000,55000)
+			flight.heading=atan2(-flight.position.x,flight.position.z);recover_flight()
+		else:finish_sortie(false,"Operational sector exited. Turn back earlier.","sector")
 	if flight.airborne and not flight.gear and flight.position.y-surface_height(flight.position.x,flight.position.z)<50: audio.radio.say("warning")
 	if flight.stall_time>1: audio.radio.say("warning")
 	apply_aircraft_pose()
@@ -611,11 +623,13 @@ func apply_aircraft_pose() -> void:
 	if flight.has_method("pose_pitch"): aircraft.rotation = Vector3(flight.pose_pitch(),-flight.pose_heading(),-flight.pose_roll())
 	else: aircraft.rotation = Vector3(flight.pitch,-flight.heading,-flight.roll)
 func begin_crash() -> void:
+	if landing_started:settle_demo_touchdown();return
 	if route_id=="sf":recover_flight();return
 	mode = "crashed"; crash_clock = 0; combat.active = false; copilot = false
 	fighter_fx.debris(flight.position); combat.burst(flight.position,Color(1,0.5,0.15),14)
 	audio.play_effect("explosion",-10); camera_rig.impulse(0.8)
 func recover_flight() -> void:
+	if landing_started:settle_demo_touchdown();return
 	# Arcade recovery keeps the existing mission, score and target progress.
 	var approach: bool=landing_started or flight_kind=="approach"
 	mode="flight";resume_mode="flight";flight.contact="";flight.airborne=true
@@ -641,7 +655,7 @@ func recover_flight() -> void:
 
 func finish_sortie(success: bool, reason: String, cause: String="") -> void:
 	if mode=="results": return
-	var result: Dictionary=Results.assess({"contact":flight.contact,"stopped":flight.speed<=.1,"boss":skein_cleared(),"cleared":skein_cleared(),"down":skein_down(),"total":skein_total(),"cinematic":mission.cinematic,"ejected":pilot_ejected,"landing":landing_started or flight_kind=="approach","cause":cause,"early_landing":landed_early},success,reason)
+	var result: Dictionary=Results.assess({"contact":flight.contact,"stopped":flight.speed<=.1,"boss":skein_cleared(),"cleared":skein_cleared(),"down":skein_down(),"total":skein_total(),"cinematic":mission.cinematic,"judge_demo":flight_kind=="demo" or landing_started,"kills":combat.kills,"ejected":pilot_ejected,"landing":landing_started or flight_kind=="approach","cause":cause,"early_landing":landed_early},success,reason)
 	mission_success=result.success;result_headline=result.headline;result_reason=result.summary;result_advice=result.advice;result_code=result.code
 	tutorial.stop()
 	if mission.active and mission_success:mission.transition("secured")
@@ -658,29 +672,40 @@ func in_landing_corridor() -> bool:
 	return route_id=="sf" and (landing_started or mission.phase=="approach")
 
 func begin_landing() -> void:
-	if flight_kind=="training":
-		if not mission.begin_assisted_landing():toast="CLEAR ALL 16 TARGETS BEFORE LANDING";toast_time=3
-		return
-	if mode!="flight" or not flight.airborne or landing_started or route_id!="sf":return
-	landed_early=mission.cinematic and not mission.skein_final and not skein_cleared()
-	landing_started=true;landing_transition=1.2
+	if mode!="flight" or landing_started:return
+	var prior_gear: bool=flight.gear;var prior_flaps: int=flight.flaps
+	landing_started=true;landing_transition=1.0;landed_early=false
 	tutorial.landing_begun()
-	combat.active=false;combat.engagement_enabled=false
-	combat.gun_firing_time=0;combat.visuals.reset()
-	vision.enabled=false;copilot=true;used_copilot=true;control=Vector3.ZERO
-	gear_override=1;flaps_override=2
-	# A deliberate short demo transition to SFO final, retaining sortie score.
-	flight.spawn_airborne(Vector3(0,49,2100),65)
-	flight.heading=0;flight.roll=0
+	combat.active=false;combat.engagement_enabled=false;combat.launch_queue.clear()
+	combat.gun_firing_time=0;combat.beam_active=false;combat.beam_target_ids.assign([-1,-1]);combat.visuals.reset()
+	# Keep the camera controls connected: the judge flies this approach.
+	copilot=false;demo_auto_fire=false;control=Vector3.ZERO;pilot_ejected=false;eject_hold=0
+	flight.spawn_airborne(Vector3(0,85,2600) if route_id=="sf" else Vector3(0,85,-12300),78)
+	flight.heading=0;flight.pitch=-.045;flight.roll=0
 	flight.pitch_velocity=0;flight.roll_velocity=0;flight.yaw_velocity=0;flight.barrel_remaining=0
-	flight.gear=true;flight.flaps=2;flight.throttle=.22;flight.engine=.3;flight.afterburner=false;flight.power_input=0
+	flight.gear=prior_gear;flight.flaps=prior_flaps;gear_override=int(prior_gear);flaps_override=prior_flaps
+	flight.throttle=.18;flight.engine=.3;flight.afterburner=false;flight.power_input=0
 	if mission.active:mission.transition("approach")
 	else:flight_kind="approach"
-	fighter_fx.reset();camera_rig.reset()
-	# The 1.2 s fade ends on a wide, low short-final framing, not the trail shot.
-	camera_rig.offset=Vector3(-14,3.4,34)
-	apply_aircraft_pose();camera_rig.update(.016)
+	fighter_fx.reset();camera_rig.reset();apply_aircraft_pose();camera_rig.update(.016)
+	toast="YOU HAVE CONTROL — A / G: GEAR + FLAPS DOWN · REDUCE THROTTLE";toast_time=5
 	audio.radio.say("approach",2)
+
+func settle_demo_touchdown() -> void:
+	# A demo landing captures the ground once; it never respawns or bounces airborne.
+	if flight.contact!="landed":
+		flight.touchdown_speed=flight.speed;flight.touchdown_sink=flight.vertical_speed
+		flight.touchdown_bank=flight.roll;flight.touchdown_pitch=flight.pitch;flight.touchdown_center=absf(flight.position.x)
+	flight.contact="landed";flight.airborne=false;flight.ever_airborne=true
+	flight.position.y=surface_height(flight.position.x,flight.position.z)+float(profile().clearance)
+	flight.speed=clampf(flight.speed,0,78);flight.pitch=0;flight.roll=0
+	flight.pitch_velocity=0;flight.roll_velocity=0;flight.yaw_velocity=0;flight.vertical_speed=0;flight.vertical_trend=0
+	flight.velocity=Vector3(sin(flight.heading),0,-cos(flight.heading))*flight.speed
+	flight.stall_time=0;flight.gear=true;flight.flaps=2;gear_override=1;flaps_override=2
+	flight.throttle=0;flight.engine=minf(flight.engine,.25);flight.afterburner=false;flight.power_input=0
+	flight.barrel_remaining=0;control=Vector3.ZERO;combat.active=false
+	mode="rollout";resume_mode="rollout"
+	if mission.active:mission.transition("rollout")
 
 ## Wheel height where the flare begins, and the sink rates it interpolates between.
 const FLARE_HEIGHT := 11.0
@@ -742,8 +767,9 @@ func is_on_runway(at: Vector3) -> bool:
 	if mission is Training and is_instance_valid(mission.airfield) and mission.airfield.contains_runway(at.x,at.z):return true
 	return world.is_runway(at.x,at.z)
 func toggle_gear() -> void:
+	if not flight.airborne and not landing_started:toast="RETRACT GEAR AFTER TAKEOFF";toast_time=3;return
 	flight.gear=not flight.gear;gear_override=int(flight.gear)
-	if flight_kind=="training":flight.flaps=(2 if mission.phase in ["return","approach"] else 1) if flight.gear else 0;flaps_override=flight.flaps
+	flight.flaps=(2 if landing_started else 1) if flight.gear else 0;flaps_override=flight.flaps
 
 func approach_data() -> Dictionary:
 	if mission is Training and is_instance_valid(mission.airfield):return mission.guidance()

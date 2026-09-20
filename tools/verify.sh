@@ -22,6 +22,8 @@ if [ ! -x .venv/bin/python ]; then ./tools/setup_vision.sh; fi
 "$engine" --headless --path simulator --script res://tests/test_missile_area_damage.gd
 "$engine" --headless --path simulator --script res://tests/test_missile_blast.gd
 "$engine" --headless --path simulator --script res://tests/test_two_waves.gd
+"$engine" --headless --path simulator --script res://tests/test_endless_waves.gd
+"$engine" --headless --path simulator --script res://tests/test_judge_landing.gd
 "$engine" --headless --path simulator --script res://tests/test_combat_feel.gd
 "$engine" --headless --path simulator --script res://tests/test_balance_profile.gd
 "$engine" --headless --path simulator --script res://tests/test_scenic_route.gd

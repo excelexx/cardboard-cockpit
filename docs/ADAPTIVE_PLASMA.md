@@ -17,8 +17,8 @@ Automatic support looks for a large flock ahead, with at least six eligible live
 
 Missiles are automatic support rather than a manual weapon. T and right mouse are not firing controls. The electronic badge remains dedicated to secondary controls such as view, tactical display, gear, landing and pause.
 
-Normal SF Play keeps its scenic route and two objective waves: **12 geese, then 20**. The transition gives a short clear or arrival beat. Only actual kills contribute to the aggregate **32**; missed or retired targets never count as destroyed. Tutorial remains a separate **16-target** takeoff, combat and landing route.
+The unified judge demo keeps the San Francisco scenery and continues to offer new flocks. **Play** and older Tutorial entry points open the same flow. The HUD shows **WAVE N** and current-wave kills; retired or missed targets never become kills. There is no fixed wave count or target quota before landing. Press **D / badge B** when ready, configure gear and flaps with **badge A / G**, reduce throttle, and fly your approach.
 
-Sound starts enabled each launch, with M available to mute. Camera movement and recoil stay subdued for comfort. Cardboard calibration, tracking recovery, throttle blending and the existing sensitivity/agility defaults remain available in both flight modes.
+Sound starts enabled each launch, with M available to mute. Camera movement and recoil stay subdued for comfort. Cardboard calibration, tracking recovery, throttle blending and the existing sensitivity/agility defaults remain available throughout the demo.
 
 Missile impacts deal area damage within120metres, with a falloff toward the edge. Nearby geese can be cleared by the same blast; each real death counts once. Missiles retarget unassigned living geese if a prior target dies. Impact visuals combine a hot core, expanding coloured pressure rings, fire/smoke, sparks and fragments, with bounded active effects and unchanged subdued camera motion.

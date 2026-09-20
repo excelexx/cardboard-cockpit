@@ -37,9 +37,9 @@ var burner_latch := false
 var inhale := 0.0
 var attributes: CameraAttributesPractical
 
-const SHAKE_STRENGTH := 0.025 # 97.5% less decorative shake; steering/aim stay unchanged.
-const HEAD_MOTION_STRENGTH := 0.15
-const FOV_PUNCH_STRENGTH := 0.15
+const SHAKE_STRENGTH := 0.60 # Kill feedback only, 40% below the original amplitude.
+const HEAD_MOTION_STRENGTH := 0.0
+const FOV_PUNCH_STRENGTH := 0.0
 const SHAKE_ANGLE := 0.05585      # 3.2 deg of pitch/yaw rattle at full energy
 const SHAKE_ROLL := 0.02793       # 1.6 deg of roll rattle
 const SHAKE_SHIFT_CHASE := 0.42   # metres of boom translation
@@ -69,12 +69,13 @@ func _ready() -> void:
 	noise.seed = 20260919
 	noise.frequency = 1.0
 
-func impulse(amount: float) -> void: trauma = minf(1,trauma+amount)
+func impulse(_amount: float) -> void:pass # Recoil, terrain, boost and generic impacts do not shake the view.
+func kill_impulse(amount: float = .15) -> void:trauma=minf(1,trauma+maxf(amount,0))
 ## The one impact in the mission the player is meant to enjoy: mains on concrete.
 ## Clamped at both ends so a greaser still registers and a firm arrival never hurts.
 func touchdown(strength: float) -> void:
 	impulse(clampf(strength,0.12,0.60))
-	settle = 0.05
+	settle = 0.0
 	settle_clock = 0.0
 func reset() -> void:
 	initialized = false; trauma = 0; last_speed = app.flight.speed; acceleration = 0
@@ -100,8 +101,8 @@ func update(dt: float) -> void:
 	# --- shake energy ---------------------------------------------------------
 	# Transonic buffet builds from Mach 0.86, peaks near 0.98 and clears by 1.02.
 	var buffet: float = clampf((f.mach-0.86)/0.12,0,1)*clampf((1.02-f.mach)/0.06,0,1)*0.55
-	var vibration: float = buffet*buffet+(0.10 if f.afterburner else 0.0)
-	var thump: float = trauma*trauma+proximity*proximity*0.55+clampf((f.g_load-3.0)/5.0,0.0,0.35)
+	var vibration: float = 0.0
+	var thump: float = trauma*trauma
 	var raw: float = thump+vibration
 	if raw>SHAKE_ENERGY_CAP:
 		var cap: float = SHAKE_ENERGY_CAP/raw

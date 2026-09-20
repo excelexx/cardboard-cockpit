@@ -9,7 +9,7 @@ func check(value: bool,message: String) -> void:
 	if not value:failures.append(message);push_error(message)
 func _initialize() -> void:call_deferred("run")
 func run() -> void:
-	var app=load("res://scenes/main.tscn").instantiate();app.set_meta("route_override","alpine");root.add_child(app)
+	var app=load("res://scenes/main.tscn").instantiate();app.set_meta("route_override","sf");root.add_child(app)
 	app.set_process(false);app.set_physics_process(false);app.audio.muted=true;app.on_action("sensitivity_reset")
 	check(app.gameplay_settings.pitch_agility==1.3 and app.gameplay_settings.bank_agility==1.3 and app.gameplay_settings.yaw_agility==1.3,"Unchanged default handling")
 	app.on_action("settings");app.hud.update_sensitivity_sliders()
@@ -23,23 +23,25 @@ func run() -> void:
 	app.on_action("camera_previews");check(not app.camera_previews,"Camera overlay has a setting")
 	app.on_action("badge_prompts");check(not app.badge_prompts,"Badge coaching has a setting")
 	app.on_action("badge_prompts");app.on_action("camera_previews")
-	app.on_action("keyboard_training");check(app.flight_kind=="training" and app.mission is TrainingMission,"Separate takeoff/combat/landing tutorial")
-	check(app.mission.phase=="takeoff" and not app.flight.airborne and app.combat.training_target_limit==16,"Tutorial begins on runway and targets sixteen geese")
+	app.on_action("keyboard_training");check(app.flight_kind=="demo" and not app.mission is TrainingMission and app.mission.cinematic,"Legacy Tutorial opens the same SF judge demo")
+	check(not app.flight.airborne and app.combat.training_target_limit==-1,"Shared demo starts grounded without a finite target quota")
+	app.flight.spawn_airborne(Vector3(0,500,-3000),150);app.flight.gear=true;app.flight.flaps=1
 	app.badge.close();app.badge=ScriptedBadge.new();app.badge.next_press=1<<0;app._physics_process(1.0/60)
-	check(not app.flight.gear and app.flight.flaps==0,"Physical badge A routes to tutorial gear/flap configuration")
-	app.begin_landing();check(not app.landing_started and app.toast_time>0,"Landing assist cannot skip the combat lesson")
-	app.mission.transition("combat");check(app.combat.enemies.size()==16,"Sixteen targets spawned")
-	app.combat.spawn_contact();check(app.combat.enemies.size()==16,"Normal respawns cannot extend the tutorial target count")
-	app.combat.kills=16;app.badge.next_press=1<<1;app._physics_process(1.0/60);check(app.landing_started and app.flight.gear and app.flight.flaps==2 and app.copilot,"Badge B/L assistance configures the tutorial landing")
-	check(app.mission.phase=="return" and app.mission.instruction().length()>0,"Landing remains on the imported return route")
+	check(not app.flight.gear and app.flight.flaps==0,"Badge A retracts both gear and flaps after takeoff")
+	app.vision.enabled=true;app.vision.tracking=true;app.vision.yoke_enabled=true
+	app.badge.next_press=1<<1;app._physics_process(.01)
+	check(app.landing_started and app.mission.phase=="approach" and not app.copilot and app.vision.enabled,"Badge B starts a pilot-controlled approach without disconnecting cardboard")
+	check(app.combat.kills==0 and not app.flight.gear and app.flight.flaps==0,"Landing needs no kills and preserves the pilot's gear configuration")
+	app.badge.next_press=1<<0;app._physics_process(.01)
+	check(app.flight.gear and app.flight.flaps==2,"Badge A deploys gear and flaps for the approach")
 	app.mode="paused";app.resume_mode="flight";app.settings_visible=true;app.badge.next_press=1<<2;app._physics_process(.01)
 	check(not app.settings_visible and app.mode=="paused","Badge HOME closes settings without restarting the flight")
 	app.badge.next_press=1<<2;app._physics_process(.01);check(app.mode=="flight","Badge HOME resumes from pause")
 	var old_tactical: bool=app.badge.tactical
 	app.badge.next_press=1<<5;app._physics_process(.01)
 	check(app.badge.tactical!=old_tactical and app.combat.missiles_fired==0,"Badge RIGHT toggles tactical display without firing")
-	app.on_action("keyboard_play");check(app.flight_kind=="demo" and not app.mission is TrainingMission,"Normal Play remains this branch's mission")
-	check(app.combat.training_target_limit==-1,"Normal combat limit restored")
+	app.on_action("keyboard_play");check(app.flight_kind=="demo" and not app.mission is TrainingMission,"Play opens the same SF judge demo")
+	check(app.combat.training_target_limit==-1,"Endless combat has no Tutorial target cap")
 	# Fresh visible/covered gun packets directly control firing without latches.
 	app.start_flight("combat");app.vision.enabled=true;app.vision.tracking=true;app.fire_guard=0
 	var camera_packet: Dictionary={"version":1,"sequence":10,"timestamp":100,"tracking":true,"yoke":{"roll":0,"pitch":0,"yaw":0,"confidence":1},"throttle":{"value":.4,"confidence":1},"weapons":{"gun":true}}
