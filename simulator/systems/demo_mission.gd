@@ -333,7 +333,6 @@ func _spawn_slice(c: CombatDirector) -> void:
 		c.spawn_contact("goose")
 		if c.enemies.size()<=previous_count:break
 		var bird: Dictionary=c.enemies.back()
-		bird.requires_aim_adjustment=true
 		bird.position=place
 		bird.node.position=bird.position
 		bird.formation_altitude=bird.position.y

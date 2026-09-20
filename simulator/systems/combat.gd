@@ -27,6 +27,7 @@ var missile_cooldown := 0.0
 var launch_queue: Array[Dictionary] = []
 var last_missile: Node3D
 var salvo_count := 0
+var wave_missile_number := -1
 var beam_ends: Array[Vector3]=[Vector3.ZERO,Vector3.ZERO]
 var beam_target_ids: Array[int]=[-1,-1]
 var swarm_active:=false
@@ -96,7 +97,7 @@ var message := ""
 var message_time := 0.0
 
 func reset(enabled: bool = true) -> void:
-	missile_cooldown=0;launch_queue.clear();last_missile=null;salvo_count=0;beam_active=false;beam_hit_id=-1;beam_clock=0;beam_target_ids.assign([-1,-1]);beam_ends.assign([Vector3.ZERO,Vector3.ZERO]);swarm_active=false;detached_trails.clear()
+	wave_missile_number=-1;missile_cooldown=0;launch_queue.clear();last_missile=null;salvo_count=0;beam_active=false;beam_hit_id=-1;beam_clock=0;beam_target_ids.assign([-1,-1]);beam_ends.assign([Vector3.ZERO,Vector3.ZERO]);swarm_active=false;detached_trails.clear()
 	training_target_limit=-1
 	for child: Node in get_children():
 		if child==visuals:continue
@@ -283,7 +284,7 @@ func tick(dt: float) -> void:
 	var best_dot: float=cos(deg_to_rad(acquire_angle()))
 	var old_alignment := -1.0
 	for enemy: Dictionary in enemies:
-		if enemy.health<=0:continue
+		if enemy.health<=0 or _wave_missile_reserved(int(enemy.id)):continue
 		var delta: Vector3=enemy.position-app.flight.position
 		var alignment: float=forward().dot(delta.normalized())
 		if enemy.id==target_id:old_alignment=alignment
@@ -368,9 +369,35 @@ func _visible_targets(reach: float,half_angle: float) -> Array[Dictionary]:
 		found.append(enemy)
 	return found
 
+func _wave_missile_reserved(id: int) -> bool:
+	for request: Dictionary in launch_queue:
+		if request.get("wave_missile",false) and request.target==id:return true
+	for shot: Dictionary in shots:
+		if shot.get("wave_missile",false) and shot.life>0 and shot.target==id:return true
+	return false
+
+func _queue_wave_missile() -> void:
+	var mission=app.mission
+	swarm_active=mission.wave_size==3 and mission.phase=="skein"
+	if not swarm_active or wave_missile_number==mission.wave_number or not mission.skein_spawned():return
+	var choices: Array[Dictionary]=[]
+	for enemy: Dictionary in enemies:
+		if enemy.health>0 and not enemy.get("retiring",false) and mission.wave_ids.has(int(enemy.id)):choices.append(enemy)
+	if choices.is_empty():return
+	choices.sort_custom(func(a: Dictionary,b: Dictionary)->bool:
+		var a_beam: bool=beam_target_ids.has(int(a.id));var b_beam: bool=beam_target_ids.has(int(b.id))
+		if a_beam!=b_beam:return not a_beam
+		return app.flight.position.distance_squared_to(a.position)>app.flight.position.distance_squared_to(b.position))
+	wave_missile_number=mission.wave_number;missile_cooldown=10.0;salvo_count+=1
+	var store: int=[0,2,1,3][(salvo_count-1)%4]
+	launch_queue.append({"target":int(choices[0].id),"side":-1.0 if store<2 else 1.0,"internal":false,"store":store,"slot":0,"salvo":salvo_count,"delay":Tune.MISSILE_RAIL_DELAY,"wave_missile":true,"wave_number":mission.wave_number})
+	event("salvo",app.flight.position,1)
+
 func update_swarm_missiles() -> void:
 	swarm_active=false
 	if not active or not engagement_enabled or not app.flight.airborne:return
+	if app.mission.cinematic:
+		_queue_wave_missile();return
 	var candidates: Array[Dictionary]=_visible_targets(Tune.SWARM_RANGE,Tune.SWARM_HALF_ANGLE)
 	swarm_active=candidates.size()>=Tune.SWARM_MIN_TARGETS
 	if not swarm_active or missile_cooldown>0:return
@@ -392,10 +419,14 @@ func update_swarm_missiles() -> void:
 	event("salvo",app.flight.position,1);app.audio.play_effect("gear_motor",-15,1.2)
 
 func update_launches(dt: float) -> void:
-	if not active or not engagement_enabled or not app.flight.airborne or _visible_targets(Tune.SWARM_RANGE,Tune.SWARM_HALF_ANGLE).size()<Tune.SWARM_MIN_TARGETS:
+	if not active or not engagement_enabled or not app.flight.airborne:
 		launch_queue.clear();return
 	for i in range(launch_queue.size()-1,-1,-1):
 		var request: Dictionary = launch_queue[i]
+		if request.get("wave_missile",false):
+			if request.wave_number!=app.mission.wave_number:launch_queue.remove_at(i);continue
+		elif _visible_targets(Tune.SWARM_RANGE,Tune.SWARM_HALF_ANGLE).size()<Tune.SWARM_MIN_TARGETS:
+			launch_queue.remove_at(i);continue
 		request.delay -= dt
 		if request.delay>0: continue
 		var viable:=false
@@ -406,6 +437,8 @@ func update_launches(dt: float) -> void:
 		var at: Vector3 = app.flight.position+basis*Vector3(request.side*0.58,-1.5,-1.0)
 		if not request.internal and request.store<app.fighter_fx.stores.size(): at = app.fighter_fx.stores[request.store].global_position
 		spawn_shot(at,app.flight.velocity+Vector3(0,-Tune.MISSILE_DROP_SPEED,0),"missile",request.target,Tune.MISSILE_DAMAGE)
+		shots.back().wave_missile=request.get("wave_missile",false)
+		shots.back().wave_number=request.get("wave_number",-1)
 		shots.back().slot=request.slot;shots.back().salvo=request.salvo;shots.back().launch_basis=basis
 		missiles_fired+=1
 		last_missile = shots.back().node
@@ -430,19 +463,21 @@ func detonate_missile(shot: Dictionary,direct_target: int=-1) -> void:
 		if enemy.health<=0:continue
 		if enemy.id==direct_target:
 			hurt_enemy(enemy,Tune.MISSILE_DAMAGE,"missile_splash",at)
-		elif Vector3(enemy.position).distance_to(at)<=Tune.MISSILE_BLAST_RADIUS:splash.append(enemy)
+		elif not shot.get("wave_missile",false) and Vector3(enemy.position).distance_to(at)<=Tune.MISSILE_BLAST_RADIUS:splash.append(enemy)
 	splash.sort_custom(func(a: Dictionary,b: Dictionary)->bool:return Vector3(a.position).distance_squared_to(at)<Vector3(b.position).distance_squared_to(at))
 	for index in range(mini(splash.size(),Tune.MISSILE_SPLASH_MAX)):
 		var enemy: Dictionary=splash[index]
 		var distance: float=Vector3(enemy.position).distance_to(at)
 		var damage: float=Tune.MISSILE_SPLASH_DAMAGE*lerpf(1,.35,clampf(distance/Tune.MISSILE_BLAST_RADIUS,0,1))
 		hurt_enemy(enemy,damage,"missile_splash",at)
-	if is_instance_valid(visuals) and visuals.has_method("missile_blast"):visuals.missile_blast(at,Tune.MISSILE_BLAST_RADIUS)
+	if not shot.get("wave_missile",false) and is_instance_valid(visuals) and visuals.has_method("missile_blast"):visuals.missile_blast(at,Tune.MISSILE_BLAST_RADIUS)
 	app.audio.play_effect("explosion",-11,.80)
 	event_log.append({"event":"missile_blast","time":elapsed})
 	if event_log.size()>120:event_log.pop_front()
 
 func _retarget_missile(shot: Dictionary) -> void:
+	if shot.get("wave_missile",false) and (shot.get("wave_number",-1)!=app.mission.wave_number or app.mission.phase!="skein"):
+		shot.life=0;return
 	for enemy: Dictionary in enemies:
 		if enemy.id==shot.target and enemy.health>0 and not enemy.get("retiring",false):return
 	var assigned: Dictionary=_missile_assignments()
@@ -463,6 +498,7 @@ func update_shots(dt: float) -> void:
 		shot.age += dt
 		if shot.life<=0: continue
 		_retarget_missile(shot)
+		if shot.life<=0:continue
 		var previous: Vector3 = shot.position
 		if shot.kind=="cannon":
 			var air_velocity: Vector3 = shot.velocity-app.flight.wind
@@ -580,8 +616,8 @@ func hurt_enemy(enemy: Dictionary,damage: float,source: String,at: Vector3) -> v
 func _plasma_targets() -> Array[int]:
 	var ids: Array[int]=[-1,-1]
 	if not assist or aim_strength<=0:return ids
-	var candidates: Array[Dictionary]=_visible_targets(Tune.BEAM_RANGE,clampf(Tune.PLASMA_HALF_ANGLE*aim_strength,5,55))
-	candidates=candidates.filter(func(enemy: Dictionary)->bool:return not enemy.get("requires_aim_adjustment",false) or forward().angle_to((enemy.position-app.flight.position).normalized())<=deg_to_rad(5.0))
+	var candidates: Array[Dictionary]=_visible_targets(Tune.BEAM_RANGE,acquire_angle())
+	candidates=candidates.filter(func(enemy: Dictionary)->bool:return not _wave_missile_reserved(int(enemy.id)))
 	if candidates.is_empty():return ids
 	var assigned: Dictionary=_missile_assignments()
 	candidates.sort_custom(func(a: Dictionary,b: Dictionary) -> bool:
@@ -614,7 +650,7 @@ func update_beam(dt: float) -> void:
 			# With aim assistance off, each cannon is still a real forward-firing beam.
 			var reach: float=Tune.BEAM_RANGE
 			for enemy: Dictionary in enemies:
-				if enemy.health<=0:continue
+				if enemy.health<=0 or _wave_missile_reserved(int(enemy.id)):continue
 				var along: float=(enemy.position-start).dot(forward())
 				if along>0 and along<reach and Vector3(enemy.position).distance_to(start+forward()*along)<float(enemy.hit_radius):
 					reach=along;hit=enemy;end=start+forward()*reach

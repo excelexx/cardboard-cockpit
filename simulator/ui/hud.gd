@@ -454,7 +454,7 @@ func draw_weapons(c: CombatDirector) -> void:
 	var swarm: bool=bool(c.get("swarm_active"))
 	put(mono,Vector2(56,943),"AUTO MISSILES",18,GREEN)
 	put(mono,Vector2(240,943),("READY" if c.missile_cooldown<=0 else "%.1fs" % c.missile_cooldown) if swarm else "STANDBY",17,GREEN if swarm else SOFT)
-	put(body,Vector2(370,941),"FLOCK SUPPORT / TWO EVERY FIVE SECONDS" if swarm else "ACTIVATE AUTOMATICALLY IN LARGE FLOCKS",15,WHITE)
+	put(body,Vector2(370,941),"ONE GOOSE PER THREE-GOOSE WAVE" if swarm else "AUTOMATIC ON THREE-GOOSE WAVES",15,WHITE)
 ## Compact wave and kill count. No progress bar or per-goose pips.
 func draw_objective(c: CombatDirector) -> void:
 	if hidden_in_flight() or not c.active or not c.engagement_enabled: return
@@ -604,7 +604,7 @@ func draw_settings() -> void:
 		put(body,rect.position+Vector2(0,-15),"Aim assistance" if axis=="auto_aim" else labels[axis.trim_suffix("_agility")],18,WHITE)
 		put(mono,rect.position+Vector2(rect.size.x-85,-15),"%.2f×" % setting_value(axis),19,GREEN)
 		put(mono,rect.position+Vector2(0,53),"OFF" if axis=="auto_aim" else "0.50×" if axis.ends_with("_agility") else "0.25×",14,SOFT)
-		put(mono,rect.position+Vector2(rect.size.x-52,53),"3.00×",14,SOFT)
+		put(mono,rect.position+Vector2(rect.size.x-52,53),"%.2f×" % sensitivity_sliders[axis].max_value,14,SOFT)
 	var v=app.vision;var input: Vector3=v.steering()
 	put(mono,card.position+Vector2(36,518),"PITCH %+.0f%%   BANK %+.0f%%   YAW %+.0f%%" % [input.y*100,input.x*100,input.z*100] if v.tracking else "SHOW THE YOKE TO CHECK LIVE INPUT",16,GREEN if v.tracking else SOFT)
 	button("camera_previews",Rect2(card.position+Vector2(36,650),Vector2(280,46)),"CAMERA PREVIEWS",false,"ON" if app.camera_previews else "OFF")

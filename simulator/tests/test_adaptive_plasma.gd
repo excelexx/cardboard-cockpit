@@ -64,7 +64,7 @@ func run() -> void:
 	var stable: Array=app.combat.beam_target_ids.duplicate()
 	for i in range(20):a.position.x+=.005;app.combat.update_beam(0)
 	check(app.combat.beam_target_ids==stable,"Small target movements do not cause beam assignment flicker")
-	a.position=app.flight.position+Vector3(-100,0,-600);b.position=app.flight.position+Vector3(100,0,-600)
+	a.position=app.flight.position+Vector3(-40,0,-600);b.position=app.flight.position+Vector3(40,0,-600)
 	app.combat.update_beam(0);stable=app.combat.beam_target_ids.duplicate()
 	bird(Vector3(0,0,-100));app.combat.update_beam(0)
 	check(app.combat.beam_target_ids==stable,"New closer geese do not steal the current valid plasma locks")

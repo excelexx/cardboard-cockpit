@@ -53,3 +53,11 @@ Validation: 39 wave/altitude checks, 253 endless-wave checks, 34 plasma/laser-wi
 Wave geese now appear at 2.2, 2.6, and 3.0 km along the camera sightline (two-bird waves use the first two slots), with alternating small lateral offsets of 90–120 m. Laser and acquisition range extends to 3.5 km, and managed waves are excluded from the old ambient-distance retirement rule so distant geese remain visible. The 1,300-foot floor and ten-second wave interval are preserved.
 
 Within 120 m of terrain and during rollout, the camera damps rapid attitude and height changes, reduces chase acceleration/yaw offsets, and lowers shake amplitude by 80%. Normal airborne kill shake is unchanged. A synthetic jitter check measured 1.294° source movement versus 0.152° cockpit and 0.023° chase movement. Wave, laser-range, camera, and landing tests pass.
+
+## Working aim slider and one automatic wave missile
+
+Plasma now uses the same slider-scaled acquisition angle as the aiming reticle. The fixed five-degree wave-target restriction and five-degree minimum are removed, so lower settings require precision, higher settings widen acquisition, and zero disables assistance. Slider endpoint labels reflect the actual 6x maximum.
+
+Each three-goose cinematic wave schedules exactly one guided missile, usually against the farthest goose not already under plasma fire. Its target is reserved while the missile is queued or flying, leaving the other two for the pilot. Two-goose waves do not launch one. Wave missiles have no collateral damage and expire when their wave ends; repeated frames cannot schedule another. They reuse the normal goose explosion rather than layering the heavy area blast.
+
+Validation: 18 real-slider targeting checks, 13 wave-missile checks (including continuous plasma, no splash, and no carryover), 36 plasma regression checks, and 27 control checks pass. Native rendering also verified one launch and one kill.
