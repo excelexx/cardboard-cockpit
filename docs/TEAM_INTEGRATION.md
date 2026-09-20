@@ -19,3 +19,9 @@ The current aircraft, world, weapons, energy cannon, visual effects, audio and n
 Physical dual-camera use and a new badge demonstration are not part of this verification. No badge firmware change is needed. The packaged app is version 0.15.0; see the normal packaging instructions in the README.
 
 Latest offline results: 113 Python tests passed; the SF route completed in 138.02 simulated seconds and the Tutorial completed all sixteen targets and stopped at the airfield in 296.92 seconds. Live sensitivity transport passed 17 checks. A weapon-format transition regression also verifies that switching from a gun-only tag back to two off switches clears both latches. Native screenshots use simulated checkerboard camera images.
+
+## 0.15.1 — restored guided cardboard setup
+
+The original integration omitted excelex’s `control_tutorial.gd` and its instructional screen, leaving only neutral calibration and previews. This follow-up restores the original three-second neutral capture, throttle idle/full/idle checks, yoke overview, shooting-grip explanation and gun cover/uncover checks. It keeps both independent camera panels visible and uses the current fonts and colours. **Set up cardboard**, C, the two-camera launcher, and camera-enabled Play/Tutorial enter this flow. Mid-flight setup pauses and resumes the current sortie; keyboard play remains available. Progress requires fresh camera observations and the correct camera image for the current step; the final ready state requires both images. No physical capture is started by the game itself: use the two-camera launcher as documented.
+
+The restored controller’s automated tests cover calibration freshness, repeated packets, camera/marker loss, gun on/off, ready pose, cancellation, keyboard fallback and entry into the sixteen-target flight. Native screenshots use simulated camera images with badge communication disabled.
