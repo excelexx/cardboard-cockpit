@@ -37,3 +37,13 @@ Validation: 49 timed/altitude checks, 253 endless-wave checks, 28 plasma checks 
 Waves now alternate between two and three geese with one arrival every eight seconds. Goose scale doubles again to 24. Mesh detail is 176 / 96 / 64 triangles; shared meshes prewarm at startup. The transparent spectral overlay formerly allocated per spawn is removed, and goose colors use unshaded rendering. Laser widths double in cockpit and chase views. Calibration replaces the existing heading with “Set throttle to 0%” while throttle is nonzero, and restores the three-second progress bar without another text line.
 
 Validation: 64 arrival/altitude checks, 253 endless-wave checks, 75 calibration checks, 19 combat checks, and actual mesh triangle budgets pass.
+
+## Ten-second waves and quick kills
+
+Full waves of two or three geese arrive every ten seconds, slightly offset left/right from the camera sightline. Geese spawn no lower than 1,300 feet even when the player is below that altitude, and remain clear of terrain. The player must aim within five degrees of a wave goose before assistance damages it. Focused plasma destroys a goose in 1 second; its mesh hides immediately and is removed on the next projectile cleanup, leaving a brief warm explosion. Red health circles replace brackets. Only cockpit lasers retain the doubled width; external-view lasers return to their original width.
+
+## Landing performance
+
+First touchdown allocated two GPU particle emitters, their curves, meshes, and materials on the contact frame. The native rendered probe reproduced a 3,043.7 ms first-touchdown peak, versus 24.5 ms on a repeat landing. Tyre smoke now uses eight shared-mesh quads created during aircraft setup, animated and faded without touchdown allocations or a particle compute pipeline. The same probe measured 26.1 ms on first touchdown and 20.1 ms on repeat, with 0.67 ms touchdown CPU work. These are local probe measurements, not a universal frame-rate guarantee.
+
+Validation: 39 wave/altitude checks, 253 endless-wave checks, 34 plasma/laser-width checks, 19 combat checks, and 21 judge-landing checks pass. tools/profile_touchdown.gd reproduces the native measurement and checks smoke pool reuse.

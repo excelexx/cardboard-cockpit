@@ -1,26 +1,32 @@
 extends "res://tests/test_endless_waves.gd"
 func run()->void:
 	setup()
-	app.flight.airborne=true;app.flight.position=Vector3(0,500,0);app.flight.pitch=.25
-	app.mission.tick(6);app.mission.tick(1.99)
-	check(app.combat.next_id==0,"No goose before eight airborne seconds")
+	app.flight.airborne=true;app.flight.position=Vector3(0,200,0);app.flight.pitch=0
+	app.mission.tick(8);app.mission.tick(2)
+	check(app.combat.next_id==2,"Wave still spawns when the player is below 1,300 feet")
+	for bird: Dictionary in app.combat.enemies:check(is_equal_approx(bird.position.y,396.24),"Low-altitude player gets geese at 1,300 feet")
+	app.flight.position=Vector3(0,1000,0)
+	app.camera=Camera3D.new();app.add_child(app.camera)
+	app.camera.position=app.flight.position
+	app.camera.look_at(app.flight.position+Vector3(.4,.12,-1))
 	app.mission.tick(.01)
 	var last_spawn: float=app.mission.clock
 	var count: int=app.combat.next_id
-	check(count==1,"First arrival is one goose")
-	for step in range(1000):
-		app.flight.heading+=.01
-		app.flight.position+=app.flight.forward()*30
+	check(count==2,"First wave spawns two geese together")
+	for step in range(700):
 		app.mission.tick(.1)
 		if app.combat.next_id>count:
-			check(app.combat.next_id==count+1,"Only one goose spawns at a time")
-			check(app.mission.clock-last_spawn>=7.999,"Spawns stay eight seconds apart across wave boundaries")
-			check(app.mission.wave_size>=2 and app.mission.wave_size<=3,"Waves contain two or three geese")
-			var bird: Dictionary=app.combat.enemies.back()
-			check(is_equal_approx(bird.position.y,app.flight.position.y),"Spawn matches current aircraft altitude")
-			check(app.flight.forward().dot((bird.position-app.flight.position).normalized())>.8,"Spawn remains ahead of the aircraft")
+			var added: int=app.combat.next_id-count
+			check(added>=2 and added<=3,"Entire waves spawn together with two or three geese")
+			check(app.mission.clock-last_spawn>=9.999 and app.mission.clock-last_spawn<10.3,"New waves arrive every ten seconds")
+			var center:=Vector3.ZERO
+			for bird: Dictionary in app.combat.enemies:
+				check(bird.position.y>=396.23,"All geese spawn at or above 1,300 feet")
+				center+=bird.position
+			center/=float(added)
+			check(is_equal_approx(center.distance_to(app.combat.spawn_sight_point(1200)),180.0),"Wave is slightly offset from camera sightline")
 			last_spawn=app.mission.clock;count=app.combat.next_id
-	check(count>=9,"Arrivals continue at the requested cadence")
+	check(count>=15,"Ten-second waves continue")
 	app.landing_started=true;app.mission.tick(100)
-	check(app.combat.next_id==count,"Landing stops arrivals")
+	check(app.combat.next_id==count,"Landing stops wave arrivals")
 	await finish()

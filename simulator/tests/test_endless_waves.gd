@@ -21,6 +21,7 @@ class FakeCombat extends CombatDirector:
 			"retiring":false,"age":0.0,"fade":1.0})
 		next_id += 1
 class Harness extends Node:
+	var camera: Camera3D
 	var cockpit := false
 	var route_id := "sf"
 	var flight := Flight.new()
@@ -55,8 +56,8 @@ func fill_wave() -> void:
 		app.flight.position+=app.flight.forward()*(app.mission.stream_gap+1)
 		app.mission.tick(maxf(.01,app.mission.next_spawn_at-app.mission.clock))
 func start_first_wave() -> void:
-	app.flight.airborne=true;app.flight.gear=true;app.flight.flaps=1;app.flight.position=Vector3(0,500,-1000)
-	app.mission.tick(6.0);app.mission.tick(2.0);fill_wave()
+	app.flight.airborne=true;app.flight.gear=true;app.flight.flaps=1;app.flight.position=Vector3(0,1000,-1000)
+	app.mission.tick(8.0);app.mission.tick(2.0);fill_wave()
 func kill_birds(count: int) -> void:
 	var remaining := count
 	for enemy in app.combat.enemies:
@@ -76,7 +77,7 @@ func run() -> void:
 	app.mission.tick(70.0)
 	check(app.mission.wave_number==0 and app.mission.phase=="opening","Ground wait never starts a clock-triggered combat wave")
 	start_first_wave()
-	check(app.mission.wave_number==1 and app.mission.wave_size==2,"First proper wave arrives eight seconds after airborne")
+	check(app.mission.wave_number==1 and app.mission.wave_size==2,"First proper wave arrives ten seconds after airborne")
 	check(app.flight.gear,"Gear-down flight does not block the first wave")
 	check(app.mission.skein_total()==2,"Total means actual arrivals, not a predetermined quota")
 	app.mission.controls()

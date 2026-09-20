@@ -388,9 +388,8 @@ func event(kind: String,at: Vector3,weight: float) -> void:
 		# The one bright thing left. It has to carry "scored hit" to a novice
 		# 600 m away, so it stays hot - but it is 0.07 s, not a fireball.
 		puff(at,Color(2.6,2.2,1.6,.95),radius*.6,.07)
-		if kind=="impact":
-			# A missile warhead genuinely burns. This is the only warm fireball
-			# left in the kill path.
+		if kind=="impact" or lethal:
+			# Missile impacts and confirmed goose kills get a brief warm fireball.
 			puff(at,Color(1,.52,.20,.88),radius*1.15,.26,false,Vector3.ZERO,.045)
 			puff(at,Color(.52,.50,.47,.42),radius*1.25,.40,true,Vector3.UP*5,.10)
 			illuminate(at,Color(1,.60,.30),3.0,42,.18)
@@ -472,7 +471,7 @@ func update_projectile(shot: Dictionary,dt: float) -> void:
 		# cyan puff that used to be here.
 		puff(shot.position,Color(.67,.67,.64,.22),clampf(distance*.008,1.3,7),.28)
 func draw_plasma() -> void:
-	var width: float=.64 if combat.app.cockpit else 2.0
+	var width: float=.64 if combat.app.cockpit else 1.0
 	if width!=plasma_view_width:
 		for material in plasma_materials:material.set_shader_parameter("width_scale",width)
 		plasma_view_width=width

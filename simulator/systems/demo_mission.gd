@@ -16,7 +16,7 @@ const FLOCK_SPREAD := 1000.0
 const FLOCK_CLOSE_RATE := 20.0
 const SECOND_WAVE_SIZE := 2
 const WAVE_SECONDS := 18.0
-const FIRST_WAVE_AIRBORNE_SECONDS := 8.0
+const FIRST_WAVE_AIRBORNE_SECONDS := 10.0
 const MAX_WAVE_SIZE := 3
 const HISTORY_LIMIT := 32
 const WAVE_BREAK_SECONDS := 3.0
@@ -46,7 +46,7 @@ var airborne_clock := 0.0
 var empty_view_clock := 0.0
 const STREAM_MIN_DISTANCE := 600.0
 const STREAM_MAX_DISTANCE := 1500.0
-const SPAWN_INTERVAL := 8.0
+const SPAWN_INTERVAL := 10.0
 var next_spawn_at := 0.0
 var stream_gap := 1050.0
 var stream_distance := 0.0
@@ -201,11 +201,11 @@ func _tick_showcase(dt: float) -> void:
 		act=2;transition("gather");app.audio.radio.say("warning",2)
 		var signature: Vector3=app.flight.position+app.flight.forward()*1700
 		c.event("skein_signature",signature,4);c.event("scan",signature,1)
-	elif phase=="gather" and app.flight.airborne and airborne_clock>=FIRST_WAVE_AIRBORNE_SECONDS:
+	elif phase=="gather" and app.flight.airborne and airborne_clock>=FIRST_WAVE_AIRBORNE_SECONDS and _spawn_visible(c):
 		act=3;transition("skein");_open_skein(c,1)
 	elif phase=="wave_break" and app.flight.airborne:
 		stream_distance+=app.flight.position.distance_to(stream_position);stream_position=app.flight.position
-		if clock>=next_spawn_at:transition("skein");_open_skein(c,wave_number+1)
+		if clock>=next_spawn_at and _spawn_visible(c):transition("skein");_open_skein(c,wave_number+1)
 	if phase=="skein":
 		_drive_skein(c,dt)
 		if skein_spawned() and wave_remaining()==0:_finish_wave(c,true)
@@ -286,7 +286,7 @@ func request_landing() -> void:
 func _drive_skein(c: CombatDirector,dt: float) -> void:
 	stream_distance+=app.flight.position.distance_to(stream_position)
 	stream_position=app.flight.position
-	if skein_pending>0 and clock>=next_spawn_at:
+	if skein_pending>0 and clock>=next_spawn_at and _spawn_visible(c):
 		_spawn_slice(c)
 		next_spawn_at=clock+SPAWN_INTERVAL
 	_tally_skein(c)
@@ -311,22 +311,37 @@ func _flock_course(heading: float) -> Vector3:
 					break
 	return course.normalized()*clampf(course.length(),16.0,24.0)
 
+func _wave_anchor(c: CombatDirector) -> Vector3:
+	var wing:=Vector3(cos(app.flight.heading),0,sin(app.flight.heading))
+	var next_number: int=wave_number+1 if phase in ["opening","gather","wave_break"] else wave_number
+	var anchor: Vector3=c.spawn_sight_point(1200)+wing*(180.0 if next_number%2==0 else -180.0)
+	for offset in [-65.0,0.0,65.0]:
+		var place: Vector3=anchor+wing*offset
+		anchor.y=maxf(anchor.y,app.world.ground_height(place.x,place.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
+	return anchor
+
+func _spawn_visible(c: CombatDirector) -> bool:
+	var point: Vector3=_wave_anchor(c)
+	var wing:=Vector3(cos(app.flight.heading),0,sin(app.flight.heading))
+	for offset in [-65.0,0.0,65.0]:
+		if not c.spawn_point_clear(point+wing*offset):return false
+	return true
+
 func _spawn_slice(c: CombatDirector) -> void:
 	var f: FlightDynamics=app.flight
 	var forward: Vector3=f.forward()
 	var wing:=Vector3(cos(f.heading),0,sin(f.heading))
-	var count: int=mini(skein_pending,1)
-	var anchor: Vector3=f.position+forward*1200
+	var count: int=skein_pending
+	var anchor: Vector3=_wave_anchor(c)
 	for i in range(count):
 		if c.enemies.size()>=MAX_WAVE_SIZE:break
-		var along: float=(float(i)+.5)*minf(stream_gap*.5,180.0)/float(count)+randf_range(-8,8)
-		var place: Vector3=anchor+forward*along+wing*randf_range(-130,130)
+		var place: Vector3=anchor+wing*(float(i)-float(count-1)*.5)*65.0
 		var previous_count: int=c.enemies.size()
 		c.spawn_contact("goose")
 		if c.enemies.size()<=previous_count:break
 		var bird: Dictionary=c.enemies.back()
+		bird.requires_aim_adjustment=true
 		bird.position=place
-		bird.position.y=maxf(f.position.y,app.world.ground_height(place.x,place.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
 		bird.node.position=bird.position
 		bird.formation_altitude=bird.position.y
 		bird.course=flock_course

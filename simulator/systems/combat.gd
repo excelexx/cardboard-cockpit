@@ -169,10 +169,22 @@ func extend_demo_route() -> void:
 		enemy.node.position = enemy.position
 	target_id = -1; lock_progress = 0
 
+func spawn_sight_point(distance: float) -> Vector3:
+	var point: Vector3=app.flight.position+forward()*distance
+	if "camera" in app and is_instance_valid(app.camera):
+		point=app.camera.global_position-app.camera.global_basis.z.normalized()*distance
+	point.y=maxf(point.y,maxf(Tune.MIN_GOOSE_ALTITUDE,app.world.ground_height(point.x,point.z)+Tune.CONTACT_FLIGHT_CLEARANCE))
+	return point
+
+func spawn_point_clear(point: Vector3) -> bool:
+	return point.y+.01>=maxf(Tune.MIN_GOOSE_ALTITUDE,app.world.ground_height(point.x,point.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
+
 func spawn_contact(kind: String = "normal") -> void:
 	if training_target_limit>=0 and next_id>=training_target_limit:return
 	if training_target_limit<0 and kind=="normal" and elapsed>28 and next_id%5==3:kind="elite"
 	if arrival_index%3==0:motif=choose_motif();event("scan",app.flight.position+forward()*700,.6)
+	var sight_point: Vector3=spawn_sight_point(1200)
+	if not managed_mission and not spawn_point_clear(sight_point):return
 	var node := goose_model();add_child(node)
 	var right := Vector3(cos(app.flight.heading),0,sin(app.flight.heading))
 	var distance: float=(430 if elapsed<15 else 570)+(next_id%3)*90
@@ -198,7 +210,7 @@ func spawn_contact(kind: String = "normal") -> void:
 		course=forward()*app.flight.speed*.82;boss_id=next_id;selected_motif="boss";event("boss_signature",position_value,4)
 	if training_target_limit>0:
 		position_value=demo_route_position(next_id);course=Vector3(sin(app.mission.airfield.heading),0,-cos(app.mission.airfield.heading))*20
-	position_value.y=maxf(app.flight.position.y,app.world.ground_height(position_value.x,position_value.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
+	if not managed_mission:position_value=sight_point+right*float(next_id%3-1)*65.0
 	node.scale*=size_factor;node.position=position_value
 	var contact: Dictionary={"id":next_id,"node":node,"position":position_value,"health":hp,"max_health":hp,"kind":kind,"size_factor":size_factor,"hit_radius":22.0*size_factor,"velocity":course,"course":course,"right":right,"cooldown":999.0,"age":0.0,"phase":rng.randf_range(0,TAU),"fade":0.0,"retiring":false,"motif":selected_motif,"presented":next_id%3==0,"hit_flash":0.0,"damage_stage":0,"dying":-1.0,"sensor_occluded":false,"weak_side":-1.0,"near_passed":false}
 	enemies.append(contact);next_id+=1
@@ -532,7 +544,7 @@ func update_shots(dt: float) -> void:
 		var enemy: Dictionary = enemies[i]
 		if enemy.fade<=0 and (not engagement_enabled or enemy.get("retiring",false)):
 			enemy.node.queue_free(); enemies.remove_at(i); continue
-		if enemy.health<=0 and enemy.dying>2.4:
+		if enemy.health<=0:
 			enemy.node.queue_free();enemies.remove_at(i)
 
 func hurt_enemy(enemy: Dictionary,damage: float,source: String,at: Vector3) -> void:
@@ -549,6 +561,7 @@ func hurt_enemy(enemy: Dictionary,damage: float,source: String,at: Vector3) -> v
 	if enemy.kind=="boss":boss_stage=stage
 	if source=="missile":event("impact",at,1)
 	if enemy.health>0:return
+	enemy.node.visible=false
 	enemy.dying=0.0;kills+=1;combo+=1;best_combo=maxi(best_combo,combo);combo_time=Tune.STREAK_TIME
 	last_reward=Tune.BASE_SCORE*(20 if enemy.kind=="boss" else 3 if enemy.kind=="elite" else 1)*mini(Tune.MAX_MULTIPLIER,1+int(combo/Tune.STREAK_STEP))
 	score+=last_reward;reward_flash=1;intent.event("kill");app.audio.ping(1+minf(combo,10)*.035)
@@ -562,6 +575,7 @@ func _plasma_targets() -> Array[int]:
 	var ids: Array[int]=[-1,-1]
 	if not assist or aim_strength<=0:return ids
 	var candidates: Array[Dictionary]=_visible_targets(Tune.BEAM_RANGE,clampf(Tune.PLASMA_HALF_ANGLE*aim_strength,5,55))
+	candidates=candidates.filter(func(enemy: Dictionary)->bool:return not enemy.get("requires_aim_adjustment",false) or forward().angle_to((enemy.position-app.flight.position).normalized())<=deg_to_rad(5.0))
 	if candidates.is_empty():return ids
 	var assigned: Dictionary=_missile_assignments()
 	candidates.sort_custom(func(a: Dictionary,b: Dictionary) -> bool:
@@ -574,7 +588,7 @@ func _plasma_targets() -> Array[int]:
 		if beam_target_ids.has(int(b.id)):cb-=50000
 		return ca<cb)
 	var first: Dictionary=candidates[0]
-	# Focusing both emitters on one goose gives a predictable 1.5-second takedown.
+	# Focusing both emitters on one goose gives a predictable 1-second takedown.
 	ids.assign([int(first.id),int(first.id)])
 	return ids
 

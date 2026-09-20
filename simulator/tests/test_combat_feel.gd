@@ -9,11 +9,12 @@ func check(value: bool,label: String):
 func run():
 	app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true;app.on_action("sensitivity_reset")
-	app.start_flight("combat"); app.flight.position.y = 500
+	app.start_flight("combat"); app.flight.position.y = 1000;app.camera_rig.update(.016)
 	check(app.combat.enemies.is_empty(),"Combat starts without a flock appearing at once")
 	var arrivals: Array[float] = []; var last_id := 0; var max_contacts := 0
 	for i in range(2400):
 		app.flight.position += app.flight.forward()*165/60
+		app.camera_rig.update(1.0/60)
 		app.combat.tick(1.0/60)
 		max_contacts = maxi(max_contacts,app.combat.enemies.size())
 		if app.combat.next_id!=last_id:
@@ -21,10 +22,10 @@ func run():
 		if i%120==0: await process_frame
 	var smallest_gap := INF
 	for i in range(1,arrivals.size()): smallest_gap = minf(smallest_gap,arrivals[i]-arrivals[i-1])
-	check(max_contacts<=4 and arrivals.size()>=3,"Paced arrivals keep at most four contacts and continue after old contacts leave")
-	check(smallest_gap>=7.99 and arrivals[0]>=7.9,"Each arrival is separated, including the first contact")
+	check(max_contacts>=1 and max_contacts<=3 and arrivals.size()>=3,"Paced arrivals keep at most four contacts and continue after old contacts leave")
+	check(smallest_gap>=9.99 and arrivals[0]>=9.9,"Each arrival is separated, including the first contact")
 	check(app.combat.hostile_launches==0 and app.combat.hull==100,"Pacing retains harmless geese")
-	app.start_flight("combat"); app.combat.spawn_clock = 999; app.combat.spawn_contact()
+	app.start_flight("combat");app.flight.position.y=1000;app.camera_rig.update(.016); app.combat.spawn_clock = 999; app.combat.spawn_contact()
 	var enemy: Dictionary = app.combat.enemies[0]
 	enemy.position = app.flight.position+Vector3(sin(deg_to_rad(4)),0,-cos(deg_to_rad(4)))*600
 	enemy.fade = 1; enemy.age = 2; enemy.course = Vector3(0,0,-1); enemy.right = Vector3.ZERO
@@ -54,7 +55,7 @@ func run():
 	check(app.flight.speed<speed-140 and app.flight.speed>78,"Airbraking sheds speed quickly without stopping the jet in midair")
 	for i in range(1800): app.flight.step(1.0/120,Vector3.ZERO,false,0,false)
 	check(app.flight.speed>=80 and app.flight.contact=="","Holding the airbrake remains forgiving at low speed")
-	app.start_flight("combat");app.combat.spawn_contact()
+	app.start_flight("combat");app.flight.position.y=1000;app.camera_rig.update(.016);app.combat.spawn_contact()
 	var victim: Dictionary=app.combat.enemies[0]
 	victim.health=10;victim.max_health=10
 	app.camera_rig.trauma=0

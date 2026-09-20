@@ -54,7 +54,9 @@ var clock := 0.0
 var plasma_models: Array[Node3D] = []
 var plasma_muzzles: Array[Node3D] = []
 var plasma_charge := 0.0
-var tyre_puffs: Array[GPUParticles3D] = []
+var tyre_puffs: Array[MeshInstance3D] = []
+var tyre_smoke_age := 2.0
+var tyre_smoke_strength := 0.0
 var last_store := 0
 var store_timers: Array[float] = [0,0,0,0]
 var wind_field: MeshInstance3D
@@ -111,6 +113,7 @@ func build() -> void:
 	vapor_wings.clear()
 	_build_burner()
 	_build_vapour()   # also creates tip_material, used by the wingtip puffs below
+	_build_tyre_puffs()
 	airframe_fill = OmniLight3D.new()
 	airframe_fill.light_cull_mask = 2
 	airframe_fill.light_color = Color(1.0,.93,.84)
@@ -317,6 +320,7 @@ func missile_launch(_side: float, index: int = -1) -> void:
 		stores[index].visible = false
 
 func update(dt: float) -> void:
+	_update_tyre_smoke(dt)
 	clock += dt
 	update_plasma(dt)
 	for i in range(stores.size()):
@@ -575,8 +579,9 @@ func tick_ejection(dt: float) -> void:
 func reset() -> void:
 	plasma_charge = 0.0
 	for model in plasma_models: WeaponModels.set_charge(model, 0.0, 0.0)
-	for puff: GPUParticles3D in tyre_puffs:
-		if is_instance_valid(puff): puff.emitting = false
+	for puff: MeshInstance3D in tyre_puffs:
+		if is_instance_valid(puff): puff.visible = false
+	tyre_smoke_age=2.0
 	clock = 0; sonic_armed = true; last_store = 0; store_timers = [0,0,0,0]
 	ab_power = 0; dry_power = 0; ignition = 0; reheat_latched = false
 	plume_length = 0; last_g = 1.0; g_rate = 0.0
@@ -645,61 +650,39 @@ func _puff_mesh(size: float) -> QuadMesh:
 	quad.material = material
 	return quad
 
-## Touchdown hook for the landing package: tyre_smoke() derives its weight from the
-## recorded sink rate, or takes an explicit 0..1 strength. The smoke is world-space and
-## heavily damped, so it stops dead on the runway while the jet runs away from it.
+## Eight prebuilt quads replace first-touchdown GPU particle allocation/compilation.
+## They remain in world space and fade while the aircraft rolls away.
 func tyre_smoke(strength: float = -1.0) -> void:
-	if DisplayServer.get_name()=="headless": return
-	var f: FlightDynamics = app.flight
-	var weight: float = strength
-	if weight<0.0: weight = clampf(absf(f.touchdown_sink)/maxf(Tune.TOUCHDOWN_MAX_SINK,0.1),0.25,1.0)
-	weight = clampf(weight,0.25,1.0)
-	if tyre_puffs.is_empty(): _build_tyre_puffs()
-	var basis := Basis.from_euler(Vector3(f.pitch,-f.heading,-f.roll))
-	var clearance: float = 2.2
-	if f.profile is Dictionary and f.profile.has("clearance"): clearance = float(f.profile.clearance)
+	if DisplayServer.get_name()=="headless":return
+	var f: FlightDynamics=app.flight
+	tyre_smoke_strength=clampf(absf(f.touchdown_sink)/maxf(Tune.TOUCHDOWN_MAX_SINK,.1) if strength<0 else strength,.25,1.0)
+	tyre_smoke_age=0.0
+	var basis:=Basis.from_euler(Vector3(f.pitch,-f.heading,-f.roll))
+	var clearance: float=float(f.profile.get("clearance",2.2))
 	for i in range(tyre_puffs.size()):
-		var side: float = -1.0 if i==0 else 1.0
-		var puff: GPUParticles3D = tyre_puffs[i]
-		var process: ParticleProcessMaterial = puff.process_material
-		process.initial_velocity_min = lerpf(2.0,6.0,weight)
-		process.initial_velocity_max = lerpf(5.5,16.0,weight)
-		process.direction = Vector3(side*0.45,0.55,1.0).normalized()
-		puff.global_position = f.position+basis*Vector3(side*2.4,-clearance,1.1)
-		puff.global_basis = basis
-		puff.amount = int(lerpf(16.0,46.0,weight))
-		puff.restart()
-		puff.emitting = true
+		var puff: MeshInstance3D=tyre_puffs[i]
+		var side: float=-1.0 if i<4 else 1.0
+		puff.global_position=f.position+basis*Vector3(side*(2.4+float(i%4)*.15),-clearance+.25,1.1+float(i%4)*.45)
+		puff.scale=Vector3.ONE*.8;puff.transparency=.25;puff.visible=true
 
 func _build_tyre_puffs() -> void:
-	for i in range(2):
-		var puff := GPUParticles3D.new()
-		puff.amount = 32
-		puff.lifetime = 1.6
-		puff.one_shot = true
-		puff.explosiveness = 0.85
-		puff.local_coords = false        # the smoke stays on the runway; the jet runs away from it
-		puff.fixed_fps = 30
-		puff.interpolate = true
-		puff.emitting = false
-		puff.visibility_aabb = AABB(Vector3(-12,-4,-12),Vector3(24,14,24))
-		var process := ParticleProcessMaterial.new()
-		process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-		process.emission_sphere_radius = 0.30
-		process.spread = 28.0
-		process.damping_min = 4.0; process.damping_max = 6.0
-		process.gravity = Vector3(0,0.8,0)
-		process.scale_min = 0.9; process.scale_max = 2.4
-		var growth := Curve.new()
-		growth.add_point(Vector2(0,0.45)); growth.add_point(Vector2(1,2.4))
-		var growth_texture := CurveTexture.new(); growth_texture.curve = growth
-		process.scale_curve = growth_texture
-		var ramp := Gradient.new()
-		ramp.set_color(0,Color(0.42,0.40,0.38,0.60)); ramp.set_offset(0,0.0)
-		ramp.set_color(1,Color(0.66,0.65,0.62,0.0)); ramp.set_offset(1,1.0)
-		var ramp_texture := GradientTexture1D.new(); ramp_texture.gradient = ramp
-		process.color_ramp = ramp_texture
-		puff.process_material = process
-		puff.draw_pass_1 = _puff_mesh(1.6)
-		add_child(puff)
-		tyre_puffs.append(puff)
+	var mesh:=_puff_mesh(1.6)
+	var material:=mesh.material as StandardMaterial3D
+	material.billboard_mode=BaseMaterial3D.BILLBOARD_ENABLED
+	material.albedo_color=Color(.56,.54,.51,.5)
+	material.vertex_color_use_as_albedo=false
+	for i in range(8):
+		var puff:=MeshInstance3D.new();puff.name="TyrePuff%d"%i;puff.mesh=mesh
+		puff.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		puff.top_level=true;puff.visible=false;add_child(puff);tyre_puffs.append(puff)
+
+func _update_tyre_smoke(dt: float) -> void:
+	if tyre_smoke_age>=1.4:return
+	tyre_smoke_age+=dt
+	var progress: float=clampf(tyre_smoke_age/1.4,0,1)
+	for i in range(tyre_puffs.size()):
+		var puff: MeshInstance3D=tyre_puffs[i]
+		puff.visible=progress<1
+		puff.position+=Vector3((-1.0 if i<4 else 1.0)*.35,.8,0)*dt
+		puff.scale=Vector3.ONE*lerpf(.8,2.5+tyre_smoke_strength,progress)
+		puff.transparency=lerpf(.25,1.0,progress)

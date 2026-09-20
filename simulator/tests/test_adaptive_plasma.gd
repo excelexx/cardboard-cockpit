@@ -8,7 +8,7 @@ func check(ok: bool,label: String) -> void:
 	checks+=1
 	if not ok:failures.append(label);push_error(label)
 func fresh() -> void:
-	app.start_flight("combat");app.flight.spawn_airborne(Vector3(0,3000,0),180);app.apply_aircraft_pose();app.combat.spawn_clock=999;app.fire_guard=0;app.combat.aim_strength=1;app.combat.assist=true
+	app.start_flight("combat");app.flight.spawn_airborne(Vector3(0,3000,0),180);app.apply_aircraft_pose();app.camera_rig.update(.016);app.combat.spawn_clock=999;app.fire_guard=0;app.combat.aim_strength=1;app.combat.assist=true
 func bird(offset: Vector3,health: float=100) -> Dictionary:
 	app.combat.spawn_contact();var enemy: Dictionary=app.combat.enemies.back()
 	enemy.position=app.flight.position+offset;enemy.node.position=enemy.position;enemy.course=Vector3(0,0,-5);enemy.right=Vector3.ZERO;enemy.fade=1;enemy.health=health;enemy.max_health=health
@@ -18,10 +18,24 @@ func run() -> void:
 	app.set_process(false);app.set_physics_process(false);app.audio.muted=true
 	fresh()
 	var timed: Dictionary=bird(Vector3(0,0,-500))
-	for frame in range(89):app.combat.fire_primary();app.combat.update_beam(1.0/60)
-	check(timed.health>0 and app.combat.kills==0,"Goose survives less than 1.5 seconds of focused fire")
+	for frame in range(59):app.combat.fire_primary();app.combat.update_beam(1.0/60)
+	check(timed.health>0 and app.combat.kills==0,"Goose survives less than 1 second of focused fire")
 	app.combat.fire_primary();app.combat.update_beam(1.0/60+.0001)
-	check(timed.health==0 and app.combat.kills==1,"Goose dies after 1.5 seconds of focused fire")
+	check(not timed.node.visible,"Destroyed goose disappears immediately")
+	app.combat.update_shots(.016)
+	check(app.combat.enemies.is_empty(),"Destroyed goose is removed after the killing frame")
+	check(timed.health==0 and app.combat.kills==1,"Goose dies after 1 second of focused fire")
+	fresh()
+	var offset_bird: Dictionary=bird(Vector3(180,0,-1200));offset_bird.requires_aim_adjustment=true
+	app.combat.fire_primary();app.combat.update_beam(.1)
+	check(offset_bird.health==100,"Offset wave goose requires a small aim adjustment before damage")
+	offset_bird.position=app.flight.position+Vector3(50,0,-1200)
+	app.combat.fire_primary();app.combat.update_beam(.1)
+	check(offset_bird.health<100,"Aiming toward the offset goose enables focused fire")
+	app.cockpit=true;app.combat.visuals.draw_plasma()
+	check(is_equal_approx(app.combat.visuals.plasma_view_width,.64),"Cockpit lasers keep the thicker width")
+	app.cockpit=false;app.combat.visuals.draw_plasma()
+	check(is_equal_approx(app.combat.visuals.plasma_view_width,1.0),"External lasers keep their original width")
 	fresh();var a: Dictionary=bird(Vector3(-30,0,-500));var b: Dictionary=bird(Vector3(30,0,-500))
 	check(app.aircraft.find_child("CG26",true,false)==null and app.aircraft.find_child("GatlingRotor",true,false)==null,"No live minigun remains")
 	check(not app.combat.has_method("fire_gun") and not app.combat.has_method("fire_missile"),"The pilot has no minigun or conscious missile firing API")
