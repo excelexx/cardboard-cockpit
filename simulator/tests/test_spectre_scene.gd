@@ -20,7 +20,7 @@ func run_tests() -> void:
 	check(app.mode=="control_setup","Enter opens the cardboard control checks")
 	app.on_action("setup_keyboard")
 	check(app.mode=="flight" and app.profile().name=="SPECTRE X-26","Explicit keyboard choice launches the single fighter")
-	check(app.combat.ammo==-1 and not app.combat.has_method("fire_missile"),"Permanent unlimited cannon-only loadout")
+	check(app.combat.ammo==-1 and app.combat.has_method("fire_missile") and app.fighter_fx.stores.size()==4,"Unlimited minigun with four visible missile stores")
 	var children: int = app.aircraft.get_child_count()
 	app.start_flight("combat")
 	check(app.aircraft.get_child_count()==children,"Restart never duplicates the fighter or weapon stores")
@@ -36,8 +36,8 @@ func run_tests() -> void:
 	var enemy: Dictionary = app.combat.enemies[0]
 	check(app.aircraft_visuals.bay_doors.size()==4,"Authored aircraft detail remains intact")
 	var before_rounds: int=app.combat.rounds_fired
-	tap(KEY_T);tap(KEY_X);app.camera_rig.update(.016)
-	check(app.combat.rounds_fired==before_rounds and app.camera.transform.is_finite(),"Removed secondary bindings cannot fire or disturb the flight camera")
+	app.fire_guard=0;tap(KEY_T);tap(KEY_X);app.camera_rig.update(.016)
+	check(app.combat.rounds_fired==before_rounds and app.combat.launch_queue.size()==1 and app.camera.transform.is_finite(),"T requests one independent missile without firing the primary or changing camera")
 	var angle := deg_to_rad(4)
 	enemy.position = app.flight.position+Vector3(sin(angle),0,-cos(angle))*1000
 	app.combat.target_id = enemy.id;app.combat.intent.confidence=1;enemy.velocity=app.flight.velocity
@@ -46,7 +46,7 @@ func run_tests() -> void:
 	check(app.combat.assisted_direction().angle_to((enemy.position-app.flight.position).normalized())<deg_to_rad(2),"Assisted shots converge on the visible goose")
 	check(app.combat.fire_gun() and app.combat.rounds_fired==preload("res://data/balance.gd").GUN_ROUNDS_PER_PACKET and app.combat.ammo==-1,"Cannon records shots without depleting ammunition")
 	check(app.combat.deploy_flares() and app.combat.flares==-1 and app.combat.flares_fired==1,"Countermeasures record a burst without running out")
-	check(app.combat.missiles_fired==0,"Cosmetic flares never launch secondary ordnance")
+	check(app.combat.launch_queue.size()==1,"Cosmetic flares do not add missile launch requests")
 	for pose: Vector3 in [Vector3.ZERO,Vector3(.8,1.4,.9),Vector3(-.8,-2.9,-2.8)]:
 		app.flight.pitch = pose.x; app.flight.heading = pose.y; app.flight.roll = pose.z
 		for cockpit in [false,true]:

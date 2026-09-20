@@ -3,6 +3,7 @@ class_name FighterEffects
 const Tune = preload("res://data/balance.gd")
 const WeaponArt = preload("res://systems/weapon_visuals.gd")
 const Fighter = preload("res://systems/fighter_model.gd")
+const WeaponModels = preload("res://systems/weapon_models.gd")
 const Utils = preload("res://systems/model_utils.gd")
 
 # --- afterburner geometry -------------------------------------------------------
@@ -50,6 +51,11 @@ var parachute: Node3D
 var chute_clock := 0.0
 var sonic_armed := true
 var clock := 0.0
+var gun_model: Node3D
+var plasma_model: Node3D
+var plasma_muzzle: Node3D
+var gun_heat := 0.0
+var plasma_charge := 0.0
 var gun_gimbal: Node3D
 var gun_rotor: Node3D
 var gun_muzzle: Node3D
@@ -106,6 +112,10 @@ func build() -> void:
 		if is_instance_valid(store): store.queue_free()
 	for child: Node in get_children(): child.queue_free()
 	gun_gas = null; gun_gas_anchor = null; tyre_puffs.clear()
+	gun_model = app.aircraft.find_child("CG26",true,false)
+	plasma_model = app.aircraft.find_child("PC26",true,false)
+	plasma_muzzle = app.aircraft.find_child("BeamMuzzle",true,false)
+	gun_heat = 0.0; plasma_charge = 0.0
 	gun_gimbal = app.aircraft.find_child("GunGimbal",true,false)
 	gun_rotor = app.aircraft.find_child("GatlingRotor",true,false)
 	gun_muzzle = app.aircraft.find_child("GunMuzzle",true,false)
@@ -171,6 +181,17 @@ func build() -> void:
 	add_child(wind_field)
 	for i in range(28):
 		wind_points.append(Vector3(wind_rng.randf_range(-24,24),wind_rng.randf_range(-18,18),wind_rng.randf_range(-45,24)))
+
+	store_timers = [0,0,0,0]
+	for i in range(4):
+		var store: Node3D = WeaponArt.missile()
+		for geometry: Node in store.find_children("*","GeometryInstance3D",true,false): geometry.layers = 2
+		var mount := Node3D.new()
+		mount.name = "MissileStore%d" % (i + 1)
+		mount.add_child(store)
+		app.aircraft.add_child(mount)
+		mount.position = Vector3((-1 if i<2 else 1)*(2.8+(i%2)*1.25),-1.14,2.85)
+		stores.append(mount)
 
 ## The burner is five cooperating pieces, cross-faded by view angle so it reads from the
 ## side AND from straight up the pipe: an axial slice that carries the shock train, a
@@ -316,6 +337,12 @@ func _build_vapour() -> void:
 		node.custom_aabb = AABB(Vector3(-3,-1,-4),Vector3(6,3,8))
 		node.visible = false
 		add_child(node); vapor_wings.append(node)
+
+func missile_launch(_side: float, index: int = -1) -> void:
+	last_store += 1
+	if index>=0 and index<stores.size():
+		store_timers[index] = Tune.MISSILE_INTERVAL
+		stores[index].visible = false
 
 func update(dt: float) -> void:
 	clock += dt
@@ -575,6 +602,9 @@ func tick_ejection(dt: float) -> void:
 
 func reset() -> void:
 	rotor_speed = 0
+	gun_heat = 0.0; plasma_charge = 0.0
+	WeaponModels.set_heat(gun_model, 0.0)
+	WeaponModels.set_charge(plasma_model, 0.0, 0.0)
 	if is_instance_valid(gun_flash): gun_flash.visible = false
 	if is_instance_valid(gun_light): gun_light.visible = false
 	if is_instance_valid(gun_gas): gun_gas.emitting = false
@@ -626,8 +656,16 @@ func update_wind(dt: float, basis: Basis) -> void:
 func gun_muzzle_position(fallback: Vector3) -> Vector3:
 	return gun_muzzle.global_position if is_instance_valid(gun_muzzle) else fallback
 
+func plasma_muzzle_position(fallback: Vector3) -> Vector3:
+	return plasma_muzzle.global_position if is_instance_valid(plasma_muzzle) else fallback
+
 func update_gun(dt: float) -> void:
 	var firing: bool = app.combat.active and app.combat.gun_firing_time>0 and app.mode=="flight"
+	var plasma_firing: bool = app.combat.active and app.combat.beam_active and app.mode=="flight"
+	gun_heat = move_toward(gun_heat, 1.0 if firing else 0.0, dt * (0.70 if firing else 0.30))
+	plasma_charge = move_toward(plasma_charge, 1.0 if plasma_firing else 0.0, dt * (3.5 if plasma_firing else 1.8))
+	WeaponModels.set_heat(gun_model, gun_heat)
+	WeaponModels.set_charge(plasma_model, plasma_charge, 1.0 if plasma_firing else 0.0)
 	rotor_speed = move_toward(rotor_speed,62.0 if firing else 0.0,dt*(480 if firing else 110))
 	# The cannon is fixed in the wing root; it does NOT slew toward the aim point.
 	if is_instance_valid(gun_gimbal):

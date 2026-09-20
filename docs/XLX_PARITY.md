@@ -1,3 +1,5 @@
+> Controls/setup reference: teammate **excelex**, GitHub `excelexx`, commit `64011f3`. The later [weapon and wave update](WEAPONS_AND_WAVES.md) explicitly supersedes the gun-only loadout described below.
+
 # XLX behavior with current graphics — 0.16.0
 
 Reference: excelex commit `64011f3`. User decisions: keep both normal SF Play and the sixteen-target Tutorial; gun ID 4 visible fires, covering it stops; gun only, with no missiles, plasma/laser or old two-switch weapon behavior. Keep the current visual presentation.

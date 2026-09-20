@@ -17,10 +17,10 @@ func run() -> void:
 	check(app.gun_requested(),"Held Space requests gun fire")
 	for i in range(180):app._physics_process(1.0/60)
 	fire=fire.duplicate();fire.pressed=false;Input.parse_input_event(fire);Input.flush_buffered_events()
-	check(app.combat.rounds_fired>160 and app.combat.missiles_fired==0,"Held input sustains the cannon alone")
+	check(app.combat.rounds_fired>=100 and app.combat.rounds_fired<=124 and app.combat.missiles_fired==0 and app.combat.beam_active,"Held Space sustains slower minigun and plasma without launching missiles")
 	var fired: int=app.combat.rounds_fired
 	for i in range(60):app._physics_process(1.0/60)
-	check(app.combat.rounds_fired==fired and not app.gun_requested() and app.combat.gun_firing_time<=0,"Released input never latches the gun")
+	check(app.combat.rounds_fired==fired and not app.gun_requested() and app.combat.gun_firing_time<=0 and not app.combat.beam_active,"Released input never latches either primary effect")
 	var mouse:=InputEventMouseButton.new();mouse.button_index=MOUSE_BUTTON_LEFT;mouse.pressed=true
 	Input.parse_input_event(mouse);Input.flush_buffered_events()
 	check(app.gun_requested(),"Held left mouse requests cannon fire")
@@ -28,10 +28,20 @@ func run() -> void:
 	check(not app.gun_requested(),"Releasing left mouse immediately clears fire request")
 	mouse=InputEventMouseButton.new();mouse.button_index=MOUSE_BUTTON_RIGHT;mouse.pressed=true
 	Input.parse_input_event(mouse);Input.flush_buffered_events()
-	check(not app.gun_requested(),"Right mouse is not a weapon control")
+	for i in range(400):app._physics_process(1.0/60)
 	mouse=mouse.duplicate();mouse.pressed=false;Input.parse_input_event(mouse);Input.flush_buffered_events()
-	key(KEY_T)
-	check(not app.gun_requested() and not app.combat.has_method("fire_missile"),"Former secondary key cannot arm a weapon")
+	check(app.combat.missiles_fired==3 and not app.gun_requested(),"Holding right mouse launches one missile every three seconds independently of primary")
+	var launches: int=app.combat.missiles_fired
+	for i in range(240):app._physics_process(1.0/60)
+	check(app.combat.missiles_fired==launches,"Releasing right mouse stops repeated launches without a latch")
+	fire=InputEventKey.new();fire.keycode=KEY_T;fire.physical_keycode=KEY_T;fire.pressed=true
+	Input.parse_input_event(fire);Input.flush_buffered_events()
+	for i in range(195):app._physics_process(1.0/60)
+	fire=fire.duplicate();fire.pressed=false;Input.parse_input_event(fire);Input.flush_buffered_events()
+	check(app.combat.missiles_fired==launches+2 and not app.gun_requested(),"Held T launches independent single missiles at the same slow cadence")
+	launches=app.combat.missiles_fired
+	for i in range(240):app._physics_process(1.0/60)
+	check(app.combat.missiles_fired==launches,"Releasing T stops repeated launches")
 	app.start_flight("combat");app.flight.position.y=600;app.fire_guard=0;app.combat.spawn_clock=999
 	key(KEY_Q)
 	check(app.flight.barrel_remaining>0,"Quick roll starts immediately")

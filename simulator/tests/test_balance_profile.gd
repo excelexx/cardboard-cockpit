@@ -18,13 +18,13 @@ func run():
 	app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
 	var target: Dictionary = target_at(400)
-	check(target.health==100 and Balance.GUN_ROUNDS_PER_PACKET==4 and Balance.GUN_DAMAGE_PER_ROUND==5 and is_equal_approx(Balance.GUN_INTERVAL,.05),"XLX durability and cannon cadence require five packets per goose")
+	check(target.health==100 and Balance.GUN_ROUNDS_PER_PACKET==4 and Balance.GUN_DAMAGE_PER_ROUND==5 and is_equal_approx(Balance.GUN_INTERVAL,.10),"Four-round cannon packets retain damage with the new slower cadence")
 	var gun_ttk := 0.0
 	for i in range(600):
 		app.combat.tick(1.0/120); app.combat.fire_gun()
 		gun_ttk += 1.0/120
 		if app.combat.kills>0: break
-	check(app.combat.kills==1 and app.combat.rounds_hit>=ceili(Balance.CONTACT_HEALTH/Balance.GUN_DAMAGE_PER_ROUND),"Primary clears the configured target after recorded hits")
+	check(app.combat.kills==1 and app.combat.rounds_hit>0 and app.combat.beam_active,"Combined minigun and plasma clear the target with recorded cannon hits")
 	check(gun_ttk>.1 and gun_ttk<1,"At 400 metres the current branch keeps gun travel visible and the kill responsive")
 	target = target_at(600)
 	app.combat.hurt_enemy(target,Balance.GUN_ROUNDS_PER_PACKET*Balance.GUN_DAMAGE_PER_ROUND,"cannon",target.position)

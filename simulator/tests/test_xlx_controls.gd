@@ -32,12 +32,12 @@ func run() -> void:
 	app.vision=LocalVision.new();app.vision.enabled=true
 	app.start_flight("combat");app.flight.spawn_airborne(Vector3(0,5000,0),180);app.combat.spawn_clock=999;app.fire_guard=0
 	packet(true);tick(60)
-	check(app.combat.rounds_fired>0,"Visible printed gun tag fires continuously")
+	check(app.combat.rounds_fired>0 and app.combat.beam_active,"Visible printed gun tag fires minigun and plasma continuously")
 	var fired: int=app.combat.rounds_fired
 	packet(false);tick(30)
-	check(app.combat.rounds_fired==fired,"Covering the tag stops new shots without a toggle")
-	check(not app.combat.has_method("fire_missile") and not app.combat.has_method("update_beam") and app.fighter_fx.stores.is_empty(),"No missile or plasma firing path or mounted missile stores")
-	for shot: Dictionary in app.combat.shots:check(shot.kind=="cannon","Only cannon projectiles exist")
+	check(app.combat.rounds_fired==fired and not app.combat.beam_active,"Covering the tag stops both primary effects without a toggle")
+	check(app.combat.has_method("fire_missile") and app.combat.has_method("update_beam") and app.fighter_fx.stores.size()==4,"Plasma and independent missile path retain four mounted stores")
+	for shot: Dictionary in app.combat.shots:check(shot.kind=="cannon","Primary trigger emits cannon projectiles, not independent missiles")
 	packet(true,false)
 	var at: Vector3=app.flight.position;var elapsed: float=app.flight.elapsed
 	tick(60)
@@ -57,6 +57,6 @@ func run() -> void:
 	check(app.flight_kind=="demo" and not app.mission is TrainingMission,"Normal Play remains a separate mode")
 	app.on_action("keyboard_training");check(app.flight_kind=="training" and app.mission is TrainingMission,"Sixteen-target Tutorial remains selectable")
 	var snapshot: Dictionary=app.badge.instrument_snapshot(app)
-	check(not snapshot.systems&4,"Badge never advertises missile readiness")
+	check(not snapshot.systems&4,"Badge remains a secondary-controls display without a missile-ready bit")
 	app.queue_free();await process_frame
 	print("XLX CONTROLS: ",checks," checks / ",failures.size()," failures");quit(0 if failures.is_empty() else 1)

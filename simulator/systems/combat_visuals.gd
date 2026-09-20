@@ -3,7 +3,9 @@ extends Node3D
 const Art = preload("res://systems/weapon_visuals.gd")
 const Tune = preload("res://data/balance.gd")
 var combat: Node
-var projectile_pool := {"cannon":[]}
+var projectile_pool := {"cannon":[],"missile":[]}
+var beams: Array[MeshInstance3D]=[]
+var beam_light: OmniLight3D
 var sprites: Array[Dictionary] = []
 var sprite_pool: Array[Sprite3D] = []
 var lights: Array[Dictionary] = []
@@ -34,6 +36,11 @@ var last_flares_fired := 0
 var rng := RandomNumberGenerator.new()
 func _ready() -> void:
 	flash_texture=load("res://assets/vfx/flash.png");smoke_texture=load("res://assets/sourced_flight/smoke.png")
+	beams.append(Art.beam(self,Color(.75,.92,1),.24,1))
+	beams.append(Art.energy_sheath(self,.48,0))
+	beams.append(Art.energy_sheath(self,.88,1.4))
+	for beam in beams:beam.visible=false
+	beam_light=OmniLight3D.new();beam_light.light_color=Color(.35,.55,1);beam_light.omni_range=12;beam_light.shadow_enabled=false;beam_light.visible=false;add_child(beam_light)
 	lead_mesh=MeshInstance3D.new();lead_mesh.mesh=ImmediateMesh.new();lead_mesh.material_override=Art.emissive(Color(.08,.55,.8),1.3,.15);lead_mesh.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;add_child(lead_mesh)
 	for i in range(96):
 		var sprite:=Sprite3D.new();sprite.texture=flash_texture;sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.shaded=false;sprite.visible=false;sprite.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;add_child(sprite);sprite_pool.append(sprite)
@@ -42,10 +49,25 @@ func _ready() -> void:
 	_build_flare_ribbon()
 	_build_feather_rigs()
 	# Warm the actual meshes/materials before the first salvo.
-	for kind in ["cannon"]:
-		for i in range(48):
+	for kind in ["cannon","missile"]:
+		for i in range(48 if kind=="cannon" else Tune.MAX_MISSILES):
 			var node:=Art.projectile(kind);node.set_meta("projectile_kind",kind);add_child(node);node.visible=false
+			if kind=="missile":_equip_missile(node)
 			projectile_pool[kind].append(node)
+func _equip_missile(node: Node3D) -> void:
+	var flare:=Sprite3D.new();flare.name="EngineFlare";flare.texture=flash_texture;flare.billboard=BaseMaterial3D.BILLBOARD_ENABLED;flare.shaded=false;flare.position.z=1.65;flare.modulate=Color(4,2.8,1.6,.8);flare.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;node.add_child(flare)
+	# A solid motor throws a warm light, not a cold one. This used to be
+	# Color(.6,.82,1), which disagreed with its own flare sprite.
+	var light:=OmniLight3D.new();light.name="MotorLight";light.light_color=Color(1,.72,.42);light.omni_range=24;light.shadow_enabled=false;node.add_child(light)
+	for mesh in node.find_children("*","MeshInstance3D",true,false):
+		if mesh.name in ["Ignition","MotorFlame"]:continue
+		for i in range(mesh.mesh.get_surface_count()):
+			var original=mesh.get_active_material(i)
+			if original is StandardMaterial3D:
+				var material: StandardMaterial3D=original.duplicate();material.metallic=.72;material.roughness=.22;material.clearcoat_enabled=true;material.clearcoat=.65
+				mesh.set_surface_override_material(i,material)
+
+# --- feathers -----------------------------------------------------------
 func _build_feather_rigs() -> void:
 	# GPUParticles3D needs a rendering device; headless regression runs skip it
 	# entirely and every call site tolerates an empty rig list.
@@ -241,19 +263,21 @@ func _draw_flares() -> void:
 
 # --- pools --------------------------------------------------------------
 func take_projectile(kind: String) -> Node3D:
-	var key: String="cannon"
+	var key: String="missile" if kind=="missile" else "cannon"
 	var node: Node3D
 	if not projectile_pool[key].is_empty():node=projectile_pool[key].pop_back()
 	else:
 		node=Art.projectile(key);node.set_meta("projectile_kind",key);add_child(node)
-	node.visible=true;node.scale=Vector3.ONE
+	node.visible=true;node.scale=Vector3.ONE*(Tune.MISSILE_VISUAL_SCALE if key=="missile" else 1.0)
 	return node
 func release_projectile(node: Node3D,kind: String) -> void:
 	if not is_instance_valid(node):return
 	node.visible=false
-	var key: String="cannon"
+	var key: String="missile" if kind=="missile" else "cannon"
 	if not projectile_pool[key].has(node):projectile_pool[key].append(node)
 func reset() -> void:
+	for beam in beams:beam.visible=false
+	if beam_light!=null:beam_light.visible=false
 	for effect in sprites:
 		effect.node.visible=false;sprite_pool.append(effect.node)
 	sprites.clear()
@@ -348,7 +372,53 @@ func add_target(enemy: Dictionary) -> void:
 		for side in [-1,0,1]:
 			var marker:=Sprite3D.new();marker.name="Weak"+str(side);marker.texture=flash_texture;marker.billboard=BaseMaterial3D.BILLBOARD_ENABLED;marker.pixel_size=.0013;marker.position.x=side*.75;root.add_child(marker)
 	rings.append({"node":root,"id":enemy.id,"material":material})
+func update_projectile(shot: Dictionary,dt: float) -> void:
+	if shot.kind!="missile":return
+	var flare: Sprite3D=shot.node.get_node_or_null("EngineFlare")
+	var motor: OmniLight3D=shot.node.get_node_or_null("MotorLight")
+	# Keyed off the real ignition check instead of a hardcoded 0.15/4.0 window
+	# that was already 0.03 s out of sync with the physics.
+	var burn_t: float=float(shot.age)-Tune.MISSILE_IGNITION_DELAY
+	var burning: bool=burn_t>=0.0 and burn_t<Tune.MISSILE_MOTOR_TIME
+	# Boost then sustain: a short over-thrust spike at light-up, a steady lower
+	# output, then a quick tail-off at burnout.
+	var thrust: float=0.0
+	if burning:
+		var boost: float=clampf(burn_t/maxf(Tune.MISSILE_ACCELERATION_TIME,.001),0,1)
+		thrust=lerpf(1.75,1.0,smoothstep(0.0,1.0,boost))
+		thrust*=clampf(burn_t/.05,0,1)
+		thrust*=clampf((Tune.MISSILE_MOTOR_TIME-burn_t)/.55,0,1)
+	var distance: float=combat.app.camera.global_position.distance_to(shot.position)
+	if flare!=null:
+		flare.visible=burning
+		flare.pixel_size=clampf(distance*.000020,.007,.05)*(.75+.35*thrust)
+		flare.modulate=Color(4,3,1.8,clampf((.52+.30*thrust)+.10*sin(shot.age*91),0,1))
+	if motor!=null:
+		motor.visible=burning and distance<450;motor.light_energy=3.5*thrust
+	if not shot.node.has_meta("motor_materials"):
+		var found: Array=[]
+		for effect_name in ["Ignition","MotorFlame"]:
+			var mesh: Node=shot.node.get_node_or_null(NodePath(effect_name))
+			if mesh is MeshInstance3D and mesh.material_override is ShaderMaterial:found.append(mesh.material_override)
+		shot.node.set_meta("motor_materials",found)
+	for material: ShaderMaterial in shot.node.get_meta("motor_materials"):
+		material.set_shader_parameter("throttle",thrust)
+	if burning and shot.age-float(shot.get("ghost_at",0))>.09:
+		shot.ghost_at=shot.age
+		# Aluminised propellant leaves dense white-grey alumina smoke, not the
+		# cyan puff that used to be here.
+		puff(shot.position,Color(.62,.63,.60,.30),clampf(distance*.014,2,12),.24)
+func draw_plasma() -> void:
+	var live: bool=combat.beam_active and combat.app.mode=="flight" and not combat.app.overlay_visible() and not combat.app.yoke_recovery_visible()
+	for beam in beams:beam.visible=live
+	beam_light.visible=live
+	if not live:return
+	var start: Vector3=combat.app.fighter_fx.plasma_muzzle_position(combat.app.flight.position)
+	for beam in beams:Art.align_beam(beam,start,combat.beam_end)
+	beam_light.position=start;beam_light.light_energy=1.2
+
 func tick(dt: float) -> void:
+	draw_plasma()
 	effects_clock+=dt;handoff_time=maxf(0,handoff_time-dt);scan_time=maxf(0,scan_time-dt);impact_emphasis=maxf(0,impact_emphasis-dt)
 	# Countermeasures are owned here: combat.gd only counts them, so the salvo
 	# is picked up from its own counter rather than reaching into that file.

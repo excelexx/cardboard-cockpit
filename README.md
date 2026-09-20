@@ -1,17 +1,18 @@
 # Goose Protocol — SPECTRE X-26
 
-Version **0.16.0** combines the current San Francisco visuals and gameplay with the team’s two-camera controls, settings and pause screens, plus a separate badge-guided **Tutorial**. Normal Play retains the current flock encounter and assisted SFO landing. Tutorial takes off, clears sixteen targets and follows a longer route to land. Both have unlimited ammunition and forgiving flight assistance.
+Version **0.17.0** combines the current San Francisco visuals and gameplay with the team’s two-camera controls, settings and pause screens, plus a separate badge-guided **Tutorial**. Normal Play retains the current flock encounter and assisted SFO landing. Tutorial takes off, clears sixteen targets and follows a longer route to land. Both have unlimited ammunition and forgiving flight assistance.
 
-Open **Launch Cardboard Cockpit.command** or the packaged **Cardboard Cockpit.app**. Both flight modes use XLX's gun-only cardboard controls and settings, with the current graphics and aircraft presentation. **Watch demo** flies and shoots automatically.
+Open **Launch Cardboard Cockpit.command** or the packaged **Cardboard Cockpit.app**. Both flight modes use excelex's cardboard controls and settings, with the current graphics and aircraft presentation. **Watch demo** flies and shoots automatically.
 
 ## Controls
 
-**Play** and **Tutorial** both begin with XLX's cardboard calibration and control checks. Choose **Use keyboard** in setup to fly without cameras. Play keeps the current SF flock route; Tutorial keeps the sixteen-target takeoff/combat/landing route.
+**Play** and **Tutorial** both begin with excelex's cardboard calibration and control checks. Choose **Use keyboard** in setup to fly without cameras. Play keeps the current SF flock route; Tutorial keeps the sixteen-target takeoff/combat/landing route.
 
 | Input | Action |
 |---|---|
-| Printed gun tag ID 4 visible / covered | Fire the gun / stop firing |
-| Hold Space or left mouse / release | Fire the gun / stop firing |
+| Printed gun tag ID 4 visible / covered | Fire minigun + plasma / stop primary fire |
+| Hold Space or left mouse / release | Fire minigun + plasma / stop primary fire |
+| T / right mouse | Hold to fire one guided missile every three seconds |
 | Yoke rotation, tilt, swivel | Bank, pitch, yaw |
 | Relative throttle tags 0 / 1 / 2 | Idle endpoint / moving handle / full endpoint |
 | Arrows / A D | Pitch and bank / rudder |
@@ -21,13 +22,15 @@ Open **Launch Cardboard Cockpit.command** or the packaged **Cardboard Cockpit.ap
 | H / hold E / Z | Route assist / eject / cosmetic flares |
 | C / Escape / R / M | Cardboard setup / pause / replay / mute |
 
-There are **no missiles, plasma/laser firing, or latched weapon switches**. Covering the gun tag or releasing the keyboard/mouse stops new shots. Yoke tracking loss pauses the flight; holding it steadily in view resumes it, with a keyboard fallback. Camera throttle changes are blended smoothly and do not automatically engage afterburner.
+The minigun now shows short, separated tracers at ten visible packets per second. Its old long trail ribbon is removed, so rounds do not leave a streak connected to earlier aircraft positions. The plasma projector fires alongside it through a thicker core/braid/halo. Missiles launch individually on a three-second cooldown with larger models. Detailed minigun and plasma machinery is mounted on the aircraft's forward chines.
+
+Normal SF Play has a **twelve-goose wave**, a brief clear beat, then **twenty more**. The objective counts all 32 actual kills and the two waves separately. Tutorial still has sixteen route targets. Yoke loss pauses the flight; a steady return resumes it. Sound starts enabled each launch; **M** mutes the current session.
 
 ## Cardboard and badge
 
 Open **Launch Two-Camera Cockpit.command** (or **Launch Cardboard Tracker.command**) with the phone connected. The laptop tracks yoke ID 7 and gun ID 4; the phone tracks the relative throttle's IDs 0/1/2. Setup checks calibration, throttle idle/full/idle, yoke instructions, and gun show/cover/show before starting. [Vision setup and print masters](docs/vision-setup.md).
 
-Settings retains separate pitch, bank and yaw sensitivity and agility, plus aim assistance. XLX defaults are restored: agility **1.30×** per axis and aim assistance **1.40×**; saved pilot preferences remain intact until Reset defaults is selected. Sensitivity changes apply live to the tracker, with no double gain.
+Settings retains separate pitch, bank and yaw sensitivity and agility, plus aim assistance. excelex defaults are restored: agility **1.30×** per axis and aim assistance **1.40×**; saved pilot preferences remain intact until Reset defaults is selected. Sensitivity changes apply live to the tracker, with no double gain.
 
 The electronic badge remains a secondary instrument: START start/replay, HOME pause/back, A gear, B landing assistance, LEFT cockpit/chase, RIGHT tactical view, UP route assist, short DOWN text visibility / held DOWN tactical view. It never fires or steers the aircraft. The packaged app includes its Bluetooth helper. [Badge instrument and wireless handoff](hardware/badge-controller/INSTRUMENT.md).
 

@@ -23,8 +23,8 @@ const THROAT_SHADER := "res://assets/vfx/plasma_housing.gdshader"
 const HUES: Array[Color] = [Color(0.46, 0.10, 1.00), Color(1.00, 0.12, 0.66), Color(1.00, 0.70, 0.14), Color(0.08, 0.92, 1.00)]
 const BEAM_WAVELENGTH := 210.0
 const BEAM_FLOW := 330.0
-const TRACER_HEAD := -1.60
-const TRACER_TAIL := 6.90
+const TRACER_HEAD := -0.40
+const TRACER_TAIL := 8.00
 
 static var _tracer_mesh: ArrayMesh
 static var _tracer_material: ShaderMaterial
@@ -49,7 +49,7 @@ static func cylinder(parent: Node3D, radius: float, length: float, material: Mat
 static func missile(in_flight: bool = false) -> Node3D:
 	var root: Node3D = load("res://assets/sourced_flight/missile.gltf").instantiate()
 	root.name = "MICA26"
-	root.scale = Vector3.ONE*(1.7 if in_flight else 1.2)
+	root.scale = Vector3.ONE*(3.2 if in_flight else 2.0)
 	if in_flight:
 		# Narrow tapered motor plume leaves the seeker, body and fins readable.
 		for layer in range(2):
@@ -112,11 +112,11 @@ static func _tracer_shader() -> ShaderMaterial:
 	if _tracer_material!=null: return _tracer_material
 	_tracer_material = ShaderMaterial.new()
 	_tracer_material.shader = load(TRACER_SHADER)
-	_tracer_material.set_shader_parameter("width",0.040)
-	_tracer_material.set_shader_parameter("min_width",0.0013)
+	_tracer_material.set_shader_parameter("width",0.055)
+	_tracer_material.set_shader_parameter("min_width",0.0012)
 	_tracer_material.set_shader_parameter("head_z",TRACER_HEAD)
-	_tracer_material.set_shader_parameter("head_radius",0.10)
-	_tracer_material.set_shader_parameter("intensity",1.7)
+	_tracer_material.set_shader_parameter("head_radius",0.22)
+	_tracer_material.set_shader_parameter("intensity",2.2)
 	return _tracer_material
 
 static func projectile(kind: String, _variant: String = "gatling") -> Node3D:

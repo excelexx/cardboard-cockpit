@@ -33,7 +33,7 @@ func run():
 	app.combat.spawn_shot(start,Vector3(0,0,-5000),"cannon",-1,28)
 	app.combat.update_shots(1.0/60)
 	check(app.combat.kills==1,"Swept collision detects a target crossed between frames")
-	check(not app.combat.has_method("fire_missile"),"Gun-only combat has no secondary launch API")
+	check(app.combat.has_method("fire_missile") and app.fighter_fx.stores.size()==4,"Independent missiles retain four visible mounted stores")
 	app.start_flight("combat")
 	app.combat.spawn_shot(Vector3(0,5,-3500),Vector3(0,-600,-100),"cannon",-1,28)
 	app.combat.update_shots(.03)
@@ -50,11 +50,11 @@ func run():
 	for code in [KEY_SPACE]:
 		var event := InputEventKey.new(); event.keycode = code; event.physical_keycode = code; event.pressed = false
 		Input.parse_input_event(event); Input.flush_buffered_events()
-	check(app.combat.rounds_fired>1200,"Holding Space sustains cannon fire beyond former ammunition limits")
-	check(app.combat.ammo==-1 and app.combat.missiles_fired==0,"Unlimited cannon ammunition never enables a secondary weapon")
+	check(app.combat.rounds_fired>=800 and app.combat.rounds_fired<=1004,"Holding Space sustains the slower cannon cadence for twenty-five seconds")
+	check(app.combat.ammo==-1 and app.combat.missiles_fired==0,"Unlimited primary fire does not launch the independent missiles")
 	var released_rounds: int=app.combat.rounds_fired
 	for i in range(30):app._physics_process(1.0/60)
-	check(app.combat.rounds_fired==released_rounds and app.combat.gun_firing_time<=0,"Releasing Space stops new rounds and clears the firing tail")
+	check(app.combat.rounds_fired==released_rounds and app.combat.gun_firing_time<=0 and not app.combat.beam_active,"Releasing Space stops new rounds and plasma after the firing tail")
 	app.start_flight("combat"); app.combat.spawn_contact(); enemy = app.combat.enemies[0]
 	enemy.position = app.flight.position+Vector3(35,0,-500); app.combat.target_id = enemy.id
 	var initial: Vector3 = app.combat.assisted_direction()

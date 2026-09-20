@@ -29,6 +29,8 @@ var music: AudioStreamPlayer
 var geese: AudioStreamPlayer
 var wind: AudioStreamPlayer
 var engine_pitch := 1.0
+var beam_loop: AudioStreamPlayer
+var beam_wanted:=false
 var muted := false
 var effects: Dictionary = {}
 var effect_players: Array[AudioStreamPlayer] = []
@@ -52,6 +54,7 @@ var pending_event: Dictionary = {}
 var honk_rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
+	beam_loop=AudioStreamPlayer.new();beam_loop.volume_db=-80;add_child(beam_loop)
 	for i in range(8):
 		var spatial:=AudioStreamPlayer3D.new();spatial.max_distance=2500;spatial.unit_size=120;spatial.attenuation_filter_cutoff_hz=8000;add_child(spatial);spatial_players.append(spatial)
 	for i in range(6):
@@ -102,6 +105,7 @@ func _ready() -> void:
 		if ResourceLoader.exists("res://assets/audio/geese.ogg"):
 			geese.stream = load("res://assets/audio/geese.ogg")
 			geese.stream.loop = true
+		beam_loop.stream=load("res://assets/audio/plasma_beam.ogg").duplicate();beam_loop.stream.loop=true;beam_loop.play()
 		gun_loop.stream = loop_sample("res://assets/audio/gatling_loop.wav")
 		gun_loop.play()
 		burner.stream = loop_sample("res://assets/audio/afterburner.wav")
@@ -120,7 +124,7 @@ func _ready() -> void:
 		honk_low = make_honk(462.0, 0.52)
 		honk_high = make_honk(548.0, 0.44)
 		player.play()
-		for effect_name: String in ["gatling_attack","cannon","explosion","impact","flare","eject","sonic","gear_motor","flap_motor","touchdown_tires","touchdown_thump"]:
+		for effect_name: String in ["gatling_attack","cannon","missile","explosion","impact","flare","eject","sonic","gear_motor","flap_motor","touchdown_tires","touchdown_thump"]:
 			effects[effect_name] = load("res://assets/audio/%s.%s" % [effect_name,"wav" if effect_name in ["gatling_attack","cannon","gear_motor","flap_motor","touchdown_tires","touchdown_thump","sonic"] else "ogg"])
 		for index in range(12):
 			var effect := AudioStreamPlayer.new()
@@ -390,6 +394,8 @@ func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> 
 	if muted:spatial_queue.clear()
 	radio.tick(dt,context_paused,muted)
 	if not context_paused: gun_envelope = move_toward(gun_envelope,1.0 if gun_wanted else 0.0,dt*(24 if gun_wanted else 7))
+	beam_loop.stream_paused=context_paused
+	beam_loop.volume_db=move_toward(beam_loop.volume_db,-24+duck_level*.4 if beam_wanted and not muted else -80,dt*220)
 	gun_loop.volume_db = -80 if muted or gun_envelope<.001 else -13+linear_to_db(gun_envelope)+duck_level*.4
 	gun_loop.pitch_scale = lerpf(.80,1.04,gun_envelope)
 	gun_loop.stream_paused = context_paused
@@ -426,7 +432,7 @@ func ping(pitch: float = 1.0) -> void:
 
 func _exit_tree() -> void:
 	# Release looping playback before the scene disappears during test shutdown.
-	for stream_player: AudioStreamPlayer in [player,tone,wind,music,geese,ambience,wheels,burner,gun_loop]:
+	for stream_player: AudioStreamPlayer in [player,tone,wind,music,geese,ambience,wheels,burner,gun_loop,beam_loop]:
 		if is_instance_valid(stream_player):
 			stream_player.stop()
 			stream_player.stream = null

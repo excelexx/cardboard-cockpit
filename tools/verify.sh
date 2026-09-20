@@ -15,6 +15,9 @@ if [ ! -x .venv/bin/python ]; then ./tools/setup_vision.sh; fi
 "$engine" --headless --path simulator --script res://tests/test_radio.gd
 "$engine" --headless --path simulator --script res://tests/test_demo_mission.gd
 "$engine" --headless --path simulator --script res://tests/test_ballistics.gd
+"$engine" --headless --path simulator --script res://tests/test_weapon_mounts.gd
+"$engine" --headless --path simulator --script res://tests/test_weapon_readability.gd
+"$engine" --headless --path simulator --script res://tests/test_two_waves.gd
 "$engine" --headless --path simulator --script res://tests/test_combat_feel.gd
 "$engine" --headless --path simulator --script res://tests/test_balance_profile.gd
 "$engine" --headless --path simulator --script res://tests/test_scenic_route.gd

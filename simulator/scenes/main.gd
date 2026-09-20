@@ -125,8 +125,7 @@ func _ready() -> void:
 	cockpit_frame = Cockpit.new(); camera.add_child(cockpit_frame); cockpit_frame.build(profile())
 	cockpit_frame.set_presentation_visible(false)
 	audio = Audio.new(); add_child(audio); audio.set_aircraft(profile())
-	var settings := ConfigFile.new()
-	if settings.load("user://settings.cfg")==OK: audio.muted = bool(settings.get_value("audio","muted",false))
+	audio.muted=false # Each launch starts with sound; M still mutes the current session.
 	combat = Combat.new(); combat.app = self; add_child(combat)
 	fighter_fx = Effects.new(); fighter_fx.app = self; add_child(fighter_fx); fighter_fx.build()
 	var layer := CanvasLayer.new(); add_child(layer)
@@ -282,6 +281,8 @@ func _input(event: InputEvent) -> void:
 			KEY_Q:
 				if mode=="flight":
 					if flight.start_barrel_roll(-1 if control.x<0 else 1):combat.event("roll",flight.position,1);audio.play_effect("sonic",-23,1.5);camera_rig.impulse(.10)
+			KEY_T:
+				if mode=="flight" and fire_guard<=0:combat.fire_missile()
 			KEY_Z:
 				if mode=="flight": combat.deploy_flares()
 			KEY_J:
@@ -301,6 +302,7 @@ func _input(event: InputEvent) -> void:
 		look.y = clampf(look.y-event.relative.y*0.003,-0.6,0.6)
 	if event is InputEventMouseButton and event.pressed and fire_guard<=0 :
 		if event.button_index==MOUSE_BUTTON_LEFT:combat.fire_gun()
+		elif event.button_index==MOUSE_BUTTON_RIGHT:combat.fire_missile()
 
 func take_manual_control(steering: bool) -> void:
 	copilot = false
@@ -439,6 +441,7 @@ func _process(dt: float) -> void:
 			if world.get("sun")!=null: cockpit_frame.set_sun(world.sun.global_basis.z,world.sun.light_energy/3.2)
 			cockpit_frame.set_tactical(tactical_state())
 			cockpit_frame.set_navigation("sf" if route_id=="sf" else "free",mission.route_index)
+	audio.beam_wanted=active and combat.beam_active
 	audio.gun_wanted = active and combat.active and combat.gun_firing_time>0
 	audio.instructor_speaking=tutorial.speaking()
 	audio.flow_intensity=combat.intent.intensity
@@ -528,6 +531,7 @@ func _physics_process(dt: float) -> void:
 		combat.tick(dt)
 		if mode!="flight": return
 		if gun_requested():combat.fire_gun()
+		if not test_mode and fire_guard<=0 and (Input.is_physical_key_pressed(KEY_T) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)):combat.fire_missile()
 	var input := Vector3(float(Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_UP))-float(Input.is_physical_key_pressed(KEY_DOWN)),float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)))
 	input.x *= Tune.KEYBOARD_SCALE; input.y *= Tune.KEYBOARD_SCALE
 	var power: float = float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
@@ -545,7 +549,8 @@ func _physics_process(dt: float) -> void:
 			var tracked: Dictionary = combat.target()
 			if not tracked.is_empty():
 				var lead: Vector3 = combat.lead_point(tracked)-flight.position
-				if flight.forward().angle_to(lead.normalized())<(deg_to_rad(25) if combat.assist else atan2(10.0,maxf(lead.length(),100))): combat.fire_gun()
+				if flight.forward().angle_to(lead.normalized())<(deg_to_rad(25) if combat.assist else atan2(10.0,maxf(lead.length(),100))):
+					combat.fire_gun();combat.fire_missile()
 	else:
 		if mouse_yoke and not vision.enabled and not Input.is_key_pressed(KEY_ALT):
 			var mouse: Vector2 = (get_viewport().get_mouse_position()-Vector2(800,470))/Tune.MOUSE_RANGE
@@ -661,7 +666,7 @@ func begin_landing() -> void:
 		if not mission.begin_assisted_landing():toast="CLEAR ALL 16 TARGETS BEFORE LANDING";toast_time=3
 		return
 	if mode!="flight" or not flight.airborne or landing_started or route_id!="sf":return
-	landed_early=mission.cinematic and mission.clock<Tune.SKEIN_DEADLINE and not skein_cleared()
+	landed_early=mission.cinematic and not mission.skein_final and not skein_cleared()
 	landing_started=true;landing_transition=1.2
 	tutorial.landing_begun()
 	combat.active=false;combat.engagement_enabled=false
@@ -782,7 +787,6 @@ func save_settings() -> void:
 	config.set_value("video","spectre_quality",high_quality)
 	config.set_value("arcade","best_score_v09",best_score)
 	config.set_value("world","spectre_route_v10",route_id)
-	if is_instance_valid(audio): config.set_value("audio","muted",audio.muted)
 	config.save("user://settings.cfg")
 
 func select_route(value: String) -> void:
@@ -812,6 +816,6 @@ func tactical_state() -> Dictionary:
 	if mission.active and mission.phase in ["opening","combat","return"]:
 		var target: Vector3 = mission.route_target()-flight.position
 		waypoint = Vector2(target.x,target.z).rotated(-flight.heading)
-	return {"gun":gun_requested(),"tracking":combat.target_id>=0 and combat.assist,
+	return {"gun":gun_requested() or combat.gun_firing_time>0,"missile_ready":combat.active and combat.missile_cooldown<=0,"missile_cooldown":combat.missile_cooldown,"tracking":combat.target_id>=0 and combat.assist,
 		"lock":combat.lock_progress,"contacts":contacts,"skein":Vector2(down,skein_total()),"waypoint":waypoint,"damaged":combat.hull<=65,
 		"objective":hud.mission_line(),"clock":hud.clock_text()}

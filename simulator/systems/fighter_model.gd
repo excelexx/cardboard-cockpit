@@ -2,6 +2,7 @@ extends RefCounted
 class_name FighterModel
 const Utils = preload("res://systems/model_utils.gd")
 const Spectre = preload("res://systems/spectre_airframe.gd")
+const Weapons = preload("res://systems/weapon_models.gd")
 
 ## The player's aircraft. USE_SPECTRE_AIRFRAME picks the procedural SPECTRE
 ## X-26 (systems/spectre_airframe.gd); set it to false to fall back to the
@@ -14,8 +15,14 @@ const SCALE := SPECTRE_SCALE if USE_SPECTRE_AIRFRAME else F35_SCALE
 ## Exhaust exit plane and gun muzzle in aircraft space; the effects layer hangs
 ## the plume, nozzle glow and muzzle flash off these.
 const NOZZLE := Vector3(0, -0.30, 7.28) if USE_SPECTRE_AIRFRAME else Vector3(0, -0.782, 7.32)
-const MUZZLE := Vector3(-1.20, -0.21, -3.53) if USE_SPECTRE_AIRFRAME else Vector3(-1.04, 0.23, -3.94)
-const GUN_MOUNT := Vector3(-1.20, -0.21, -3.02) if USE_SPECTRE_AIRFRAME else Vector3(-0.80, -0.30, -3.10)
+# Forward chine pods: the barrel cluster and accelerator sit outside the hull,
+# while the tapered rear fairings blend into the shoulder behind them.
+const GUN_SCALE := 1.45
+const PLASMA_SCALE := 1.65
+const GUN_MOUNT := Vector3(-1.70, 0.30, -4.00) if USE_SPECTRE_AIRFRAME else Vector3(-1.25, 0.30, -3.70)
+const PLASMA_MOUNT := Vector3(1.72, 0.30, -3.65) if USE_SPECTRE_AIRFRAME else Vector3(1.25, 0.30, -3.70)
+const MUZZLE := GUN_MOUNT + Vector3(0, 0, Weapons.MUZZLE_Z * GUN_SCALE)
+const PLASMA_MUZZLE := PLASMA_MOUNT + Vector3(0, 0, -0.52 * PLASMA_SCALE)
 
 static func _paint(livery: Texture2D) -> ShaderMaterial:
 	var material := Spectre.paint_material()
@@ -29,34 +36,49 @@ static func create() -> Node3D:
 	model.scale = SCALE
 	for geometry: Node in model.find_children("*", "GeometryInstance3D", true, false):
 		geometry.layers = 2
-	# CG26 rotary cannon on the port chine. The gimbal is aimed by the effects
-	# layer and the muzzle marker is where rounds and the flash originate.
-	var gun := Node3D.new()
-	gun.name = "CG26"
-	gun.position = GUN_MOUNT
+	# Keep the authored graphite, machined edges, gold trim and heat shaders.
+	# The gimbal translates for recoil; only GatlingRotor rotates.
+	_hardpoint(model, GUN_MOUNT, -1.0, 3.30)
+	var gun_mount := Node3D.new()
+	gun_mount.name = "GunMount"
+	gun_mount.position = GUN_MOUNT
+	model.add_child(gun_mount)
 	var gimbal := Node3D.new()
 	gimbal.name = "GunGimbal"
-	gun.add_child(gimbal)
-	var rotor: Node3D = load("res://assets/sourced_flight/cannon.gltf").instantiate()
-	rotor.name = "GatlingRotor"
-	gimbal.add_child(rotor)
-	var muzzle := Marker3D.new()
-	muzzle.name = "GunMuzzle"
-	muzzle.position.z = -0.51
-	gimbal.add_child(muzzle)
-	# The sourced cannon ships in pale plastic; on a near-black airframe it reads
-	# as a bolted-on toy unless it is repainted in the same gunmetal.
-	var gunmetal := StandardMaterial3D.new()
-	gunmetal.albedo_color = Color(0.042, 0.045, 0.050)
-	gunmetal.metallic = 0.88
-	gunmetal.roughness = 0.31
-	for geometry: Node in gun.find_children("*", "GeometryInstance3D", true, false):
-		geometry.layers = 2
-		if geometry is MeshInstance3D and geometry.mesh != null:
-			for surface in range(geometry.mesh.get_surface_count()):
-				geometry.set_surface_override_material(surface, gunmetal)
-	model.add_child(gun)
+	gun_mount.add_child(gimbal)
+	var gun := Weapons.rotary_cannon()
+	gun.scale = Vector3.ONE * GUN_SCALE
+	gimbal.add_child(gun)
+
+	_hardpoint(model, PLASMA_MOUNT, 1.0, 1.85)
+	var plasma := Weapons.plasma_cannon()
+	plasma.position = PLASMA_MOUNT
+	plasma.scale = Vector3.ONE * PLASMA_SCALE
+	model.add_child(plasma)
 	return model
+
+## A low swept mounting shoe carries each pod back into the chine. The socket
+## stays fixed to the airframe while the rotary cannon recoils above it.
+static func _hardpoint(model: Node3D, origin: Vector3, side: float, length: float) -> void:
+	var mount := Node3D.new()
+	mount.name = "PortWeaponHardpoint" if side < 0 else "StarboardWeaponHardpoint"
+	mount.position = origin + Vector3(-side * 0.19, -0.17, 0.25)
+	model.add_child(mount)
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	Weapons.loft(surface, 0, [
+		[0.0, Weapons.section(8, 0.15, 0.045, 0.0), Vector2.ZERO],
+		[0.24, Weapons.section(8, 0.30, 0.085, 0.0), Vector2.ZERO],
+		[length * 0.70, Weapons.section(8, 0.28, 0.065, 0.0), Vector2(-side * 0.07, -0.025)],
+		[length, Weapons.section(8, 0.055, 0.018, 0.0), Vector2(-side * 0.18, -0.07)]])
+	surface.generate_normals()
+	surface.generate_tangents()
+	var shoe := MeshInstance3D.new()
+	shoe.name = "ChineSocket"
+	shoe.mesh = surface.commit()
+	shoe.material_override = Weapons.metal({"base_tint": Color(0.052, 0.058, 0.068), "rough_lo": 0.30, "rough_hi": 0.52})
+	shoe.layers = 2
+	mount.add_child(shoe)
 
 static func _dressed_f35() -> Node3D:
 	var model: Node3D = load("res://assets/aircraft/f35/f35.tscn").instantiate()

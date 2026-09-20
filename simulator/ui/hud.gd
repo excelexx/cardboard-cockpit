@@ -225,7 +225,7 @@ func draw_title() -> void:
 	big(Vector2(92,268),"WILD GOOSE",124,WHITE,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
 	big(Vector2(92,376),"CHASE",124,WHITE,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
 	text(Vector2(96,436),"Shoot down the geese. Clear the big skein.",20,WHITE)
-	text(Vector2(96,466),"Land at SFO. You have 2:30.",20,WHITE)
+	text(Vector2(96,466),"Two flocks: 12, then 20. Land at SFO.",20,WHITE)
 	button("fly",Rect2(96,520,420,72),"PLAY",true,"ENTER · START")
 	button("training",Rect2(96,604,420,52),"TUTORIAL",false,"TAKE OFF · SHOOT · LAND")
 	button("guided",Rect2(96,666,205,52),"WATCH DEMO")
@@ -438,8 +438,8 @@ func draw_sight(f: FlightDynamics,c: CombatDirector) -> void:
 			diamond(point,8,Color(RED.r,RED.g,RED.b,0.9),2)
 func draw_weapons(_c: CombatDirector) -> void:
 	if hidden_in_flight(): return
-	var gun_on: bool = app.gun_requested()
-	put(mono,Vector2(56,900),"GUN",20,GREEN)
+	var gun_on: bool = app.gun_requested() or _c.gun_firing_time>0
+	put(mono,Vector2(56,900),"PRIMARY",20,GREEN)
 	var chip := Rect2(204,873,64 if gun_on else 72,36)
 	if gun_on:
 		draw_rect(chip,GREEN)
@@ -447,7 +447,10 @@ func draw_weapons(_c: CombatDirector) -> void:
 	else:
 		draw_rect(chip,Color(GLASS.r,GLASS.g,GLASS.b,0.62));draw_rect(chip,Color(GREEN.r,GREEN.g,GREEN.b,0.7),false,1)
 		draw_string(display_bold,chip.position+Vector2(13,28),"OFF",HORIZONTAL_ALIGNMENT_LEFT,-1,30,SOFT)
-	put(body,Vector2(292,898),"Show ID 4 / hold SPACE or left mouse",16,WHITE)
+	put(body,Vector2(292,898),"MINIGUN + PLASMA / SHOW TAG OR HOLD SPACE",16,WHITE)
+	put(mono,Vector2(56,943),"MISSILE",20,GREEN)
+	put(mono,Vector2(204,943),"READY" if _c.missile_cooldown<=0 else "%.1fs" % _c.missile_cooldown,18,GREEN if _c.missile_cooldown<=0 else SOFT)
+	put(body,Vector2(330,941),"T / right mouse · one every 3 seconds",16,WHITE)
 ## How much of the skein is down, in the span the old health bar used to hold:
 ## one pip per bird, amber as it goes down. No named individual, no health bar.
 func draw_objective(c: CombatDirector) -> void:
@@ -455,9 +458,14 @@ func draw_objective(c: CombatDirector) -> void:
 	if app.flight_kind=="training":
 		put(mono,Vector2(540,118),"TRAINING TARGETS  %d / %d" % [c.kills,app.mission.TARGET_COUNT],20,GREEN);bar(Rect2(540,132,520,12),float(c.kills)/app.mission.TARGET_COUNT,GREEN);return
 	var tally: Vector2 = skein_tally(c)
+	var wave_title: String="FLOCKS"
+	if app.mission.cinematic and app.mission.has_method("wave_down"):
+		if app.mission.wave_number<=0:return
+		tally=Vector2(app.mission.wave_down(),app.mission.wave_size)
+		wave_title="WAVE %d / 2" % app.mission.wave_number
 	if tally.y<=0.0: return
 	put(mono,Vector2(540,118),"GEESE %d / %d" % [int(tally.x),int(tally.y)],20,AMBER)
-	put(mono,Vector2(540,118),"SKEIN",20,AMBER,HORIZONTAL_ALIGNMENT_RIGHT,520)
+	put(mono,Vector2(540,118),wave_title,20,AMBER,HORIZONTAL_ALIGNMENT_RIGHT,520)
 	var pips: int = clampi(int(tally.y),1,26)
 	var width: float = (526.0-float(pips-1)*4.0)/float(pips)
 	draw_rect(Rect2(536,124,534,22),Color(GLASS.r,GLASS.g,GLASS.b,0.66))
@@ -592,7 +600,7 @@ func draw_results() -> void:
 func draw_help() -> void:
 	zones.clear(); dim(); panel(Rect2(330,110,940,790),.9)
 	put(display_bold,Vector2(384,196),"CONTROLS",64,WHITE)
-	var rows: Array[Array] = [["ARROWS","Climb, dive and bank"],["A  D","Rudder: slide left and right"],["W  S","Faster, slower"],["SHIFT","Hold for afterburner"],["SPACE / CLICK","Hold to fire; release to stop"],["GUN TAG ID 4","Show to fire; cover to stop"],["Z","Flares"],["Q","Barrel roll"],["V","Cockpit or chase view"],["G  F","Landing gear, flaps"],["H","Auto-fly on / off"],["HOLD E","Eject"],["C  M  ESC","Set up cardboard, mute, pause"]]
+	var rows: Array[Array] = [["ARROWS","Climb, dive and bank"],["A  D","Rudder: slide left and right"],["W  S","Faster, slower"],["SHIFT","Hold for afterburner"],["SPACE / CLICK","Hold minigun + plasma; release to stop"],["T / RIGHT CLICK","Slow guided missiles"],["GUN TAG ID 4","Show to fire; cover to stop"],["Z","Flares"],["Q","Barrel roll"],["V","Cockpit or chase view"],["G  F","Landing gear, flaps"],["H","Auto-fly on / off"],["HOLD E","Eject"],["C  M  ESC","Set up cardboard, mute, pause"]]
 	for i in range(rows.size()):
 		put(mono,Vector2(388,252+i*40),rows[i][0],18,GREEN)
 		put(body,Vector2(610,252+i*40),rows[i][1],18,WHITE)
