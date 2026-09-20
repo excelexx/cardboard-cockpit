@@ -6,8 +6,6 @@ var ambience: AudioStreamPlayer
 var wheels: AudioStreamPlayer
 var burner: AudioStreamPlayer
 var burner_wanted := false
-var beam_loop: AudioStreamPlayer
-var beam_wanted:=false
 var flow_intensity:=0.0
 var acquisition:=0.0
 var instructor_speaking:=false
@@ -31,6 +29,8 @@ var music: AudioStreamPlayer
 var geese: AudioStreamPlayer
 var wind: AudioStreamPlayer
 var engine_pitch := 1.0
+var beam_loop: AudioStreamPlayer
+var beam_wanted:=false
 var muted := false
 var effects: Dictionary = {}
 var effect_players: Array[AudioStreamPlayer] = []
@@ -375,9 +375,6 @@ func _release_all_flock_voices() -> void:
 	for key: String in flock_state.keys():_release_flock_voice(key)
 
 func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> void:
-	beam_loop.stream_paused=context_paused
-	beam_loop.volume_db=move_toward(beam_loop.volume_db,-20+duck_level*.4 if beam_wanted and not muted else -80,dt*220)
-	beam_loop.pitch_scale=1.0+sin(Time.get_ticks_msec()*.0017)*.015
 	acquire_clock-=dt
 	if acquisition>0 and acquisition<1 and acquire_clock<=0 and not context_paused:
 		ping(.65+acquisition*.6);acquire_clock=.085
@@ -397,6 +394,8 @@ func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> 
 	if muted:spatial_queue.clear()
 	radio.tick(dt,context_paused,muted)
 	if not context_paused: gun_envelope = move_toward(gun_envelope,1.0 if gun_wanted else 0.0,dt*(24 if gun_wanted else 7))
+	beam_loop.stream_paused=context_paused
+	beam_loop.volume_db=move_toward(beam_loop.volume_db,-24+duck_level*.4 if beam_wanted and not muted else -80,dt*220)
 	gun_loop.volume_db = -80 if muted or gun_envelope<.001 else -13+linear_to_db(gun_envelope)+duck_level*.4
 	gun_loop.pitch_scale = lerpf(.80,1.04,gun_envelope)
 	gun_loop.stream_paused = context_paused

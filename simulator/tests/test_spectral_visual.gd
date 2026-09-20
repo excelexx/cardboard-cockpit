@@ -32,7 +32,7 @@ func run() -> void:
 		var began:=Time.get_ticks_msec();var frames:=0;var max_shots:=0;var saved_roll:=false
 		while Time.get_ticks_msec()-began<4500:
 			var dt: float=minf(app.get_process_delta_time(),.05)
-			app.combat.fire_gun();app.combat.fire_missile();app.combat.tick(dt)
+			app.combat.fire_gun();app.combat.tick(dt)
 			app.flight.step(dt,Vector3.ZERO,false,0,false);app.apply_aircraft_pose()
 			app._process(dt);frames+=1;max_shots=maxi(max_shots,app.combat.shots.size())
 			await process_frame

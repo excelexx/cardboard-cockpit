@@ -1,3 +1,5 @@
+> Historical two-switch design, retired in 0.16.0. Current controls use visible/covered gun tag ID 4 only. See [current vision setup](vision-setup.md) and [demo runbook](DEMO_RUNBOOK.md). The old switch print sheets are no longer shipped.
+
 # Cardboard yoke switches and wireless badge
 
 The cardboard controls own steering, throttle and firing. The badge is a secondary panel. Keep both hands on the yoke during normal engagements.

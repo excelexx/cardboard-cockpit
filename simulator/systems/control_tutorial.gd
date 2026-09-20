@@ -15,7 +15,7 @@ const STEPS := [
 	["yoke_info", "yoke", "The yoke controls your flight", "Turn to bank, tilt to climb or descend, and swivel to steer left or right.", "No movement check needed. The gun checks are next."],
 	["grip", "weapons", "Set your shooting grip", "Put your middle finger on the green elastic band and ring finger on the blue elastic band.", "Show the gun tag. Keep your left hand free for the throttle."],
 	["cover_gun", "weapons", "Cover the gun tag with your pointer finger", "Cover most of the printed pattern. Keep the yoke tag visible.", "The gun should turn OFF. Middle finger stays on green; ring finger stays on blue."],
-	["show", "weapons", "Lift your pointer finger to shoot", "Lift your pointer finger off the gun tag so the camera can see it.", "The gun should turn ON. Put your pointer finger back to stop firing."],
+	["show", "weapons", "Lift your pointer finger to shoot", "Lift your pointer finger off the gun tag so the camera can see it.", "Minigun and plasma turn ON. Cover the tag to stop both."],
 ]
 var index := 0
 var calibrating := true

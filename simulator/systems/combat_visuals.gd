@@ -4,14 +4,14 @@ const Art = preload("res://systems/weapon_visuals.gd")
 const Tune = preload("res://data/balance.gd")
 var combat: Node
 var projectile_pool := {"cannon":[],"missile":[]}
+var beams: Array[MeshInstance3D]=[]
+var beam_light: OmniLight3D
 var sprites: Array[Dictionary] = []
 var sprite_pool: Array[Sprite3D] = []
 var lights: Array[Dictionary] = []
 var light_pool: Array[OmniLight3D] = []
 var rings: Array[Dictionary] = []
-var beams: Array[MeshInstance3D] = []
 var lead_mesh: MeshInstance3D
-var beam_light: OmniLight3D
 var ghost_clock := 0.0
 var effects_clock := 0.0
 var scan_time := 0.0
@@ -36,11 +36,11 @@ var last_flares_fired := 0
 var rng := RandomNumberGenerator.new()
 func _ready() -> void:
 	flash_texture=load("res://assets/vfx/flash.png");smoke_texture=load("res://assets/sourced_flight/smoke.png")
-	beams.append(Art.beam(self,Color(.72,.94,1),.10,1))
-	beams.append(Art.energy_sheath(self,.38,0))
-	beams.append(Art.energy_sheath(self,.72,1.4))
+	beams.append(Art.beam(self,Color(.75,.92,1),.24,1))
+	beams.append(Art.energy_sheath(self,.48,0))
+	beams.append(Art.energy_sheath(self,.88,1.4))
 	for beam in beams:beam.visible=false
-	beam_light=OmniLight3D.new();beam_light.light_color=Color(.15,.7,1);beam_light.omni_range=35;beam_light.shadow_enabled=false;beam_light.visible=false;add_child(beam_light)
+	beam_light=OmniLight3D.new();beam_light.light_color=Color(.35,.55,1);beam_light.omni_range=12;beam_light.shadow_enabled=false;beam_light.visible=false;add_child(beam_light)
 	lead_mesh=MeshInstance3D.new();lead_mesh.mesh=ImmediateMesh.new();lead_mesh.material_override=Art.emissive(Color(.08,.55,.8),1.3,.15);lead_mesh.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;add_child(lead_mesh)
 	for i in range(96):
 		var sprite:=Sprite3D.new();sprite.texture=flash_texture;sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.shaded=false;sprite.visible=false;sprite.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;add_child(sprite);sprite_pool.append(sprite)
@@ -50,19 +50,10 @@ func _ready() -> void:
 	_build_feather_rigs()
 	# Warm the actual meshes/materials before the first salvo.
 	for kind in ["cannon","missile"]:
-		for i in range(48 if kind=="cannon" else 48):
+		for i in range(48 if kind=="cannon" else Tune.MAX_MISSILES):
 			var node:=Art.projectile(kind);node.set_meta("projectile_kind",kind);add_child(node);node.visible=false
 			if kind=="missile":_equip_missile(node)
 			projectile_pool[kind].append(node)
-	if DisplayServer.get_name()!="headless":call_deferred("_warm_pipeline")
-func _warm_pipeline() -> void:
-	if combat.app.mode!="title":return
-	var preview: Node3D=projectile_pool.missile[0];preview.position=Vector3(0,0,-12);preview.visible=true
-	for beam in beams:beam.position=Vector3(-1,0,-8);beam.visible=true
-	await get_tree().process_frame
-	await get_tree().process_frame
-	preview.visible=false
-	for beam in beams:beam.visible=false
 func _equip_missile(node: Node3D) -> void:
 	var flare:=Sprite3D.new();flare.name="EngineFlare";flare.texture=flash_texture;flare.billboard=BaseMaterial3D.BILLBOARD_ENABLED;flare.shaded=false;flare.position.z=1.65;flare.modulate=Color(4,2.8,1.6,.8);flare.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;node.add_child(flare)
 	# A solid motor throws a warm light, not a cold one. This used to be
@@ -277,8 +268,7 @@ func take_projectile(kind: String) -> Node3D:
 	if not projectile_pool[key].is_empty():node=projectile_pool[key].pop_back()
 	else:
 		node=Art.projectile(key);node.set_meta("projectile_kind",key);add_child(node)
-		if key=="missile":_equip_missile(node)
-	node.visible=true;node.scale=Vector3.ONE*(1.7 if key=="missile" else 1.0)
+	node.visible=true;node.scale=Vector3.ONE*(Tune.MISSILE_VISUAL_SCALE if key=="missile" else 1.0)
 	return node
 func release_projectile(node: Node3D,kind: String) -> void:
 	if not is_instance_valid(node):return
@@ -286,6 +276,8 @@ func release_projectile(node: Node3D,kind: String) -> void:
 	var key: String="missile" if kind=="missile" else "cannon"
 	if not projectile_pool[key].has(node):projectile_pool[key].append(node)
 func reset() -> void:
+	for beam in beams:beam.visible=false
+	if beam_light!=null:beam_light.visible=false
 	for effect in sprites:
 		effect.node.visible=false;sprite_pool.append(effect.node)
 	sprites.clear()
@@ -295,9 +287,7 @@ func reset() -> void:
 	for entry in rings:
 		if is_instance_valid(entry.node):entry.node.queue_free()
 	rings.clear()
-	for beam in beams:beam.visible=false
 	if lead_mesh!=null:lead_mesh.mesh.clear_surfaces()
-	if beam_light!=null:beam_light.visible=false
 	_stop_feathers()
 	flare_items.clear()
 	if flare_mesh!=null:flare_mesh.mesh.clear_surfaces()
@@ -327,9 +317,6 @@ func event(kind: String,at: Vector3,weight: float) -> void:
 	elif kind=="scan":scan_time=.35
 	elif kind=="candidate":puff(at,Color(.12,.65,1,.22),16,.2)
 	elif kind=="lock":puff(at,Color(.3,1,1,.75),28,.15);combat.app.audio.ping(1.35)
-	elif kind=="salvo":
-		illuminate(at,Color(1,.78,.48),5,16,.2)
-		puff(at-combat.forward()*5,Color(.72,.70,.66,.4),12,.45,true)
 	elif kind=="near_miss":
 		combat.app.audio.play_spatial("sonic",at,-19,1.35);combat.app.camera_rig.impulse(.08)
 	elif kind in ["impact","armor_break","kill","boss_death"]:
@@ -421,7 +408,17 @@ func update_projectile(shot: Dictionary,dt: float) -> void:
 		# Aluminised propellant leaves dense white-grey alumina smoke, not the
 		# cyan puff that used to be here.
 		puff(shot.position,Color(.62,.63,.60,.30),clampf(distance*.014,2,12),.24)
+func draw_plasma() -> void:
+	var live: bool=combat.beam_active and combat.app.mode=="flight" and not combat.app.overlay_visible() and not combat.app.yoke_recovery_visible()
+	for beam in beams:beam.visible=live
+	beam_light.visible=live
+	if not live:return
+	var start: Vector3=combat.app.fighter_fx.plasma_muzzle_position(combat.app.flight.position)
+	for beam in beams:Art.align_beam(beam,start,combat.beam_end)
+	beam_light.position=start;beam_light.light_energy=1.2
+
 func tick(dt: float) -> void:
+	draw_plasma()
 	effects_clock+=dt;handoff_time=maxf(0,handoff_time-dt);scan_time=maxf(0,scan_time-dt);impact_emphasis=maxf(0,impact_emphasis-dt)
 	# Countermeasures are owned here: combat.gd only counts them, so the salvo
 	# is picked up from its own counter rather than reaching into that file.
@@ -478,27 +475,7 @@ func tick(dt: float) -> void:
 					mat.stencil_color=Color(.52,.64,.76,.55 if designated else 0.0)
 					mat.emission_energy_multiplier=.7+enemy.hit_flash*3+enemy.damage_stage*.3
 					mat.stencil_outline_thickness=.35 if designated else .0
-	_update_designator()
 	_draw_lead(target)
-## The three beam meshes P2 disarmed, restyled: a single thin EOTS designator
-## sourced from under the nose, dimming to nothing past about 1.2 km. The
-## braided sheath, the halo and the 35 m blue light are all off.
-func _update_designator() -> void:
-	var live: bool=combat.beam_active and combat.lock_progress>=1 and combat.beam_hit_id>=0
-	var f: FlightDynamics=combat.app.flight
-	var basis:=Basis.from_euler(Vector3(f.pitch,-f.heading,-f.roll))
-	var start: Vector3=f.position+basis*Vector3(0,-1.05,-4.2)
-	var reach: float=start.distance_to(combat.beam_end)
-	var strength: float=clampf(1.0-(reach-600.0)/600.0,0,1) if live else 0.0
-	for index in range(beams.size()):
-		beams[index].visible=index==0 and strength>.02
-	beam_light.visible=false
-	if strength<=.02:return
-	Art.align_beam(beams[0],start,combat.beam_end)
-	beams[0].scale.x=.35
-	beams[0].scale.z=.35
-	var arcs: Node=beams[0].get_node_or_null("Arcs")
-	if arcs!=null:arcs.visible=false
 func _draw_lead(target: Dictionary) -> void:
 	var ribbon: ImmediateMesh=lead_mesh.mesh;ribbon.clear_surfaces()
 	if target.is_empty() or combat.intent.confidence<.3:return

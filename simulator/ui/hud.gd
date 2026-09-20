@@ -58,7 +58,7 @@ func _ready() -> void:
 		elif axis=="auto_aim": slider.min_value = 0; slider.max_value = GAMEPLAY_SETTINGS.MAX_AUTO_AIM
 		slider.step = .05
 		slider.scrollable = false
-		slider.tooltip_text = {"pitch":"Pitch sensitivity: nose up / down", "bank":"Bank sensitivity: wings left / right", "yaw":"Yaw sensitivity: nose left / right", "pitch_agility":"Speed of pitching up and down", "bank_agility":"Speed of banking and banked turns", "yaw_agility":"Speed of swivelling the nose left and right", "auto_aim":"Gun aiming assistance. Zero shoots straight ahead; missile guidance is independent."}[axis]
+		slider.tooltip_text = {"pitch":"Pitch sensitivity: nose up / down", "bank":"Bank sensitivity: wings left / right", "yaw":"Yaw sensitivity: nose left / right", "pitch_agility":"Speed of pitching up and down", "bank_agility":"Speed of banking and banked turns", "yaw_agility":"Speed of swivelling the nose left and right", "auto_aim":"Gun aiming assistance. Zero shoots straight ahead."}[axis]
 		var track := StyleBoxFlat.new()
 		track.bg_color = GLASS.lightened(.12)
 		track.content_margin_top = 4; track.content_margin_bottom = 4
@@ -213,6 +213,7 @@ func _draw() -> void:
 	if app.help_visible: draw_help()
 	if app.calibration_visible: draw_camera_setup()
 	if app.credits_visible: draw_credits()
+	if app.yoke_recovery_visible() and not app.overlay_visible():draw_yoke_recovery()
 	if app.settings_visible:draw_settings()
 
 # --- title ------------------------------------------------------------------
@@ -224,7 +225,7 @@ func draw_title() -> void:
 	big(Vector2(92,268),"WILD GOOSE",124,WHITE,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
 	big(Vector2(92,376),"CHASE",124,WHITE,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
 	text(Vector2(96,436),"Shoot down the geese. Clear the big skein.",20,WHITE)
-	text(Vector2(96,466),"Land at SFO. You have 2:30.",20,WHITE)
+	text(Vector2(96,466),"Two flocks: 12, then 20. Land at SFO.",20,WHITE)
 	button("fly",Rect2(96,520,420,72),"PLAY",true,"ENTER · START")
 	button("training",Rect2(96,604,420,52),"TUTORIAL",false,"TAKE OFF · SHOOT · LAND")
 	button("guided",Rect2(96,666,205,52),"WATCH DEMO")
@@ -378,10 +379,6 @@ func draw_flight() -> void:
 		line(cross-Vector2(90,0),cross+Vector2(90,0),Color(GREEN.r,GREEN.g,GREEN.b,0.5),2)
 		line(cross-Vector2(0,40),cross+Vector2(0,40),Color(GREEN.r,GREEN.g,GREEN.b,0.5),2)
 		diamond(cross+Vector2(guidance.localizer*80,-guidance.glideslope*34),7,WHITE,3)
-	if app.camera_rig.missile_link:
-		panel(Rect2(43,430,336,198),.92,GREEN)
-		draw_texture_rect(app.camera_rig.pip_texture,Rect2(49,459,324,164),false)
-		text(Vector2(56,452),"MISSILE CAMERA · X TO CLOSE",14,GREEN,true)
 	if show and not app.audio.radio.caption.is_empty():
 		put(mono,Vector2(0,626),app.audio.radio.speaker,15,GREEN,HORIZONTAL_ALIGNMENT_CENTER,1600)
 		put(body,Vector2(0,654),app.audio.radio.caption,20,WHITE,HORIZONTAL_ALIGNMENT_CENTER,1600)
@@ -411,7 +408,7 @@ func draw_flight_path(f: FlightDynamics) -> void:
 func draw_sight(f: FlightDynamics,c: CombatDirector) -> void:
 	draw_flight_path(f)
 	var nose: Vector2 = app.camera.unproject_position(f.position+c.forward()*2000)
-	var ring_edge: Vector3 = c.forward().rotated(app.camera.global_basis.x,deg_to_rad(c.intent.acquire_degrees(c)))
+	var ring_edge: Vector3 = c.forward().rotated(app.camera.global_basis.x,deg_to_rad(c.acquire_angle()))
 	var ring_radius: float = clampf(nose.distance_to(app.camera.unproject_position(f.position+ring_edge*1200)),38,115)
 	var tracking: bool = c.target_id>=0 and c.assist
 	var locked: bool = tracking and c.lock_progress>=1
@@ -439,22 +436,21 @@ func draw_sight(f: FlightDynamics,c: CombatDirector) -> void:
 			if pip.distance_to(center)>9: line(center,pip,Color(tone.r,tone.g,tone.b,0.55),2)
 		else:
 			diamond(point,8,Color(RED.r,RED.g,RED.b,0.9),2)
-func draw_weapons(c: CombatDirector) -> void:
+func draw_weapons(_c: CombatDirector) -> void:
 	if hidden_in_flight(): return
-	var gun_on: bool = app.primary_latched or c.beam_active
-	var rows: Array = [["GUN",gun_on,"Switch 1 · SPACE",c.primary_used],["MISSILES",app.salvo_latched,"Switch 2 · T",c.salvo_used]]
-	for i in range(2):
-		var y: float = 900+i*46
-		put(mono,Vector2(56,y),rows[i][0],20,GREEN)
-		var on: bool = rows[i][1]
-		var chip := Rect2(204,y-27,64 if on else 72,36)
-		if on:
-			draw_rect(chip,GREEN)
-			draw_string(display_bold,chip.position+Vector2(13,28),"ON",HORIZONTAL_ALIGNMENT_LEFT,-1,30,GLASS)
-		else:
-			draw_rect(chip,Color(GLASS.r,GLASS.g,GLASS.b,0.62));draw_rect(chip,Color(GREEN.r,GREEN.g,GREEN.b,0.7),false,1)
-			draw_string(display_bold,chip.position+Vector2(13,28),"OFF",HORIZONTAL_ALIGNMENT_LEFT,-1,30,SOFT)
-		if not rows[i][3] and app.mission.clock<25: put(body,Vector2(292,y-2),rows[i][2],16,WHITE)
+	var gun_on: bool = app.gun_requested() or _c.gun_firing_time>0
+	put(mono,Vector2(56,900),"PRIMARY",20,GREEN)
+	var chip := Rect2(204,873,64 if gun_on else 72,36)
+	if gun_on:
+		draw_rect(chip,GREEN)
+		draw_string(display_bold,chip.position+Vector2(13,28),"ON",HORIZONTAL_ALIGNMENT_LEFT,-1,30,GLASS)
+	else:
+		draw_rect(chip,Color(GLASS.r,GLASS.g,GLASS.b,0.62));draw_rect(chip,Color(GREEN.r,GREEN.g,GREEN.b,0.7),false,1)
+		draw_string(display_bold,chip.position+Vector2(13,28),"OFF",HORIZONTAL_ALIGNMENT_LEFT,-1,30,SOFT)
+	put(body,Vector2(292,898),"MINIGUN + PLASMA / SHOW TAG OR HOLD SPACE",16,WHITE)
+	put(mono,Vector2(56,943),"MISSILE",20,GREEN)
+	put(mono,Vector2(204,943),"READY" if _c.missile_cooldown<=0 else "%.1fs" % _c.missile_cooldown,18,GREEN if _c.missile_cooldown<=0 else SOFT)
+	put(body,Vector2(330,941),"T / right mouse · one every 3 seconds",16,WHITE)
 ## How much of the skein is down, in the span the old health bar used to hold:
 ## one pip per bird, amber as it goes down. No named individual, no health bar.
 func draw_objective(c: CombatDirector) -> void:
@@ -462,9 +458,14 @@ func draw_objective(c: CombatDirector) -> void:
 	if app.flight_kind=="training":
 		put(mono,Vector2(540,118),"TRAINING TARGETS  %d / %d" % [c.kills,app.mission.TARGET_COUNT],20,GREEN);bar(Rect2(540,132,520,12),float(c.kills)/app.mission.TARGET_COUNT,GREEN);return
 	var tally: Vector2 = skein_tally(c)
+	var wave_title: String="FLOCKS"
+	if app.mission.cinematic and app.mission.has_method("wave_down"):
+		if app.mission.wave_number<=0:return
+		tally=Vector2(app.mission.wave_down(),app.mission.wave_size)
+		wave_title="WAVE %d / 2" % app.mission.wave_number
 	if tally.y<=0.0: return
 	put(mono,Vector2(540,118),"GEESE %d / %d" % [int(tally.x),int(tally.y)],20,AMBER)
-	put(mono,Vector2(540,118),"SKEIN",20,AMBER,HORIZONTAL_ALIGNMENT_RIGHT,520)
+	put(mono,Vector2(540,118),wave_title,20,AMBER,HORIZONTAL_ALIGNMENT_RIGHT,520)
 	var pips: int = clampi(int(tally.y),1,26)
 	var width: float = (526.0-float(pips-1)*4.0)/float(pips)
 	draw_rect(Rect2(536,124,534,22),Color(GLASS.r,GLASS.g,GLASS.b,0.66))
@@ -474,13 +475,6 @@ func draw_objective(c: CombatDirector) -> void:
 		else: draw_rect(slot,Color(AMBER.r,AMBER.g,AMBER.b,0.18)); draw_rect(slot,Color(AMBER.r,AMBER.g,AMBER.b,0.35),false,1)
 func draw_alerts(f: FlightDynamics,c: CombatDirector) -> void:
 	var y := 800.0
-	if c.incoming_distance<2200:
-		var bearing: float = c.incoming_bearing
-		var position := Vector2(800+sin(bearing)*650,470-cos(bearing)*300)
-		var direction := Vector2(sin(bearing),-cos(bearing))
-		var side := direction.orthogonal()
-		draw_colored_polygon(PackedVector2Array([position+direction*16,position-direction*9+side*11,position-direction*9-side*11]),RED)
-		banner(y,"MISSILE!",["Press","[Z]","for flares"],RED); y -= 62
 	if f.stall_time>.6: banner(y,"NOSE TOO HIGH",["Ease off, add power"],RED); y -= 62
 	if app.eject_hold>0:
 		banner(y,"EJECTING",["Keep holding","[E]"],RED)
@@ -523,7 +517,6 @@ func draw_clear_flight() -> void:
 		text(Vector2(56,952),"R resets the flight. SPACE in the camera window re-centers.",16,SOFT)
 	else:
 		text(Vector2(56,952),"POWER %d%% · GEAR %s" % [int(f.throttle*100),"DOWN" if f.gear else "UP"],18,GREEN,true)
-	if c.incoming_distance<2200: banner(250,"MISSILE!",["Press","[Z]","for flares"],RED)
 	if f.stall_time>.6: banner(312,"NOSE TOO HIGH",["Ease off, add power"],RED)
 	if show and not app.audio.radio.caption.is_empty():
 		put(body,Vector2(0,884),app.audio.radio.caption,20,WHITE,HORIZONTAL_ALIGNMENT_CENTER,1600)
@@ -539,10 +532,6 @@ func draw_scope(center: Vector2,c: CombatDirector) -> void:
 		var point: Vector2 = center+(Vector2(delta.x,delta.z).rotated(-app.flight.heading)*0.030).limit_length(86)
 		if enemy.id==c.target_id or skein_ids(c).has(enemy.id): draw_colored_polygon(PackedVector2Array([point+Vector2(0,-7),point+Vector2(7,0),point+Vector2(0,7),point+Vector2(-7,0)]),RED)
 		else: draw_circle(point,4,RED)
-	for shot: Dictionary in c.shots:
-		if shot.kind!="hostile_missile": continue
-		var delta: Vector3 = shot.position-app.flight.position
-		draw_circle(center+(Vector2(delta.x,delta.z).rotated(-app.flight.heading)*0.030).limit_length(86),3,AMBER)
 	draw_colored_polygon(PackedVector2Array([center+Vector2(0,-9),center+Vector2(-7,8),center+Vector2(7,8)]),GREEN)
 	put(mono,center+Vector2(-100,-104),"RADAR 3 KM",15,GREEN,HORIZONTAL_ALIGNMENT_CENTER,200)
 func brackets(point: Vector2,radius: float,color: Color) -> void:
@@ -567,6 +556,16 @@ func draw_control_feedback() -> void:
 
 # --- overlays ---------------------------------------------------------------
 func dim() -> void: draw_rect(Rect2(0,0,1600,1000),Color(0.02,0.035,0.035,0.80))
+func draw_yoke_recovery() -> void:
+	zones.clear();dim();panel(Rect2(180,125,1240,740),.95)
+	put(mono,Vector2(220,177),"FLIGHT HELD / YOKE TRACKING",17,AMBER)
+	put(display_bold,Vector2(216,243),"BRING THE YOKE BACK INTO VIEW",48,WHITE)
+	put(body,Vector2(220,288),"Hold the yoke visible and steady to resume. Your flight stays here while tracking returns.",19,SOFT)
+	camera_card(Rect2(220,324,558,340),"LAPTOP / YOKE + GUN",app.yoke_preview,app.vision.tracking)
+	camera_card(Rect2(802,324,578,340),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4)
+	put(body,Vector2(220,713),"Keep the yoke pattern uncovered. Cover the gun tag to stop shooting.",18,SOFT)
+	button("keyboard",Rect2(220,757,330,62),"USE KEYBOARD",true)
+	put(mono,Vector2(580,796),"ARROWS STEER / W S POWER / HOLD SPACE TO FIRE",16,GREEN)
 func draw_pause() -> void:
 	zones.clear();dim();panel(Rect2(500,185,600,635),.94)
 	put(mono,Vector2(546,236),"FLIGHT PAUSED",17,GREEN)
@@ -601,7 +600,7 @@ func draw_results() -> void:
 func draw_help() -> void:
 	zones.clear(); dim(); panel(Rect2(330,110,940,790),.9)
 	put(display_bold,Vector2(384,196),"CONTROLS",64,WHITE)
-	var rows: Array[Array] = [["ARROWS","Climb, dive and bank"],["A  D","Rudder: slide left and right"],["W  S","Faster, slower"],["SHIFT","Hold for afterburner"],["SPACE","Gun on / off (yoke switch 1)"],["T","Missiles on / off (yoke switch 2)"],["Z","Flares"],["Q","Barrel roll"],["V","Cockpit or chase view"],["X","Missile camera"],["G  F","Landing gear, flaps"],["H","Auto-fly on / off"],["HOLD E","Eject"],["C  M  ESC","Set up cardboard, mute, pause"]]
+	var rows: Array[Array] = [["ARROWS","Climb, dive and bank"],["A  D","Rudder: slide left and right"],["W  S","Faster, slower"],["SHIFT","Hold for afterburner"],["SPACE / CLICK","Hold minigun + plasma; release to stop"],["T / RIGHT CLICK","Slow guided missiles"],["GUN TAG ID 4","Show to fire; cover to stop"],["Z","Flares"],["Q","Barrel roll"],["V","Cockpit or chase view"],["G  F","Landing gear, flaps"],["H","Auto-fly on / off"],["HOLD E","Eject"],["C  M  ESC","Set up cardboard, mute, pause"]]
 	for i in range(rows.size()):
 		put(mono,Vector2(388,252+i*40),rows[i][0],18,GREEN)
 		put(body,Vector2(610,252+i*40),rows[i][1],18,WHITE)
@@ -645,19 +644,19 @@ func camera_card(rect: Rect2,title: String,preview,tracking: bool) -> void:
 	put(mono,rect.position+Vector2(12,rect.size.y-10),"TRACKING" if tracking and preview.texture!=null else "LIVE / TAG NOT FOUND" if preview.texture!=null else "DISCONNECTED",13,GREEN if tracking and preview.texture!=null else AMBER)
 func draw_camera_previews() -> void:
 	if app.mode=="paused":
-		camera_card(Rect2(56,340,360,248),"LAPTOP / YOKE + WEAPONS",app.yoke_preview,app.vision.tracking)
+		camera_card(Rect2(56,340,360,248),"LAPTOP / YOKE + GUN",app.yoke_preview,app.vision.tracking)
 		camera_card(Rect2(1184,340,360,248),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4)
 		return
-	camera_card(Rect2(56,162,258,196),"LAPTOP / YOKE + WEAPONS",app.yoke_preview,app.vision.tracking)
+	camera_card(Rect2(56,162,258,196),"LAPTOP / YOKE + GUN",app.yoke_preview,app.vision.tracking)
 	camera_card(Rect2(328,162,258,196),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4)
 func draw_camera_setup() -> void:
 	zones.clear();dim();panel(Rect2(180,90,1240,820),.95)
 	put(display_bold,Vector2(218,166),"TWO-CAMERA COCKPIT",56,WHITE)
-	put(body,Vector2(220,201),"Laptop: yoke and weapons. Phone: throttle. Both previews stay independent.",18,SOFT)
-	camera_card(Rect2(220,234,558,362),"LAPTOP / YOKE + WEAPONS",app.yoke_preview,app.vision.tracking)
+	put(body,Vector2(220,201),"Laptop: yoke and gun. Phone: throttle. Both previews stay independent.",18,SOFT)
+	camera_card(Rect2(220,234,558,362),"LAPTOP / YOKE + GUN",app.yoke_preview,app.vision.tracking)
 	camera_card(Rect2(802,234,578,362),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4)
 	put(body,Vector2(220,640),"Keep the yoke tag visible; show the throttle handle and both end tags to the phone.",18,WHITE)
-	put(mono,Vector2(220,675),"GUN %s  ·  MISSILES %s  /  SWITCH 2 OR T" % ["ON" if app.primary_latched else "OFF","ON" if app.salvo_latched else "OFF"],16,GREEN)
+	put(mono,Vector2(220,675),"GUN %s  /  SHOW ID 4 OR HOLD SPACE / LEFT MOUSE" % ("ON" if app.gun_requested() else "OFF"),16,GREEN)
 	put(body,Vector2(220,706),"Badge: A gear · B landing assist · HOME back/pause · hold DOWN for tactical view.",16,SOFT)
 	var calibration=app.vision.yoke_calibration
 	var neutral_status: String="READY TO CALIBRATE / HOLD THE YOKE UPRIGHT"
@@ -670,7 +669,7 @@ func draw_camera_setup() -> void:
 func draw_credits() -> void:
 	zones.clear(); dim(); panel(Rect2(330,150,940,700),.9)
 	put(display_bold,Vector2(384,236),"CREDITS",64,WHITE)
-	var lines: Array[String] = ["The SPECTRE is a made-up jet, tuned for fun.","Jet model: FlightGear F-35B community, GPL (source included).","Goose: Poly by Google, CC BY 3.0.","Missile: Jarlan Perez, CC BY 3.0.","Sound effects and voices: Kenney, CC0.","Music: MintoDog, CC0. Goose calls: British Library, CC BY-SA.","Ground and sky: USGS, FlightGear, Poly Haven.","Fonts: Saira Condensed and IBM Plex Mono, SIL OFL.","Title art: image generation.","Engine: Godot, MIT. Full notices ship with the game."]
+	var lines: Array[String] = ["The SPECTRE is a made-up jet, tuned for fun.","Jet model: FlightGear F-35B community, GPL (source included).","Goose: Poly by Google, CC BY 3.0.","Sound effects and voices: Kenney, CC0.","Music: MintoDog, CC0. Goose calls: British Library, CC BY-SA.","Ground and sky: USGS, FlightGear, Poly Haven.","Fonts: Saira Condensed and IBM Plex Mono, SIL OFL.","Title art: image generation.","Engine: Godot, MIT. Full notices ship with the game."]
 	for i in range(lines.size()): put(body,Vector2(388,296+i*40),lines[i],18,WHITE if i==0 else SOFT)
 	button("credits",Rect2(990,770,240,52),"BACK",true)
 func draw_tutorial() -> void:
@@ -797,7 +796,7 @@ func draw_control_setup() -> void:
 	var at:=Vector2(360,537)
 	var heading: String="CONTROLS CHECKED" if done else str(step[2]).to_upper()
 	put(display_bold,at,heading,37,WHITE);at.y+=43
-	var instruction: String="Centre the yoke, set 0% throttle and turn the gun off." if done else str(step[3])
+	var instruction: String="Centre the yoke, set 0% throttle and cover the gun tag." if done else str(step[3])
 	for value: String in tutorial_lines(instruction,1120,20):
 		put(body,at,value,20,WHITE);at.y+=29
 	at.y+=10

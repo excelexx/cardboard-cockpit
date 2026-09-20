@@ -14,6 +14,9 @@ const FLOCK_SPEED := 19.0
 const FLOCK_REGROUP_DISTANCE := 900.0
 const FLOCK_SPREAD := 130.0
 const FLOCK_CLOSE_RATE := 70.0
+const SECOND_WAVE_SIZE := 20
+const SECOND_WAVE_DEADLINE := 165.0
+const WAVE_BREAK_SECONDS := 4.0
 func route_points() -> Array[Vector3]: return SHOWCASE_POINTS if cinematic else SFRoute.POINTS if app.route_id=="sf" else CoastalRoute.POINTS
 func route_names() -> Array[String]: return SHOWCASE_NAMES if cinematic else SFRoute.NAMES if app.route_id=="sf" else CoastalRoute.NAMES
 # Scenic showcase: over the coast range to the Pacific cliffs, up Ocean Beach with the
@@ -33,6 +36,10 @@ var skein_down := 0
 var skein_success := false
 var skein_final := false
 var skein_size := 0
+var wave_number := 0
+var wave_size := 0
+var wave_ids: Array[int] = []
+var skein_killed: Array[int] = []
 var flock_course := Vector3.ZERO
 var flock_altitude := 0.0
 var roll_demo_done := false
@@ -50,6 +57,7 @@ func reset(enabled: bool) -> void:
 	history.clear(); nearest_runway_distance = INF; route_index = 0; visited_route.clear()
 	cinematic=enabled and app.route_id=="sf";act=0;skein_cleared_at=-1;roll_demo_done=false
 	skein_ids.clear();skein_alive.clear();skein_pending=0;skein_down=0;skein_success=false;skein_final=false;skein_size=0
+	wave_number=0;wave_size=0;wave_ids.clear();skein_killed.clear()
 	flock_course=Vector3.ZERO;flock_altitude=0.0;Outcome.cinematic_state={}
 	if cinematic:
 		phase="opening";app.flight.speed=45;app.flight.engine=1;app.flight.throttle=1;app.flight.flaps=1
@@ -83,7 +91,7 @@ func tick(dt: float) -> void:
 	if f.contact=="landed": transition("rollout")
 	app.combat.engagement_enabled = phase=="combat"
 func label() -> String:
-	if cinematic:return {"opening":"TAKE OFF","combat":"PACIFIC COAST","gather":"BIG FLOCK INCOMING","skein":"THE BIG FLOCK","aftermath":"HEAD HOME","approach":"LANDING","rollout":"BRAKING"}.get(phase,"FREE FLIGHT")
+	if cinematic:return {"opening":"TAKE OFF","combat":"PACIFIC COAST","gather":"BIG FLOCK INCOMING","skein":wave_label(),"wave_break":"SECOND WAVE INCOMING","aftermath":"HEAD HOME","approach":"LANDING","rollout":"BRAKING"}.get(phase,"FREE FLIGHT")
 	return {"takeoff":"TAKE OFF","combat":"GEESE","return":"HEAD HOME","approach":"LANDING","rollout":"BRAKING"}.get(phase,"")
 ## "TITLE|words|[KEY]|words": the HUD draws the title in colour and [KEY] as a keycap.
 func instruction() -> String:
@@ -92,7 +100,8 @@ func instruction() -> String:
 		if phase=="approach":return "LANDING|The jet lands itself"
 		if phase=="rollout":return "LANDED|Braking"
 		if phase=="gather":return "BIG FLOCK INCOMING|Twelve geese, twelve o'clock"
-		if phase=="skein":return "SHOOT DOWN 12 GEESE|Put the ring on a goose" if phase_clock<4 else ""
+		if phase=="wave_break":return "WAVE 1 COMPLETE|Second wave: twenty geese" if wave_down()==wave_size else "SECOND WAVE INCOMING|Twenty fresh geese ahead"
+		if phase=="skein":return "%s|%d geese — put the ring on a goose" % [wave_label(),wave_size] if phase_clock<4 else ""
 		return ""
 	if app.route_id in ["coast","sf"] and phase in ["combat","return"]: return "GO TO|"+route_names()[mini(route_index,route_names().size()-1)].capitalize()+"|Follow the diamond"
 	if phase=="takeoff": return "TAKE OFF|Hold|[W]|Pull up at 105 knots" if not app.flight.airborne else "GEAR UP|Press|[G]"
@@ -136,10 +145,6 @@ func controls() -> Vector3:
 	f.throttle = clampf(.2+(speed-f.speed)*.045,0,1)
 	f.afterburner = phase=="combat" and phase_clock<1.8
 	if f.afterburner: f.throttle = 1
-	if app.combat.incoming_distance<650:
-		for shot: Dictionary in app.combat.shots:
-			if shot.kind=="hostile_missile" and not shot.has("decoy") and shot.position.distance_to(f.position)<650:
-				app.combat.deploy_flares(); break
 	return Vector3(clampf((bank-f.roll)*1.6-f.roll_velocity*.3,-1,1),clampf((pitch-f.pitch)*3.0-f.pitch_velocity*.25,-1,1),clampf(error*.8,-1,1))
 
 func route_target() -> Vector3:
@@ -160,6 +165,7 @@ func coastal_controls() -> Vector3:
 
 func _tick_showcase(dt: float) -> void:
 	var c: CombatDirector=app.combat
+	if not skein_final:_tally_skein(c)
 	if phase in ["approach","rollout"]:return
 	if phase=="opening" and clock>=22:act=1;transition("combat")
 	elif phase=="combat" and clock>=60:
@@ -169,7 +175,9 @@ func _tick_showcase(dt: float) -> void:
 		c.event("skein_signature",signature,4)
 		c.event("scan",signature,1)
 	elif phase=="gather" and clock>=64:
-		act=3;transition("skein");_open_skein(c)
+		act=3;transition("skein");_open_skein(c,1)
+	elif phase=="wave_break" and phase_clock>=WAVE_BREAK_SECONDS:
+		transition("skein");_open_skein(c,2)
 	if phase=="gather":
 		# Clear the sky so the flock arrives on an empty stage.
 		for enemy: Dictionary in c.enemies:
@@ -178,13 +186,12 @@ func _tick_showcase(dt: float) -> void:
 		_drive_skein(c,dt)
 		for enemy: Dictionary in c.enemies:
 			# Strays that are not part of the flock bow out; the objective is
-			# exactly the twelve birds that arrived together.
-			if enemy.health>0 and not skein_has(enemy.id):enemy.retiring=true
-		if skein_spawned() and skein_remaining()==0:
-			_close_skein(clock,skein_down>=skein_total());app.audio.radio.say("cleared",2)
-		elif clock>=Tune.SKEIN_DEADLINE:
-			_close_skein(clock,false)
-			for enemy: Dictionary in c.enemies:enemy.retiring=true
+			# exactly the current wave, independent of earlier stragglers.
+			if enemy.health>0 and not wave_ids.has(int(enemy.id)):enemy.retiring=true
+		if skein_spawned() and wave_remaining()==0:
+			_finish_wave(c,true)
+		elif clock>=(Tune.SKEIN_DEADLINE if wave_number==1 else SECOND_WAVE_DEADLINE):
+			_finish_wave(c,false)
 	_publish_outcome()
 	if phase=="aftermath" and (clock-skein_cleared_at>=7 or clock>=Tune.DEMO_LIMIT):
 		app.begin_landing()
@@ -201,51 +208,59 @@ func _tick_showcase(dt: float) -> void:
 	if app.world.has_method("update_showcase"):app.world.update_showcase(app.flight.position,act,c.intent.intensity,dt)
 
 ## ---------------------------------------------------------------------------
-## The big flock. One V of twelve arrives at clock 64 and is the whole objective
-## from there to the SKEIN_DEADLINE. Every accessor prefers the combat
-## director's own flock API and falls back to mission-side bookkeeping, so the
-## showcase runs whether or not the director has landed its half yet.
+## Two flock waves share one honest 32-goose objective. The first arrives at
+## clock 64; a short beat separates it from the twenty-goose second wave.
 ## ---------------------------------------------------------------------------
 func _combat_flock() -> bool: return app.combat.has_method("spawn_skein")
 
-func skein_has(id: int) -> bool:
-	var ids: Variant=app.combat.get("skein_ids")
-	if ids is Array:return (ids as Array).has(id)
-	return skein_ids.has(id)
+func skein_has(id: int) -> bool: return skein_ids.has(id)
 
-func skein_total() -> int:
-	if skein_final:return skein_size
-	var reported: Variant=app.combat.get("skein_total")
-	if reported!=null and int(reported)>0:return int(reported)
-	return skein_ids.size()+skein_pending
+## The full objective is known from departure, including an unspawned wave.
+## Retiring or missing birds remain outstanding, so early landing stays honest.
+func skein_total() -> int: return Tune.SKEIN_SIZE+SECOND_WAVE_SIZE if cinematic else 0
+func skein_remaining() -> int: return maxi(0,skein_total()-skein_down)
+func skein_spawned() -> bool: return wave_number>0 and skein_pending==0 and wave_ids.size()==wave_size
+func wave_down() -> int:
+	var down:=0
+	for id: int in wave_ids:
+		if skein_killed.has(id):down+=1
+	return down
+func wave_remaining() -> int: return maxi(0,wave_size-wave_down())
+func wave_label() -> String: return "WAVE %d / 2" % wave_number if wave_number>0 else "TWO WAVES / 32 GEESE"
 
-func skein_remaining() -> int:
-	if skein_final:return maxi(0,skein_total()-skein_down)
-	if _combat_flock() and app.combat.has_method("skein_remaining"):return int(app.combat.skein_remaining())+skein_pending
-	return skein_alive.size()+skein_pending
-
-func skein_spawned() -> bool: return skein_pending==0 and skein_total()>0
-
-## Open the act: twelve geese in one V, a couple of birds per frame so the
-## flock forms in the air instead of popping in whole.
-func _open_skein(c: CombatDirector) -> void:
+func _open_skein(c: CombatDirector,number: int = 1) -> void:
+	wave_number=number;wave_size=Tune.SKEIN_SIZE if number==1 else SECOND_WAVE_SIZE
+	wave_ids.clear();flock_altitude=0.0
 	flock_course=_flock_course(app.flight.heading)
 	if _combat_flock():
-		c.spawn_skein(Tune.SKEIN_SIZE,flock_course)
+		c.spawn_skein(wave_size,flock_course)
 		var ids: Variant=c.get("skein_ids")
 		if ids is Array:
 			for id: int in ids as Array:
 				if not skein_ids.has(id):skein_ids.append(id);skein_alive.append(id)
+				wave_ids.append(id)
 		skein_pending=0
-		return
-	skein_pending=Tune.SKEIN_SIZE
+	else:skein_pending=wave_size
+	c.announce("WAVE %d — %d GEESE" % [wave_number,wave_size])
 
-## Latch the tally before the stragglers retire, so the debrief stays honest:
-## only birds actually shot down count, never birds that simply went away.
+func _finish_wave(c: CombatDirector,cleared: bool) -> void:
+	if wave_number==1:
+		transition("wave_break")
+		c.engagement_enabled=false
+		c.announce("FIRST WAVE CLEAR — 20 MORE INCOMING" if cleared else "SECOND WAVE INCOMING — 20 GEESE")
+		if cleared:
+			app.audio.radio.say("cleared",2)
+			c.event("reward",app.flight.position+app.flight.forward()*500,1)
+		for enemy: Dictionary in c.enemies:
+			if enemy.health>0:enemy.retiring=true
+	else:
+		_close_skein(clock,cleared and skein_down==skein_total())
+		if skein_success:app.audio.radio.say("cleared",2)
+		for enemy: Dictionary in c.enemies:enemy.retiring=true
+
 func _close_skein(at: float,won: bool) -> void:
-	skein_size=maxi(skein_total(),Tune.SKEIN_SIZE if skein_ids.is_empty() else skein_ids.size())
-	skein_down=clampi(skein_down,0,skein_size)
-	skein_success=won and skein_down>=skein_size
+	skein_size=skein_total();skein_down=clampi(skein_down,0,skein_size)
+	skein_success=won and skein_down==skein_size
 	skein_final=true
 	skein_cleared_at=at;transition("aftermath");act=4
 
@@ -280,7 +295,7 @@ func _spawn_slice(c: CombatDirector) -> void:
 	var wing:=Vector3(lead_direction.z,0,-lead_direction.x)
 	var anchor: Vector3=f.position+forward*Tune.SKEIN_SPAWN_DISTANCE+Vector3.UP*Tune.SKEIN_SPAWN_HEIGHT
 	for i in range(mini(Tune.SKEIN_SPAWN_PER_FRAME,skein_pending)):
-		var index: int=skein_ids.size()
+		var index: int=wave_ids.size()
 		var slot: int=(index+1)/2
 		var side: float=-1.0 if index%2==0 else 1.0
 		var place: Vector3=anchor-lead_direction*(slot*Tune.SKEIN_SLOT_BACK)+wing*(side*slot*Tune.SKEIN_SLOT_SIDE)+Vector3.UP*(slot*Tune.SKEIN_SLOT_RISE)
@@ -295,7 +310,7 @@ func _spawn_slice(c: CombatDirector) -> void:
 		bird.velocity=flock_course
 		bird.retiring=false
 		bird.age=0.0
-		skein_ids.append(int(bird.id));skein_alive.append(int(bird.id))
+		skein_ids.append(int(bird.id));skein_alive.append(int(bird.id));wave_ids.append(int(bird.id))
 		skein_pending-=1
 
 func _tally_skein(c: CombatDirector) -> void:
@@ -304,7 +319,9 @@ func _tally_skein(c: CombatDirector) -> void:
 	for i in range(skein_alive.size()-1,-1,-1):
 		var id: int=skein_alive[i]
 		if not health.has(id):skein_alive.remove_at(i)
-		elif float(health[id])<=0.0:skein_down+=1;skein_alive.remove_at(i)
+		elif float(health[id])<=0.0:
+			if not skein_killed.has(id):skein_killed.append(id);skein_down+=1
+			skein_alive.remove_at(i)
 
 ## Hold the V together and let it wheel back toward the fight after the jet has
 ## blown through it. Geese bank and regroup, they do not evaporate - and a flock
@@ -313,13 +330,13 @@ func _hold_formation(c: CombatDirector,dt: float) -> void:
 	var f: FlightDynamics=app.flight
 	var centre:=Vector3.ZERO;var count:=0
 	for enemy: Dictionary in c.enemies:
-		if enemy.health>0 and skein_ids.has(int(enemy.id)):centre+=enemy.position;count+=1
+		if enemy.health>0 and wave_ids.has(int(enemy.id)):centre+=enemy.position;count+=1
 	if count==0:return
 	centre/=float(count)
 	if flock_altitude<=0.0:flock_altitude=centre.y
 	var turn: float=deg_to_rad(Tune.SKEIN_LEAD_ROTATE)*dt
 	for enemy: Dictionary in c.enemies:
-		if enemy.health<=0 or not skein_ids.has(int(enemy.id)):continue
+		if enemy.health<=0 or not wave_ids.has(int(enemy.id)):continue
 		# The director retires any contact the jet has blown past and culls it
 		# once it has faded out. A 19 m/s flock is behind a 265 m/s jet within
 		# seconds, so the flock is held present until the act is over: the geese
@@ -354,14 +371,17 @@ func _publish_outcome() -> void:
 ## Where the autopilot points during the act: the middle of what is left of the
 ## flock, or straight ahead once the sky is clear.
 func _skein_focus(f: FlightDynamics) -> Vector3:
-	var centre:=Vector3.ZERO;var count:=0
+	# Aim at one surviving bird rather than orbiting an empty formation centre.
+	var choice: Dictionary={};var cost:=INF
 	for enemy: Dictionary in app.combat.enemies:
-		if enemy.health>0 and skein_has(int(enemy.id)):centre+=enemy.position;count+=1
-	if count==0:
-		var ahead: Vector3=f.position+f.forward()*1400
-		ahead.y=clampf(f.position.y,300,650)
-		return ahead
-	return centre/float(count)
+		if enemy.health<=0 or not wave_ids.has(int(enemy.id)):continue
+		var offset: Vector3=enemy.position-f.position
+		var candidate: float=offset.length()+f.forward().angle_to(offset.normalized())*600
+		if candidate<cost:cost=candidate;choice=enemy
+	if not choice.is_empty():return app.combat.lead_point(choice)
+	var ahead: Vector3=f.position+f.forward()*1400
+	ahead.y=clampf(f.position.y,300,650)
+	return ahead
 
 func _showcase_controls() -> Vector3:
 	var f: FlightDynamics=app.flight
@@ -370,8 +390,8 @@ func _showcase_controls() -> Vector3:
 		return Vector3(0,.85 if f.speed>f.effective_rotation_speed() else 0,clampf(-f.position.x*.03-f.heading*3,-1,1))
 	f.gear=false;f.flaps=0
 	var desired: Vector3=route_target()
-	var wanted_speed: float=380 if clock<65 else 265
-	if phase in ["skein","aftermath"]:desired=_skein_focus(f)
+	var wanted_speed: float=155 if phase in ["gather","skein","wave_break"] else 380 if clock<65 else 265
+	if phase in ["skein","wave_break","aftermath"]:desired=_skein_focus(f)
 	if app.demo_auto_fire:
 		var tracked: Dictionary=app.combat.target()
 		if not tracked.is_empty():
@@ -389,5 +409,5 @@ func _showcase_controls() -> Vector3:
 	var pitch: float=clampf(atan2(delta.y,maxf(Vector2(delta.x,delta.z).length(),300)),-.20,.32)
 	f.throttle=clampf(.35+(wanted_speed-f.speed)*.055,0,1)
 	f.afterburner=clock<12 or (clock>28 and clock<33)
-	f.power_input=1 if f.afterburner else -.55 if clock>33 and clock<34 else 0
+	f.power_input=1 if f.afterburner else -.8 if phase in ["gather","skein","wave_break"] and f.speed>wanted_speed+8 else -.55 if clock>33 and clock<34 else 0
 	return Vector3(clampf((bank-f.roll)*4-f.roll_velocity*.25,-1,1),clampf((pitch-f.pitch)*4.5-f.pitch_velocity*.25,-1,1),clampf(error*1.4,-1,1))

@@ -120,7 +120,7 @@ func run() -> void:
 	check(app.mode == "control_setup", "C/setup can retest controls during a flight")
 	press.keycode = KEY_ESCAPE; app._input(press)
 	check(app.mode == "flight" and not app.vision.yoke_calibration.active, "Escape restores the interrupted flight and cancels calibration")
-	app.on_action("title");app.vision.enabled=false;app.on_action("fly")
+	app.on_action("title");app.vision.enabled=false;app.on_action("keyboard_play")
 	check(app.mode == "flight" and app.flight_kind == "demo", "Keyboard Play retains the existing route without camera setup")
 	app.on_action("title");app.vision.enabled=true;app.on_action("training")
 	check(app.mode == "control_setup" and app.controls_lesson.calibrating, "Camera Tutorial starts with fresh calibration")

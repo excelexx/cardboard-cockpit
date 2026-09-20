@@ -5,57 +5,63 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cardboard Cockpit — print sheet</title>
 <style>
-  /* No fixed paper size: one page on both Letter and A4 at 100% scale. */
-  @page { margin: 10mm; }
+  @page { size: A4 portrait; margin: 12mm; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: #dce1e4; color: #182b35; font: 11px/1.35 Arial, sans-serif; }
+  body { margin: 0; background: #dce1e4; color: #182b35; font: 12px/1.4 Arial, sans-serif; }
   main { width: 186mm; margin: 16px auto; padding: 0; background: white; }
-  header { padding: 4mm 0 2mm; border-bottom: 2px solid #182b35; }
-  h1 { margin: 0; font-size: 22px; letter-spacing: 2px; }
+  header { padding: 7mm 0 4mm; border-bottom: 2px solid #182b35; }
+  h1 { margin: 0; font-size: 27px; letter-spacing: 2px; }
   .eyebrow { color: #946a34; font-size: 10px; font-weight: bold; letter-spacing: 2px; }
-  .note { margin: 1.5mm 0; font-size: 10.5px; }
-  .markers { display: flex; justify-content: space-around; align-items: flex-start; gap: 4mm; padding: 4mm 0 1mm; }
-  figure { margin: 0; text-align: center; }
+  .note { margin: 2mm 0; font-size: 11px; }
+  .markers { display: flex; justify-content: space-around; align-items: flex-start; gap: 4mm; padding: 6mm 0 2mm; }
+  figure { margin: 0; text-align: center; break-inside: avoid; }
+  .markers, .throttle-tags, .cols, .panel { break-inside: avoid; }
   figure.yoke { width: 99mm; }
-  figure.throttle { width: 76mm; }
-  /* The dashed line is the outer edge of the white quiet margin: cut ON it, never inside it. */
-  figure img { display: block; margin: auto; outline: 0.3mm dashed #8f9aa0; }
+  .throttle-tags { display: flex; gap: 7mm; justify-content: center; margin: 5mm 0; }
+  .throttle-tags img { width: 40mm; height: 40mm; }
+  figure.throttle { width: 76mm; padding-top: 13.33mm; }
+  figure img { display: block; margin: auto; }
   .yoke img { width: 93.333mm; height: 93.333mm; }
   .throttle img { width: 66.667mm; height: 66.667mm; }
-  figcaption { font-size: 10.5px; letter-spacing: 1px; margin-top: 1.5mm; }
-  h2 { margin: 3mm 0 1.2mm; font-size: 11px; letter-spacing: 1.5px; }
+  figcaption { font-size: 11px; letter-spacing: 1px; margin-top: 2mm; }
+  h2 { margin: 5mm 0 2mm; font-size: 12px; letter-spacing: 1.5px; }
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 7mm; }
-  p { margin: 0 0 1.3mm; }
-  .panel { border: 1px dashed #60707a; padding: 2mm; margin-top: 2.5mm; break-inside: avoid; }
+  p { margin: 0 0 2mm; }
+  .panel { border: 1px dashed #60707a; padding: 3mm; margin-top: 5mm; }
   .panel h2 { margin-top: 0; }
-  .keys { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1.5mm; font-size: 8.5px; }
-  .key { border: 1px solid #182b35; padding: 1.2mm 1.5mm; }
-  .key strong { display: block; font-size: 11px; }
-  .ruler { width: 50mm; box-sizing: border-box; border-bottom: 2px solid black; border-left: 1px solid black; border-right: 1px solid black; height: 3mm; margin: 2.5mm 0 1mm; }
-  footer { display: flex; justify-content: space-between; align-items: end; font-size: 9px; margin-bottom: 0; break-inside: avoid; }
+  .keys { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2mm; font-size: 10px; }
+  .key { border: 1px solid #182b35; padding: 2mm; }
+  .key strong { display: block; font-size: 13px; }
+  .ruler { width: 50mm; border-bottom: 2px solid black; border-left: 1px solid black; border-right: 1px solid black; height: 3mm; margin: 4mm 0 1mm; }
+  footer { display: flex; justify-content: space-between; align-items: end; font-size: 9px; margin-bottom: 4mm; }
   @media print { body { background: white; } main { margin: 0; } header { padding-top: 0; } }
 </style>
 </head>
 <body><main>
 <header><div class="eyebrow">CUT · FOLD · CALIBRATE · FLY</div>
 <h1>CARDBOARD COCKPIT</h1>
-<p class="note">Two paper markers turn ordinary cardboard into flight controls. Print at <strong>100% / actual size</strong>, with browser headers and footers disabled.</p></header>
+<p class="note">A yoke tag and three relative throttle tags turn cardboard into flight controls. Print at <strong>100% / actual size</strong>, with browser headers and footers disabled.</p></header>
 <div class="markers">
-<figure class="yoke"><img src="markers/yoke-id-7.svg" alt="ArUco yoke ID 7"><figcaption><strong>YOKE / ID 7</strong><br>Black square: 70 × 70 mm · cut on the dashed line</figcaption></figure>
-<figure class="throttle"><img src="markers/throttle-id-23.svg" alt="ArUco throttle ID 23"><figcaption><strong>THROTTLE / ID 23</strong><br>Black square: 50 × 50 mm · cut on the dashed line</figcaption></figure>
+<figure class="yoke"><img src="markers/yoke-id-7.svg" alt="ArUco yoke ID 7"><figcaption><strong>YOKE / ID 7</strong><br>Black square: 70 × 70 mm</figcaption></figure>
+
 </div>
-<p class="note">The white border inside the dashed line is part of each marker: cut on the line, not around the black square. Mount flat, facing the webcam; keep fingers and shiny tape away from the pattern. Do not show spare copies to the camera.</p>
+<div class="throttle-tags">
+<figure><img src="markers/throttle-idle-id-0.svg" alt="Fixed idle ID 0"><figcaption><strong>00 / FIXED 0%</strong><br>30 mm black square</figcaption></figure>
+<figure><img src="markers/throttle-id-1.svg" alt="Moving throttle ID 1"><figcaption><strong>01 / MOVING SLIDER</strong><br>30 mm black square</figcaption></figure>
+<figure><img src="markers/throttle-full-id-2.svg" alt="Fixed full ID 2"><figcaption><strong>02 / FIXED 100%</strong><br>30 mm black square</figcaption></figure>
+</div>
+<p class="note">Keep the entire white margin around each marker. Mount flat, facing the webcam; keep fingers and shiny tape away from the pattern. Do not show spare copies to the camera.</p>
 <div class="cols">
-<section><h2>01 / BUILD THE YOKE</h2><p>Laminate two <strong>32 × 20 cm</strong> cardboard U shapes; remove a centered <strong>16 × 12 cm</strong> rectangle from the top. Add folded ribs and taped handles.</p><p>Mount ID 7 on an <strong>11 × 11 cm</strong> center plate; lean it back 10–15° if the webcam sits low. Rotate for roll; tilt the top forward/backward for pitch. Rest your wrists; keep the marker visible.</p></section>
-<section><h2>02 / BUILD THE THROTTLE</h2><p>Cut a <strong>20 × 1.2 cm</strong> slot in a shoebox lid. Fit a <strong>10 × 8 cm</strong> sliding carriage between two underside guide rails. Tape a capped pen upright as the grip.</p><p>Mount ID 23 on an <strong>8 × 8 cm</strong> upright plate that moves with the carriage. Label nearest end IDLE, middle CRUISE, far end FULL.</p></section>
+<section><h2>01 / BUILD THE YOKE</h2><p>Laminate two <strong>32 × 20 cm</strong> cardboard U shapes; remove a centered <strong>16 × 12 cm</strong> rectangle from the top. Add folded ribs and taped handles.</p><p>Mount ID 7 on an <strong>11 × 11 cm</strong> center plate. Rotate for roll; tilt the top forward/backward for pitch. Rest your wrists; keep the marker visible.</p></section>
+<section><h2>02 / BUILD THE THROTTLE</h2><p>Build a slider with about <strong>10 cm travel</strong>. Put fixed tags <strong>0 and 2</strong> at its two ends. Tag <strong>1</strong> moves beside them on a parallel track; at each stop its center lines up across the track with the endpoint.</p><p>Keep all three faces <strong>in the same flat plane</strong>. Leave the fixed tags visible throughout travel. The endpoint tags define the range live.</p></section>
 </div>
 <h2>03 / SET UP &amp; CALIBRATE</h2>
-<p>Webcam: <strong>70–100 cm</strong> in front, <strong>25–40 cm</strong> above desk, aimed down. Keep both markers in view. Raise or offset it if throttle travel is hard to see. Run the tracker with <strong>--camera 0 --check</strong>, sweep both controls, press Q and fix any FAIL line. Then run <strong>--camera 0 --calibrate</strong>: hold each pose for one second and press <strong>Space</strong>: neutral → left → right → forward → back → idle → full. Center the yoke, idle the throttle, select vision in the game, and start.</p>
+<p>Aim the camera down toward all markers. Start <strong>tools/tracker.sh --camera 0 --paper-test</strong> and hold yoke 7 still to center. Or use <strong>--throttle-only</strong> with keyboard steering. Launch the game with <strong>tools/run.sh -- --stickers</strong>. Throttle needs no endpoint calibration. Keep spare tags out of view.</p>
 <div class="panel"><h2>AUXILIARY PANEL / CUT OUT OR PLACE BESIDE KEYS</h2>
 <div class="keys">
 <div class="key"><strong>W / S</strong>THROTTLE</div><div class="key"><strong>ARROWS</strong>PITCH / ROLL</div><div class="key"><strong>A / D</strong>STEER / RUDDER</div>
 <div class="key"><strong>G</strong>LANDING GEAR</div><div class="key"><strong>V</strong>CAMERA VIEW</div><div class="key"><strong>SPACE</strong>WHEEL BRAKES</div>
-<div class="key"><strong>R / ENTER</strong>RESET / START</div><div class="key"><strong>M / ESC</strong>MUTE / PAUSE</div><div class="key"><strong>N</strong>NEW PILOT (TRACKER)</div><div class="key"><strong>C</strong>CALIBRATE (TRACKER)</div>
+<div class="key"><strong>R / ENTER</strong>RESET / START</div><div class="key"><strong>M / ESC</strong>MUTE / PAUSE</div><div class="key"><strong>C</strong>CENTER YOKE</div>
 </div></div>
 <footer><div><div class="ruler"></div>50 mm scale check. Measure before cutting.</div><div>DICT_4X4_50 · Read docs/cardboard-build-guide.md<br>Real cardboard + webcam test still required.</div></footer>
 </main></body></html>

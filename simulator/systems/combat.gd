@@ -11,12 +11,6 @@ var boss_id := -1
 var boss_defeated := false
 var boss_stage := 0
 var primary_used := false
-var salvo_used := false
-var salvo_count := 0
-var beam_active := false
-var beam_end := Vector3.ZERO
-var beam_hit_id := -1
-var beam_clock := 0.0
 var near_miss_clock := 0.0
 var event_log: Array[Dictionary] = []
 func _ready() -> void:
@@ -25,9 +19,18 @@ func event(kind: String,at: Vector3=Vector3.ZERO,weight: float=1.0) -> void:
 	event_log.append({"event":kind,"time":elapsed})
 	if event_log.size()>120:event_log.pop_front()
 	if is_instance_valid(visuals):visuals.event(kind,at,weight)
-## One fighter, one permanent cannon-and-missile loadout. No progression system.
+## Primary: separated cannon rounds plus a continuous plasma projector. Secondary: slow individual missiles.
 const Fighter = preload("res://systems/fighter_model.gd")
 const WeaponArt = preload("res://systems/weapon_visuals.gd")
+var missile_cooldown := 0.0
+var launch_queue: Array[Dictionary] = []
+var last_missile: Node3D
+var salvo_count := 0
+var beam_active := false
+var beam_end := Vector3.ZERO
+var beam_hit_id := -1
+var beam_clock := 0.0
+var detached_trails: Array[Dictionary] = []
 var app: Node
 var active := false
 var engagement_enabled := true
@@ -52,11 +55,9 @@ var rounds_hit := 0
 var missiles_fired := 0
 var missiles_evaded := 0
 var hostile_launches := 0
-var trail_core_material: StandardMaterial3D
 var detonation_texture: Texture2D
 var gun_cooldown := 0.0
 var gun_firing_time := 0.0
-var missile_cooldown := 0.0
 var flare_cooldown := 0.0
 var lock_progress := 0.0
 var target_id := -1
@@ -67,11 +68,9 @@ const MAX_CONTACTS := Tune.MAX_CONTACTS
 var aim_direction := Vector3.FORWARD
 var reticle_direction := Vector3.FORWARD
 var arrival_index := 0
-var detached_trails: Array[Dictionary] = []
 var next_id := 0
 var spawn_clock := 2.0
 var attack_spacing := 0.0
-var launch_queue: Array[Dictionary] = []
 var incoming_distance := INF
 var incoming_bearing := 0.0
 var threat_level := 0.0
@@ -80,7 +79,6 @@ var hit_confirm := 0.0
 var assist := true
 var aim_strength: float=1.0:
 	set(value):aim_strength=clampf(value,0,3) if is_finite(value) else 1.0
-var last_missile: Node3D
 var enemies: Array[Dictionary] = []
 var shots: Array[Dictionary] = []
 var bursts: Array[Dictionary] = []
@@ -94,23 +92,26 @@ var message := ""
 var message_time := 0.0
 
 func reset(enabled: bool = true) -> void:
+	missile_cooldown=0;launch_queue.clear();last_missile=null;salvo_count=0;beam_active=false;beam_hit_id=-1;beam_clock=0;detached_trails.clear()
 	training_target_limit=-1
 	for child: Node in get_children():
 		if child==visuals:continue
 		remove_child(child); child.queue_free()
 	if is_instance_valid(visuals):visuals.reset()
-	intent.reset();motif_history.clear();boss_id=-1;boss_defeated=false;boss_stage=0;primary_used=false;salvo_used=false;salvo_count=0;beam_active=false;beam_clock=0;near_miss_clock=0;event_log.clear()
-	enemies.clear(); shots.clear(); bursts.clear(); launch_queue.clear(); detached_trails.clear()
+	intent.reset();motif_history.clear();boss_id=-1;boss_defeated=false;boss_stage=0;primary_used=false;near_miss_clock=0;event_log.clear()
+	enemies.clear(); shots.clear(); bursts.clear()
 	active = enabled; engagement_enabled = enabled; managed_mission = false; elapsed = 0; hull = Tune.PLAYER_HEALTH
 	ammo = -1; missiles = -1; flares = -1; flares_fired = 0
 	kills = 0; score = 0; combo = 0; best_combo = 0; combo_time = 0; reward_flash = 0; rounds_fired = 0; rounds_hit = 0; missiles_fired = 0; missiles_evaded = 0; hostile_launches = 0
-	gun_firing_time = 0; gun_cooldown = 0; missile_cooldown = 0; flare_cooldown = 0
+	gun_firing_time = 0; gun_cooldown = 0; flare_cooldown = 0
 	lock_progress = 0; target_id = -1; target_hold = 0; aim_direction = forward(); reticle_direction = forward(); next_id = 0; spawn_clock = Tune.FIRST_ARRIVAL; arrival_index = 0
 	incoming_distance = INF; threat_level = 0; hit_flash = 0; hit_confirm = 0
-	last_missile = null; message = ""; message_time = 0; attack_spacing = 0
+	message = ""; message_time = 0; attack_spacing = 0
 	patrol_south = false; course_recovery = false; runs_started+=1;rng.seed = 260926+97*(runs_started-1)
 
 func forward() -> Vector3: return app.flight.forward().normalized()
+func acquire_angle() -> float:return ACQUIRE_ANGLE*aim_strength
+func release_angle() -> float:return RELEASE_ANGLE*aim_strength
 func target() -> Dictionary:
 	for enemy: Dictionary in enemies:
 		if enemy.id==target_id and enemy.health>0: return enemy
@@ -143,9 +144,30 @@ func choose_motif() -> String:
 	if motif_history.size()>8:motif_history.pop_front()
 	return chosen
 
+func demo_route_position(index: int) -> Vector3:
+	var mission = app.mission
+	var distance := 1400.0+index*500.0
+	var side: float = [-200,260,-320,180,330,-240,280,-190][index%8]
+	var height_offset: float = [-90,100,-140,60,-75,140,-110,95][index%8]
+	var at: Vector3 = mission.airfield.to_global(Vector3(-550+distance/13000*330+side,0,mission.airfield.DISTANCE-distance))
+	at.y = minf(mission.cruise_height,app.flight.position.y+distance*.16)+height_offset
+	at.y = maxf(at.y,app.world.ground_height(at.x,at.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
+	return at
+
+func extend_demo_route() -> void:
+	# Uncleared geese circle ahead for another pass if the pilot needs more time.
+	for enemy: Dictionary in enemies:
+		if enemy.health<=0: continue
+		enemy.position = demo_route_position(enemy.id)
+		enemy.course = Vector3(sin(app.mission.airfield.heading),0,-cos(app.mission.airfield.heading))*20
+		enemy.right = Vector3(cos(app.mission.airfield.heading),0,sin(app.mission.airfield.heading))
+		enemy.fade = 0; enemy.age = 0
+		enemy.node.position = enemy.position
+	target_id = -1; lock_progress = 0
+
 func spawn_contact(kind: String = "normal") -> void:
 	if training_target_limit>=0 and next_id>=training_target_limit:return
-	if kind=="normal" and elapsed>28 and next_id%5==3:kind="elite"
+	if training_target_limit<0 and kind=="normal" and elapsed>28 and next_id%5==3:kind="elite"
 	if arrival_index%3==0:motif=choose_motif();event("scan",app.flight.position+forward()*700,.6)
 	var node := goose_model();add_child(node)
 	var right := Vector3(cos(app.flight.heading),0,sin(app.flight.heading))
@@ -170,6 +192,8 @@ func spawn_contact(kind: String = "normal") -> void:
 	if kind=="boss":
 		hp=Tune.BOSS_HEALTH;size_factor=5.2;position_value=app.flight.position+forward()*1600+Vector3.UP*110
 		course=forward()*app.flight.speed*.82;boss_id=next_id;selected_motif="boss";event("boss_signature",position_value,4)
+	if training_target_limit>0:
+		position_value=demo_route_position(next_id);course=Vector3(sin(app.mission.airfield.heading),0,-cos(app.mission.airfield.heading))*20
 	node.scale*=size_factor;node.position=position_value
 	var contact: Dictionary={"id":next_id,"node":node,"position":position_value,"health":hp,"max_health":hp,"kind":kind,"size_factor":size_factor,"hit_radius":22.0*size_factor,"velocity":course,"course":course,"right":right,"cooldown":999.0,"age":0.0,"phase":rng.randf_range(0,TAU),"fade":0.0,"retiring":false,"motif":selected_motif,"presented":next_id%3==0,"hit_flash":0.0,"damage_stage":0,"dying":-1.0,"sensor_occluded":false,"weak_side":-1.0,"near_passed":false}
 	enemies.append(contact);next_id+=1
@@ -181,10 +205,10 @@ func tick(dt: float) -> void:
 	intent.tick(self,dt);near_miss_clock=maxf(0,near_miss_clock-dt)
 	gun_firing_time = maxf(0,gun_firing_time-dt)
 	target_hold = maxf(0,target_hold-dt)
-	update_launches(dt)
+	missile_cooldown=maxf(0,missile_cooldown-dt);update_launches(dt)
 	gun_cooldown = maxf(0,gun_cooldown-dt);
 	if gun_cooldown<.0001: gun_cooldown = 0
-	missile_cooldown = maxf(0,missile_cooldown-dt); flare_cooldown = maxf(0,flare_cooldown-dt)
+	flare_cooldown = maxf(0,flare_cooldown-dt)
 	hit_flash = maxf(0,hit_flash-dt*2.4); hit_confirm = maxf(0,hit_confirm-dt*5)
 	combo_time = maxf(0,combo_time-dt); reward_flash = maxf(0,reward_flash-dt*1.4)
 	if combo_time==0: combo = 0
@@ -210,12 +234,14 @@ func tick(dt: float) -> void:
 		enemy.fade = minf(.1 if enemy.kind=="boss" and enemy.age<4 else 1.0,enemy.fade+dt*Tune.CONTACT_FADE_IN) if present else maxf(0,enemy.fade-dt*Tune.CONTACT_FADE_OUT)
 		var lateral: Vector3 = enemy.get("right",Vector3.RIGHT)
 		var velocity: Vector3 = enemy.get("course",forward()*150)+lateral*sin(enemy.age*.55+enemy.phase)*Tune.CONTACT_WEAVE_SPEED+Vector3.UP*cos(enemy.age*.4+enemy.phase)*Tune.CONTACT_VERTICAL_SPEED
-		if enemy.kind=="boss":
+		if training_target_limit>0:
+			velocity=enemy.course+lateral*sin(enemy.age*.55+enemy.phase)*2+Vector3.UP*cos(enemy.age*.4+enemy.phase)
+		elif enemy.kind=="boss":
 			var anchor: Vector3=app.flight.position+Vector3(forward().x,0,forward().z).normalized()*950+lateral*sin(elapsed*.18)*110
 			anchor.y=clampf(app.flight.position.y+sin(elapsed*.22)*35,300,650)
 			velocity=app.flight.velocity+(anchor-enemy.position)*.65+lateral*sin(elapsed*.7)*25
 			enemy.weak_side=-1.0 if enemy.damage_stage==1 else 1.0 if enemy.damage_stage==2 else 0.0
-		elif enemy.age>8 and distance>1200 and not enemy.retiring:
+		elif training_target_limit<0 and enemy.age>8 and distance>1200 and not enemy.retiring:
 			velocity=velocity.lerp(app.flight.velocity*.72+(app.flight.position+forward()*700-enemy.position)*.22,.03)
 		if distance<130 and not enemy.near_passed:
 			enemy.near_passed=true;intent.event("near_miss");event("near_miss",enemy.position,1)
@@ -230,25 +256,29 @@ func tick(dt: float) -> void:
 		enemy.node.get_node("WingR").rotation.z = -flap
 		if enemy.fade<1 or enemy.age<1.5:
 			for geometry: Node in enemy.node.find_children("*","GeometryInstance3D",true,false): geometry.transparency = 1-enemy.fade
-	var best: int=intent.choose(self,dt) if engagement_enabled else -1
-	if best!=target_id:target_id=best;lock_progress*=.35;target_hold=.38;event("candidate",target().get("position",app.flight.position),.5)
+	var best := -1
+	var best_dot: float=cos(deg_to_rad(acquire_angle()))
+	var old_alignment := -1.0
+	for enemy: Dictionary in enemies:
+		if enemy.health<=0:continue
+		var delta: Vector3=enemy.position-app.flight.position
+		var alignment: float=forward().dot(delta.normalized())
+		if enemy.id==target_id:old_alignment=alignment
+		if engagement_enabled and not enemy.retiring and enemy.fade>.45 and delta.length()<Tune.TARGET_RANGE and alignment>best_dot:
+			best=enemy.id;best_dot=alignment
+	if old_alignment>cos(deg_to_rad(release_angle())) and not target().get("retiring",true) and (target_hold>0 or acos(clampf(old_alignment,-1,1))-acos(clampf(best_dot,-1,1))<deg_to_rad(Tune.TARGET_SWITCH_MARGIN*aim_strength)):
+		best=target_id
+	if best!=target_id:
+		target_id=best;lock_progress=0;target_hold=Tune.TARGET_STICK_TIME*aim_strength;event("candidate",target().get("position",app.flight.position),.5)
 	var locked_before: bool=lock_progress>=1
-	var rate: float=lerpf(4.5,12.0,clampf(intent.confidence+intent.help_amount*.2,0,1))
-	lock_progress=minf(1,lock_progress+dt*rate) if target_id>=0 else maxf(0,lock_progress-dt*6)
+	lock_progress=minf(1,lock_progress+dt*aim_strength/Tune.LOCK_TIME) if target_id>=0 else 0.0
+	intent.confidence=lock_progress
 	if not locked_before and lock_progress>=1:
 		intent.metrics.locks+=1;app.audio.radio.say("target_locked");event("lock",target().get("position",app.flight.position),1)
 	update_aim(dt)
-	update_shots(dt); update_beam(dt); update_bursts(dt); update_detached_trails(dt)
+	update_shots(dt); update_beam(dt);update_bursts(dt);update_detached_trails(dt)
 	if is_instance_valid(visuals):visuals.tick(dt)
-	incoming_distance = INF
-	for shot: Dictionary in shots:
-		if shot.kind=="hostile_missile" and shot.life>0:
-			var delta: Vector3 = shot.position-app.flight.position
-			if delta.length()<incoming_distance:
-				incoming_distance = delta.length()
-				incoming_bearing = wrapf(atan2(delta.x,-delta.z)-app.flight.heading,-PI,PI)
-	threat_level = 1-clampf(incoming_distance/2200,0,1)
-	if incoming_distance<1800: app.audio.radio.say("warning")
+	incoming_distance = INF;threat_level=0
 	if hull<=0:
 		active = false
 		app.begin_crash()
@@ -263,24 +293,23 @@ func safe_direction_lerp(a: Vector3,b: Vector3,weight: float) -> Vector3:
 	return a.rotated(axis.normalized(),angle*weight).normalized()
 
 func assisted_direction() -> Vector3:
-	if not assist or aim_strength<=0 or aim_direction.length_squared()<.0001:return forward()
-	if aim_strength>=1:return aim_direction
-	return safe_direction_lerp(forward(),aim_direction,aim_strength)
+	return aim_direction if assist and aim_strength>0 else forward()
 
 func update_aim(dt: float) -> void:
 	var desired: Vector3 = forward()
 	var enemy: Dictionary = target()
-	if assist and not enemy.is_empty():
+	if assist and aim_strength>0 and not enemy.is_empty():
 		var wanted: Vector3 = (lead_point(enemy)-app.flight.position).normalized()
-		if desired.angle_to(wanted)<deg_to_rad(intent.retain_degrees(self)): desired = forward().slerp(wanted,clampf((.45+intent.confidence*.7)*aim_strength,0,1))
+		if desired.angle_to(wanted)<deg_to_rad(release_angle()): desired = wanted
 	if aim_direction.length_squared()<.5: aim_direction = forward()
 	var angle: float = aim_direction.angle_to(desired)
-	var weight: float = minf(1-exp(-dt*Tune.AIM_RESPONSE*maxf(.1,aim_strength)),deg_to_rad(Tune.AIM_SLEW_DEGREES)*dt/maxf(angle,.0001))
+	var response: float = aim_strength if assist and aim_strength>0 else 1.0
+	var weight: float = minf(1-exp(-dt*Tune.AIM_RESPONSE*response),deg_to_rad(Tune.AIM_SLEW_DEGREES)*response*dt/maxf(angle,.0001))
 	aim_direction = safe_direction_lerp(aim_direction,desired,weight)
 	var visual: Vector3 = forward()
-	if assist and not enemy.is_empty() and forward().angle_to((enemy.position-app.flight.position).normalized())<deg_to_rad(intent.retain_degrees(self)):
+	if assist and aim_strength>0 and not enemy.is_empty() and forward().angle_to((enemy.position-app.flight.position).normalized())<deg_to_rad(release_angle()):
 		visual = (enemy.position-app.flight.position).normalized()
-	reticle_direction = safe_direction_lerp(reticle_direction,visual,1-exp(-dt*Tune.RETICLE_RESPONSE))
+	reticle_direction = safe_direction_lerp(reticle_direction,visual,1-exp(-dt*Tune.RETICLE_RESPONSE*response))
 
 func reticle_point() -> Vector3:
 	var enemy: Dictionary = target()
@@ -320,17 +349,16 @@ func fire_gun() -> bool:
 
 func fire_missile() -> bool:
 	if not active or not app.flight.airborne or missile_cooldown>0:return false
+	var airborne_missiles:=0
+	for shot: Dictionary in shots:
+		if shot.kind=="missile":airborne_missiles+=1
+	if airborne_missiles+launch_queue.size()>=Tune.MAX_MISSILES:return false
 	var tracked: Dictionary=target()
 	var chosen: int=target_id if not tracked.is_empty() and lock_progress>=.65 else -1
-	var flying_missiles:=0
-	for shot: Dictionary in shots:
-		if shot.kind=="missile":flying_missiles+=1
-	if flying_missiles+launch_queue.size()>Tune.MAX_MISSILES-4:return false
-	missile_cooldown=Tune.MISSILE_INTERVAL;salvo_count+=1;salvo_used=true;missiles_fired+=4
-	for i in range(4):
-		var store: int=[1,3,0,2][i]
-		launch_queue.append({"target":chosen,"side":-1.0 if store<2 else 1.0,"internal":false,"store":store,"slot":i,"salvo":salvo_count,"delay":.015+i*Tune.SALVO_STAGGER})
-	event("salvo",app.flight.position,1);app.audio.play_effect("gear_motor",-15,1.2);app.camera_rig.impulse(.12)
+	var store: int=[1,3,0,2][salvo_count%4]
+	missile_cooldown=Tune.MISSILE_INTERVAL;salvo_count+=1
+	launch_queue.append({"target":chosen,"side":-1.0 if store<2 else 1.0,"internal":false,"store":store,"slot":0,"salvo":salvo_count,"delay":Tune.MISSILE_RAIL_DELAY})
+	event("salvo",app.flight.position,1);app.audio.play_effect("gear_motor",-15,1.2)
 	return true
 
 func update_launches(dt: float) -> void:
@@ -338,11 +366,12 @@ func update_launches(dt: float) -> void:
 		var request: Dictionary = launch_queue[i]
 		request.delay -= dt
 		if request.delay>0: continue
-		var basis: Basis = Basis.from_euler(Vector3(app.flight.pitch,-app.flight.heading,-app.flight.roll))
+		var basis: Basis = app.flight.pose_basis()
 		var at: Vector3 = app.flight.position+basis*Vector3(request.side*0.58,-1.5,-1.0)
 		if not request.internal and request.store<app.fighter_fx.stores.size(): at = app.fighter_fx.stores[request.store].global_position
 		spawn_shot(at,app.flight.velocity+Vector3(0,-Tune.MISSILE_DROP_SPEED,0),"missile",request.target,Tune.MISSILE_DAMAGE)
 		shots.back().slot=request.slot;shots.back().salvo=request.salvo;shots.back().launch_basis=basis
+		missiles_fired+=1
 		last_missile = shots.back().node
 		app.audio.play_effect("gear_motor",-26,1.3)
 		app.camera_rig.impulse(0.13)
@@ -352,10 +381,6 @@ func update_launches(dt: float) -> void:
 func deploy_flares() -> bool:
 	if not active or flare_cooldown>0: return false
 	flares_fired += 1; flare_cooldown = Tune.FLARE_INTERVAL
-	for shot: Dictionary in shots:
-		if shot.kind=="hostile_missile" and shot.position.distance_to(app.flight.position)<1800:
-			shot.decoy = app.flight.position+Vector3(cos(app.flight.heading),0,sin(app.flight.heading))*(120 if rng.randf()>0.5 else -120)+Vector3(0,-35,60)
-			shot.life = minf(shot.life,1.6)
 	for i in range(10): burst(app.flight.position+Vector3(rng.randf_range(-9,9),rng.randf_range(-3,3),rng.randf_range(8,24)),Color(1,0.65,0.25),2.2)
 	app.audio.play_effect("flare",-14)
 	return true
@@ -428,11 +453,11 @@ func update_shots(dt: float) -> void:
 			shot.position = previous.lerp(shot.position,hi); shot.life = 0
 			burst(shot.position,Color(1,.70,.32),1.6 if shot.kind=="cannon" else 12)
 			continue
-		if is_instance_valid(visuals):visuals.update_projectile(shot,dt)
-		if shot.kind=="cannon": shot.node.scale.z = clampf(shot.age*shot.velocity.length()/9,.01,1)
+		if shot.kind=="missile" and is_instance_valid(visuals):visuals.update_projectile(shot,dt)
+		if shot.kind=="cannon": shot.node.scale.z = clampf(shot.age*shot.velocity.length()/3.2,.01,1)
 		shot.node.position = shot.position
 		shot.node.look_at(shot.position+shot.velocity,Vector3.UP)
-		if shot.kind=="cannon" or (shot.kind in ["missile","hostile_missile"] and shot.age>Tune.MISSILE_IGNITION_DELAY): update_trail(shot)
+		if shot.kind=="missile" and shot.age>Tune.MISSILE_IGNITION_DELAY:update_trail(shot)
 		if shot.kind=="hostile_missile":
 			if segment_distance(app.flight.position,previous,shot.position)<8:
 				hull = maxf(0,hull-shot.damage); shot.life = 0; shot.hit_player = true; hit_flash = 0.35
@@ -441,7 +466,7 @@ func update_shots(dt: float) -> void:
 				burst(app.flight.position,Color(1,0.45,0.17),4)
 		else:
 			for enemy: Dictionary in enemies:
-				if (enemy.health>0 or (shot.kind=="missile" and enemy.dying<.8)) and segment_distance(enemy.position,previous,shot.position)<(float(enemy.hit_radius)+(5.0 if shot.kind=="missile" else 2.0+intent.help_amount*3)):
+				if (enemy.health>0 or (shot.kind=="missile" and enemy.dying<.8)) and segment_distance(enemy.position,previous,shot.position)<(float(enemy.hit_radius)+5.0 if shot.kind=="missile" else Tune.GUN_HIT_RADIUS):
 					if enemy.health<=0:event("impact",enemy.position,.7)
 					hurt_enemy(enemy,shot.damage,shot.kind,shot.position);shot.life=0;shot.hit=true;hit_confirm=1
 					app.audio.play_effect("impact",-24,1.15)
@@ -471,7 +496,7 @@ func hurt_enemy(enemy: Dictionary,damage: float,source: String,at: Vector3) -> v
 	if stage>enemy.damage_stage:
 		enemy.damage_stage=stage;event("armor_break",at,3 if enemy.kind=="boss" else 1)
 	if enemy.kind=="boss":boss_stage=stage
-	if source=="missile":event("impact",at,2 if enemy.kind=="boss" else 1)
+	if source=="missile":event("impact",at,1)
 	if enemy.health>0:return
 	enemy.dying=0.0;kills+=1;combo+=1;best_combo=maxi(best_combo,combo);combo_time=Tune.STREAK_TIME
 	last_reward=Tune.BASE_SCORE*(20 if enemy.kind=="boss" else 3 if enemy.kind=="elite" else 1)*mini(Tune.MAX_MULTIPLIER,1+int(combo/Tune.STREAK_STEP))
@@ -486,8 +511,8 @@ func update_beam(dt: float) -> void:
 	beam_active=active and app.flight.airborne and gun_firing_time>0
 	beam_hit_id=-1;beam_clock-=dt
 	if not beam_active:return
-	var basis:=Basis.from_euler(Vector3(app.flight.pitch,-app.flight.heading,-app.flight.roll))
-	var start: Vector3=app.flight.position+basis*Vector3(.75,-.30,-3.8)
+	var basis: Basis=app.flight.pose_basis()
+	var start: Vector3=app.fighter_fx.plasma_muzzle_position(app.flight.position+basis*Fighter.PLASMA_MUZZLE)
 	var direction: Vector3=assisted_direction();var length: float=Tune.BEAM_RANGE;var hit: Dictionary={}
 	for enemy: Dictionary in enemies:
 		if enemy.health<=0:continue
@@ -522,12 +547,7 @@ func pilot_controls() -> Vector3:
 	var altitude: float = maxf(desired.y,terrain+350)
 	var pitch: float = clampf(atan2(altitude-at.y,maxf(Vector2(delta.x,delta.z).length(),1000)),-0.12,0.36)
 	app.flight.throttle = clampf(0.20+(195-app.flight.speed)*0.04,0,1)
-	app.flight.afterburner = incoming_distance<1600 and at.y-app.world.ground_height(at.x,at.z)>350
-	if app.flight.afterburner: app.flight.throttle = 1.0
-	if incoming_distance<650:
-		for shot: Dictionary in shots:
-			if shot.kind=="hostile_missile" and not shot.has("decoy") and shot.position.distance_to(at)<650:
-				deploy_flares(); break
+	app.flight.afterburner=false
 	return Vector3(clampf((bank-app.flight.roll)*1.6-app.flight.roll_velocity*0.3,-1,1),clampf((pitch-app.flight.pitch)*2.2-app.flight.pitch_velocity*0.25,-1,1),clampf(error*0.8,-1,1))
 
 func complete(success: bool, reason: String) -> void:
@@ -563,13 +583,14 @@ func segment_distance(point: Vector3, a: Vector3, b: Vector3) -> float:
 	return point.distance_to(a+delta*t)
 
 func spawn_shot(at: Vector3, velocity: Vector3, kind: String, target_value: int, damage: float, variant: String = "gatling") -> void:
-	var node: Node3D = visuals.take_projectile("missile" if kind=="hostile_missile" else kind) if is_instance_valid(visuals) else WeaponArt.projectile(kind,variant)
+	assert(kind in ["cannon","missile"],"Unsupported projectile kind")
+	var node: Node3D = visuals.take_projectile(kind) if is_instance_valid(visuals) else WeaponArt.projectile(kind,variant)
 	if node.get_parent()==null:add_child(node)
 	node.position = at
 	if kind=="cannon": node.scale.z = .01
 	node.look_at(at+velocity,Vector3.UP)
 	var shot: Dictionary = {"node":node,"position":at,"velocity":velocity,"kind":kind,"target":target_value,"damage":damage,"life":Tune.MISSILE_LIFETIME if kind in ["missile","hostile_missile"] else Tune.GUN_LIFETIME,"age":0.0,"launch_speed":velocity.length(),"trail_points":[at],"trail_node":null,"trail_clock":0.0,"hit":false}
-	if kind in ["missile","hostile_missile","cannon"]:
+	if kind=="missile":
 		var trail := MeshInstance3D.new()
 		trail.mesh = ImmediateMesh.new()
 		var smoke := StandardMaterial3D.new()
@@ -588,12 +609,13 @@ func spawn_shot(at: Vector3, velocity: Vector3, kind: String, target_value: int,
 	shots.append(shot)
 
 func update_trail(shot: Dictionary) -> void:
+	if shot.kind!="missile":return
 	if elapsed-float(shot.trail_clock)<.025:return
 	shot.trail_clock=elapsed
 	var points: Array = shot.trail_points
 	if Vector3(points.back()).distance_to(shot.position)>7:
 		points.append(shot.position)
-		if points.size()>(4 if shot.kind=="cannon" else 52): points.pop_front()
+		if points.size()>52: points.pop_front()
 	var ribbon: ImmediateMesh = shot.trail_node.mesh
 	ribbon.clear_surfaces()
 	if points.size()<2: return
@@ -612,16 +634,6 @@ func update_trail(shot: Dictionary) -> void:
 			ribbon.surface_set_uv(vertex[1])
 			ribbon.surface_add_vertex(vertex[0])
 	ribbon.surface_end()
-	if shot.kind=="missile":
-		if trail_core_material==null:trail_core_material=WeaponArt.emissive(Color(.25,.72,1),3.0,.7)
-		ribbon.surface_begin(Mesh.PRIMITIVE_TRIANGLES,trail_core_material)
-		for i in range(maxi(0,points.size()-12),points.size()-1):
-			var a: Vector3=points[i];var b: Vector3=points[i+1]
-			var width: float=clampf(app.camera.global_position.distance_to(b)*.00065,.18,1.1)
-			var side: Vector3=(b-a).cross(app.camera.global_position-a).normalized()*width
-			for v: Vector3 in [a-side,a+side,b-side,b-side,a+side,b+side]:ribbon.surface_add_vertex(v)
-		ribbon.surface_end()
-
 func free_shot(shot: Dictionary) -> void:
 	if is_instance_valid(visuals):visuals.release_projectile(shot.node,shot.kind)
 	else:shot.node.queue_free()

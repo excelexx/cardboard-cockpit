@@ -111,7 +111,7 @@ func instruction() -> String:
 		return "Fly through the guide rings"
 	if phase=="combat":
 		if app.combat.kills>=TARGET_COUNT: return "Geese cleared · follow the guide rings toward the airfield"
-		return ("Fire with the yoke switch or gun tag" if app.vision.enabled else "SPACE: gun · T: missiles")+(" · hold badge DOWN: tactical view" if app.badge_prompts else "")
+		return ("Uncover the gun tag to fire; cover it to stop" if app.vision.enabled else "HOLD SPACE / LEFT MOUSE: gun")+(" · hold badge DOWN: tactical view" if app.badge_prompts else "")
 	if phase in ["return","approach"]:
 		if f.throttle>.3 or f.speed>(90 if phase=="approach" else 125): return "Reduce throttle and slow down · follow the landing guides"
 		if not f.gear: return "A / G: lower landing gear · B / L: landing assist" if app.badge_prompts else "Lower landing gear or enable landing assist"
@@ -200,26 +200,17 @@ func cleanup_visuals() -> void:
 	if is_instance_valid(airfield):airfield.queue_free()
 	ring_root=null;airfield=null
 func _reposition_targets(force: bool) -> void:
-	if phase!="combat":return
-	var f: FlightDynamics=app.flight
-	var forward:=Vector3(sin(f.heading),0,-cos(f.heading));var right:=Vector3(cos(f.heading),0,sin(f.heading))
-	for enemy: Dictionary in app.combat.enemies:
-		if enemy.health<=0:continue
-		var delta: Vector3=enemy.position-f.position
-		if force or delta.length()>2300 or delta.dot(forward)<-150:
-			enemy.position=f.position+forward*(700+(int(enemy.id)%4)*110)+right*((int(enemy.id)%5)-2)*75
-			enemy.position.y=maxf(enemy.position.y,app.world.ground_height(enemy.position.x,enemy.position.z)+130)
-			enemy.node.position=enemy.position;enemy.course=forward*maxf(90,f.speed*.75);enemy.right=right;enemy.retiring=false
+	if force and phase=="combat":app.combat.extend_demo_route()
 func begin_assisted_landing() -> bool:
 	if app.combat.kills<TARGET_COUNT or not is_instance_valid(airfield):return false
 	app.landing_started=true;app.copilot=true;app.used_copilot=true
 	app.flight.gear=true;app.flight.flaps=2;app.gear_override=1;app.flaps_override=2
-	app.primary_latched=false;app.salvo_latched=false;app.combat.gun_firing_time=0
+	app.combat.gun_firing_time=0
 	if phase=="combat":transition("return")
 	return true
 func badge_hint() -> String:
 	if not app.badge_prompts:return ""
 	if phase=="takeoff":return "BADGE A  GEAR + FLAPS  ·  UP  AUTO-FLY  ·  HOME  PAUSE"
-	if phase=="combat":return "BADGE LEFT  VIEW  ·  RIGHT  MISSILE CAMERA  ·  HOLD DOWN  TACTICAL"
+	if phase=="combat":return "BADGE LEFT  VIEW  ·  RIGHT  TACTICAL VIEW  ·  HOLD DOWN  TACTICAL"
 	if phase in ["return","approach"]:return "BADGE A  LANDING CONFIG  ·  B  LANDING ASSIST  ·  HOME  PAUSE"
 	return "BADGE START  REPLAY  ·  HOME  PAUSE"

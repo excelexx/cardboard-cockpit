@@ -8,7 +8,7 @@ class_name WeaponModels
 ## fighter_effects.gd keeps finding "GatlingRotor" and "GunMuzzle" by name.
 ##
 ##   WeaponModels.rotary_cannon()  -> Node3D, child "GatlingRotor" spins on Z,
-##                                    Marker3D "GunMuzzle" at z = -0.51
+##                                    Marker3D "GunMuzzle" at z = -0.79
 ##   WeaponModels.plasma_cannon()  -> Node3D, Marker3D "BeamMuzzle"
 ##   WeaponModels.set_heat(gun, 0..1)               barrel glow while firing
 ##   WeaponModels.set_charge(cannon, 0..1, firing)  plasma spool-up

@@ -29,9 +29,9 @@ else:
 YOKE_ID = 7
 THROTTLE_ID = 23
 if __package__:
-    from .weapon_switches import WeaponSwitches
+    from .weapon_tags import WeaponTags
 else:
-    from weapon_switches import WeaponSwitches
+    from weapon_tags import WeaponTags
 
 DEFAULT_CALIBRATION = Path(__file__).resolve().with_name("calibration.local.json")
 PREVIEW_TITLE = "Cardboard Cockpit - private local tracker"
@@ -59,7 +59,7 @@ def generate_markers(directory: Path) -> None:
     cv2, np = load_cv()
     dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
     directory.mkdir(parents=True, exist_ok=True)
-    for marker_id, role, size_mm in ((YOKE_ID, "yoke", 70), (THROTTLE_ID, "throttle", 50), (31,"primary-on",35),(32,"primary-off",35),(41,"salvo-on",35),(42,"salvo-off",35)):
+    for marker_id, role, size_mm in ((YOKE_ID, "yoke", 70), (THROTTLE_ID, "throttle", 50)):
         # Six cells = four data cells + one-cell black border on each side.
         cells = cv2.aruco.generateImageMarker(dictionary, marker_id, 6)
         rects = ['<rect width="8" height="8" fill="white"/>']
@@ -92,7 +92,6 @@ class ArucoTracker:
         parameters = self.cv2.aruco.DetectorParameters()
         parameters.cornerRefinementMethod = self.cv2.aruco.CORNER_REFINE_SUBPIX
         self.detector = self.cv2.aruco.ArucoDetector(dictionary, parameters)
-        self.weapon_observations = {}
         self.previous_pose = None
         self.previous_pose_time = 0.0
         self.branch_evidence = 0.0
@@ -157,7 +156,7 @@ class ArucoTracker:
             return found
         for marker_corners, marker_id in zip(corners, ids.flatten()):
             marker_id = int(marker_id)
-            if marker_id not in (self.yoke_id, self.throttle_id) and marker_id not in WeaponSwitches.IDS:
+            if marker_id not in (self.yoke_id, self.throttle_id):
                 continue
             # Duplicated IDs are ambiguous; reject that control instead of
             # choosing whichever marker happens to be enumerated last.
@@ -216,10 +215,8 @@ class ArucoTracker:
                 points = self._rescue(gray, marker_id, now)
                 if points is not None:
                     found[marker_id] = points
-        seen = set(found)  # includes duplicated IDs, which still block their opposite switch tag
         found = {marker_id: points.astype(np.float32) for marker_id, points in found.items() if points is not None}
         yoke = throttle = None
-        self.weapon_observations = {}
         if not found:
             return yoke, throttle
         if draw:
@@ -234,14 +231,6 @@ class ArucoTracker:
             matrix=self.lens.camera_matrix(width,height)
             distortion=np.asarray(self.lens.distortion,dtype=np.float64)
         object_points = np.array([[-.5, .5, 0], [.5, .5, 0], [.5, -.5, 0], [-.5, -.5, 0]], dtype=np.float32)
-        for key, points in found.items():
-            if key not in WeaponSwitches.IDS:
-                continue
-            role, value = WeaponSwitches.IDS[key]
-            other = 32 if key == 31 else 31 if key == 32 else 42 if key == 41 else 41
-            side = float(min(np.linalg.norm(points[(i + 1) % 4] - points[i]) for i in range(4)))
-            if other not in seen and side >= 24 * frame_scale:
-                self.weapon_observations[role] = (value, clamp(side / (75 * frame_scale), .3, 1.0))
         for marker_id, points in found.items():
             if marker_id not in (self.yoke_id, self.throttle_id):
                 continue
@@ -607,7 +596,7 @@ async def run(args):
         source = CameraSource(args.camera, args.width, args.height, args.fps)
 
     controller = ControlFilter(calibration, args.smoothing, args.deadzone)
-    weapon_switches = WeaponSwitches()
+    weapon_tags = None if args.simulate else WeaponTags(*load_cv())
     clients = set()
 
     async def handler(connection):
@@ -651,12 +640,14 @@ async def run(args):
             while args.duration <= 0 or time.monotonic() - start < args.duration:
                 frame_start = time.monotonic()
                 frame = None
+                weapons = {"gun": False}
                 if args.simulate:
                     yoke, throttle = simulated_observations(frame_number, args.fps, args.loss_demo)
                 else:
                     # Capture can block briefly; keep socket handshakes alive.
                     frame = await asyncio.to_thread(source.read)
                     if frame is None:
+                        weapon_tags.reset()
                         yoke = throttle = None
                         failure_count += 1
                         if failure_count in (1, args.fps * 3):
@@ -673,14 +664,13 @@ async def run(args):
                                 detector.set_pitch_range(None)
                         if wizard:
                             wizard.width, wizard.height = frame.shape[1], frame.shape[0]
+                        weapons = weapon_tags.detect(frame, frame_start) if not wizard else weapon_tags.reset()
                         yoke, throttle = detector.detect(frame, frame_start, not args.no_preview)
                 if wizard:
                     wizard.observe(yoke, throttle)
                     yoke = throttle = None
                 packet = controller.step(time.monotonic(), int(time.time() * 1000), yoke, throttle)
-                weapons = weapon_switches.step(getattr(detector,"weapon_observations",{}) if frame is not None and not wizard else {}, time.monotonic())
-                if weapon_switches.configured and not wizard:
-                    packet['weapons'] = weapons
+                packet["weapons"] = weapons
                 serialized = json.dumps(packet, allow_nan=False, separators=(",", ":"))
                 for queue in tuple(clients):
                     if queue.full():
