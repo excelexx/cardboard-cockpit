@@ -637,6 +637,7 @@ func _physics_process(dt: float) -> void:
 	if flight.stall_time>1: audio.radio.say("warning")
 	apply_aircraft_pose()
 func apply_aircraft_pose() -> void:
+	if camera_rig.shake_suppressed():flight.pose_offset=Vector3.ZERO
 	aircraft.position = flight.position
 	if not flight.airborne:aircraft.position.y+=flight.gear_drop()-float(profile().clearance)
 	# Drawn attitude, not flown attitude: alpha, sideslip and the gust wobble ride

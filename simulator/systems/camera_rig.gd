@@ -74,7 +74,16 @@ func _ready() -> void:
 	noise.frequency = 1.0
 
 func impulse(_amount: float) -> void:pass # Recoil, terrain, boost and generic impacts do not shake the view.
-func kill_impulse(amount: float = .85) -> void:trauma=minf(1,trauma+maxf(amount,0))
+func kill_impulse(amount: float = .85) -> void:
+	if not shake_suppressed():trauma=minf(1,trauma+maxf(amount,0))
+
+func shake_suppressed(ground: float=INF) -> bool:
+	var f: FlightDynamics=app.flight
+	if not f.airborne or app.mode=="rollout" or f.airborne_time<8.0:return true
+	if "landing_started" in app and app.landing_started:return true
+	if "flight_kind" in app and app.flight_kind=="approach":return true
+	if is_inf(ground):ground=app.world.ground_height(f.position.x,f.position.z)
+	return f.position.y-ground<120.0
 ## The one impact in the mission the player is meant to enjoy: mains on concrete.
 ## Clamped at both ends so a greaser still registers and a firm arrival never hurts.
 func touchdown(strength: float) -> void:
@@ -100,7 +109,8 @@ func update(dt: float) -> void:
 	last_speed = f.speed
 	var plane_basis: Basis = Basis.from_euler(Vector3(f.pitch,-f.heading,-f.roll))
 	var ground: float = app.world.ground_height(f.position.x,f.position.z)
-	var grounded: bool=not f.airborne or app.mode=="rollout" or f.position.y-ground<120
+	var grounded: bool=shake_suppressed(ground)
+	if grounded:trauma=0.0;settle=0.0
 	ground_motion=move_toward(ground_motion,1.0 if grounded else 0.0,dt*2.0)
 	var speed_norm: float = clampf((f.speed-120.0)/260.0,0,1)
 	var proximity: float = (1.0-clampf((f.position.y-ground)/150.0,0,1))*speed_norm
@@ -120,7 +130,7 @@ func update(dt: float) -> void:
 		noise.get_noise_2d(t,0.0)*thump+noise.get_noise_2d(v,90.0)*vibration,
 		noise.get_noise_2d(t,37.0)*thump+noise.get_noise_2d(v,131.0)*vibration,
 		noise.get_noise_2d(t,74.0)*thump+noise.get_noise_2d(v,172.0)*vibration)
-	wobble *= SHAKE_STRENGTH*lerpf(1.0,.2,ground_motion)
+	wobble *= SHAKE_STRENGTH
 	var angular := Vector3(wobble.x*SHAKE_ANGLE,wobble.y*SHAKE_ANGLE*0.6,wobble.z*SHAKE_ROLL)
 	if app.pilot_ejected and is_instance_valid(app.fighter_fx.parachute):
 		app.cockpit_frame.set_presentation_visible(false)

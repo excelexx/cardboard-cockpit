@@ -8,6 +8,8 @@ class Frame extends Node3D:
 class App extends Node3D:
 	var route_id:="alpine"
 	var mode:="flight"
+	var landing_started:=false
+	var flight_kind:="combat"
 	var cockpit:=false
 	var pilot_ejected:=false
 	var look:=Vector2.ZERO
@@ -24,7 +26,7 @@ func run()->void:
 	check(Rig.SHAKE_STRENGTH==.9,"Kill shake uses the requested visible amplitude")
 	for cockpit:bool in [false,true]:
 		var app=App.new();root.add_child(app);app.add_child(app.cockpit_frame);app.cockpit=cockpit
-		app.flight.airborne=true;app.flight.position=Vector3(0,2000,0);app.flight.speed=335;app.flight.mach=.98;app.flight.g_load=5;app.flight.afterburner=true
+		app.flight.airborne=true;app.flight.airborne_time=30;app.flight.position=Vector3(0,2000,0);app.flight.speed=335;app.flight.mach=.98;app.flight.g_load=5;app.flight.afterburner=true
 		var rig=Rig.new();rig.app=app;app.add_child(rig);rig.reset()
 		var previous:=Basis.IDENTITY;var at:=Vector3.ZERO;var idle_angle:=0.0;var idle_shift:=0.0
 		for i in range(420):
@@ -54,5 +56,17 @@ func run()->void:
 			raw_previous=raw;previous=rig.camera.basis
 		check(camera_peak<raw_peak*.5,"Ground camera filters rapid takeoff/landing attitude jitter")
 		print("GROUND CAMERA cockpit=",cockpit," raw_peak_deg=",rad_to_deg(raw_peak)," camera_peak_deg=",rad_to_deg(camera_peak))
+		for phase: String in ["takeoff","initial_climb","landing","rollout"]:
+			app.mode="rollout" if phase=="rollout" else "flight"
+			app.landing_started=phase=="landing"
+			app.flight.airborne=phase in ["initial_climb","landing"]
+			app.flight.airborne_time=2.0 if phase=="initial_climb" else 30.0
+			app.flight.position.y=2000 if app.flight.airborne else 3
+			app.flight.pitch=0;app.flight.roll=0;app.flight.velocity=Vector3.ZERO;rig.reset()
+			for i in range(300):rig.update(1.0/60)
+			var before:Transform3D=rig.camera.transform
+			rig.kill_impulse(1);rig.trauma=1;rig.settle=.6;rig.update(1.0/60)
+			check(rig.trauma==0 and rig.settle==0,"No shake energy survives during "+phase)
+			check(before.origin.distance_to(rig.camera.position)<.001 and (before.basis.inverse()*rig.camera.basis).get_euler().length()<.0001,"No camera shake is applied during "+phase)
 		app.queue_free();await process_frame
 	print("KILL-ONLY CAMERA: ",failures.size()," failures");quit(0 if failures.is_empty() else 1)

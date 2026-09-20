@@ -69,3 +69,7 @@ Waves arrive every 7.5 seconds. The first goose remains near 2.2 km, while later
 Missiles accelerate to 900 m/s (previously 600) in 0.25 seconds, with a 600 m/s coast speed. Exhaust flames are larger; smoke ribbons are about twice as wide, more opaque, and brighter near the motor, without increasing the trail point limit. A far-target test measured a 3.58-second interception.
 
 Validation: 87 spawn/cadence/radial-spacing checks, 253 endless-wave checks, 14 missile checks, 36 plasma regression checks, and 19 combat checks pass. The native rendered missile also completed one launch and one kill; the trail was visually inspected.
+
+## No takeoff or landing shake
+
+Camera shake is fully disabled on the ground, during the initial eight seconds airborne, below 120 m AGL, and throughout approach/rollout. New shake impulses are ignored and residual shake/bounce energy is cleared immediately, without a fade-in window. Cosmetic gust pose offsets are also cleared in these phases. Normal airborne kill feedback remains unchanged. Camera transform checks confirm zero added shake in both cockpit and chase views; judge landing behavior remains valid.

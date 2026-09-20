@@ -14,6 +14,8 @@ func run()->void:
 	app.set_process(false);app.set_physics_process(false);app.audio.muted=true;app.vision=LocalVision.new()
 	app.on_action("keyboard_training")
 	check(app.flight_kind=="demo" and not app.mission is TrainingMission,"Tutorial and Play enter the same mission")
+	app.flight.pose_offset=Vector3(.1,.1,.1);app.apply_aircraft_pose()
+	check(app.flight.pose_offset==Vector3.ZERO,"Takeoff has no cosmetic airframe wobble")
 	check(not app.mission.has_method("build_rings"),"The shared mission does not build navigation rings")
 	app.vision.enabled=true;app.vision.connected=true;app.vision.tracking=true;app.vision.yoke_enabled=true;app.vision.throttle_confidence=1;app.vision.throttle=.3
 	app.flight.gear=false;app.flight.flaps=0;app.gear_override=0;app.flaps_override=0
@@ -23,6 +25,8 @@ func run()->void:
 	check(not app.mouse_yoke,"B does not enable the former mouse-yoke binding")
 	check(app.landing_started and app.mission.phase=="approach" and not app.copilot and app.vision.enabled,"B immediately begins a camera-controlled landing, without kill quotas")
 	check(not app.combat.active and app.combat.launch_queue.is_empty(),"Choosing landing stops waves and automatic weapons")
+	app.flight.pose_offset=Vector3(.1,.1,.1);app.apply_aircraft_pose()
+	check(app.flight.pose_offset==Vector3.ZERO,"Landing has no cosmetic airframe wobble")
 	var first:Vector3=app.flight.position
 	check(first.z==3400 and first.y==115,"The landing approach starts farther out at matching height")
 	app.flight.position+=Vector3(100,-20,-500);event.keycode=KEY_B;app._input(event)
