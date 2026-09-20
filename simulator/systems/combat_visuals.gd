@@ -453,7 +453,7 @@ func update_projectile(shot: Dictionary,dt: float) -> void:
 	var distance: float=combat.app.camera.global_position.distance_to(shot.position)
 	if flare!=null:
 		flare.visible=burning
-		flare.pixel_size=clampf(distance*.000026,.008,.055)*(.75+.35*thrust)
+		flare.pixel_size=clampf(distance*.000039,.012,.0825)*(.75+.35*thrust)
 		flare.modulate=Color(4,3,1.8,clampf((.52+.30*thrust)+.10*sin(shot.age*91),0,1))
 	if motor!=null:
 		motor.visible=burning and distance<450;motor.light_energy=3.5*thrust
@@ -469,7 +469,7 @@ func update_projectile(shot: Dictionary,dt: float) -> void:
 		shot.ghost_at=shot.age
 		# Aluminised propellant leaves dense white-grey alumina smoke, not the
 		# cyan puff that used to be here.
-		puff(shot.position,Color(.67,.67,.64,.22),clampf(distance*.008,1.3,7),.28)
+		puff(shot.position,Color(.78,.79,.77,.38),clampf(distance*.012,2,10),.28)
 func draw_plasma() -> void:
 	var width: float=.64 if combat.app.cockpit else 1.0
 	if width!=plasma_view_width:

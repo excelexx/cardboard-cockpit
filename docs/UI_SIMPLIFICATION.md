@@ -61,3 +61,11 @@ Plasma now uses the same slider-scaled acquisition angle as the aiming reticle. 
 Each three-goose cinematic wave schedules exactly one guided missile, usually against the farthest goose not already under plasma fire. Its target is reserved while the missile is queued or flying, leaving the other two for the pilot. Two-goose waves do not launch one. Wave missiles have no collateral damage and expire when their wave ends; repeated frames cannot schedule another. They reuse the normal goose explosion rather than layering the heavy area blast.
 
 Validation: 18 real-slider targeting checks, 13 wave-missile checks (including continuous plasma, no splash, and no carryover), 36 plasma regression checks, and 27 control checks pass. Native rendering also verified one launch and one kill.
+
+## Varied spacing and faster missile exhaust
+
+Waves arrive every 7.5 seconds. The first goose remains near 2.2 km, while later geese receive varied gaps of roughly 400–550 m plus small lateral jitter. The placement helper enforces a minimum 400 m increase in actual distance from the plane, including after altitude-floor and terrain corrections. Three-goose waves spread across both sides and near the centre instead of repeating one lane.
+
+Missiles accelerate to 900 m/s (previously 600) in 0.25 seconds, with a 600 m/s coast speed. Exhaust flames are larger; smoke ribbons are about twice as wide, more opaque, and brighter near the motor, without increasing the trail point limit. A far-target test measured a 3.58-second interception.
+
+Validation: 87 spawn/cadence/radial-spacing checks, 253 endless-wave checks, 14 missile checks, 36 plasma regression checks, and 19 combat checks pass. The native rendered missile also completed one launch and one kill; the trail was visually inspected.

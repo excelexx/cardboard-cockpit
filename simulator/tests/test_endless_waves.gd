@@ -57,7 +57,7 @@ func fill_wave() -> void:
 		app.mission.tick(maxf(.01,app.mission.next_spawn_at-app.mission.clock))
 func start_first_wave() -> void:
 	app.flight.airborne=true;app.flight.gear=true;app.flight.flaps=1;app.flight.position=Vector3(0,1000,-1000)
-	app.mission.tick(8.0);app.mission.tick(2.0);fill_wave()
+	app.mission.tick(5.5);app.mission.tick(2.0);fill_wave()
 func kill_birds(count: int) -> void:
 	var remaining := count
 	for enemy in app.combat.enemies:
@@ -77,7 +77,7 @@ func run() -> void:
 	app.mission.tick(70.0)
 	check(app.mission.wave_number==0 and app.mission.phase=="opening","Ground wait never starts a clock-triggered combat wave")
 	start_first_wave()
-	check(app.mission.wave_number==1 and app.mission.wave_size==2,"First proper wave arrives ten seconds after airborne")
+	check(app.mission.wave_number==1 and app.mission.wave_size==2,"First proper wave arrives 7.5 seconds after airborne")
 	check(app.flight.gear,"Gear-down flight does not block the first wave")
 	check(app.mission.skein_total()==2,"Total means actual arrivals, not a predetermined quota")
 	app.mission.controls()
@@ -102,7 +102,7 @@ func run() -> void:
 		check(app.mission.history.size()<=Mission.HISTORY_LIMIT and app.combat.enemies.size()<=12,"Mission history and live contacts stay bounded")
 		if wave<40:next_wave()
 		await process_frame
-	check(app.mission.clock>600 and app.mission.wave_number==40,"More than ten minutes and thirty waves remain playable")
+	check(app.mission.clock>300 and app.mission.wave_number==40,"Forty waves continue with the shorter interval")
 	check(app.landing_calls==0 and app.result_calls==0,"No deadline or wave quota requests landing or finishes sortie")
 	check(app.mission.skein_total()==100 and app.mission.skein_down>32,"Cumulative counts continue beyond the former 32-bird ending")
 	check(app.combat.managed_mission and is_inf(app.combat.spawn_clock),"Mission suppresses finite patrol ending and ambient arrivals")

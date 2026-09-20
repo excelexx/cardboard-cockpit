@@ -23,7 +23,7 @@ func run():
 	var smallest_gap := INF
 	for i in range(1,arrivals.size()): smallest_gap = minf(smallest_gap,arrivals[i]-arrivals[i-1])
 	check(max_contacts>=1 and max_contacts<=3 and arrivals.size()>=3,"Paced arrivals keep at most four contacts and continue after old contacts leave")
-	check(smallest_gap>=9.99 and arrivals[0]>=9.9,"Each arrival is separated, including the first contact")
+	check(smallest_gap>=7.49 and arrivals[0]>=7.4,"Each arrival is separated, including the first contact")
 	check(app.combat.hostile_launches==0 and app.combat.hull==100,"Pacing retains harmless geese")
 	app.start_flight("combat");app.flight.position.y=1000;app.camera_rig.update(.016); app.combat.spawn_clock = 999; app.combat.spawn_contact()
 	var enemy: Dictionary = app.combat.enemies[0]

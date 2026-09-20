@@ -16,7 +16,7 @@ const FLOCK_SPREAD := 1000.0
 const FLOCK_CLOSE_RATE := 20.0
 const SECOND_WAVE_SIZE := 2
 const WAVE_SECONDS := 18.0
-const FIRST_WAVE_AIRBORNE_SECONDS := 10.0
+const FIRST_WAVE_AIRBORNE_SECONDS := Tune.WAVE_INTERVAL
 const MAX_WAVE_SIZE := 3
 const HISTORY_LIMIT := 32
 const WAVE_BREAK_SECONDS := 3.0
@@ -46,7 +46,7 @@ var airborne_clock := 0.0
 var empty_view_clock := 0.0
 const STREAM_MIN_DISTANCE := 600.0
 const STREAM_MAX_DISTANCE := 1500.0
-const SPAWN_INTERVAL := 10.0
+const SPAWN_INTERVAL := Tune.WAVE_INTERVAL
 var next_spawn_at := 0.0
 var stream_gap := 1050.0
 var stream_distance := 0.0
@@ -314,7 +314,7 @@ func _flock_course(heading: float) -> Vector3:
 func _wave_position(c: CombatDirector,index: int) -> Vector3:
 	var next_number: int=wave_number+1 if phase in ["opening","gather","wave_break"] else wave_number
 	var side: float=1.0 if next_number%2==0 else -1.0
-	var lateral: float=[120.0,-90.0,90.0][index%3]*side
+	var lateral: float=[120.0,-100.0,0.0][index%3]*side
 	var point: Vector3=c.spawn_sight_point(Tune.GOOSE_SPAWN_DISTANCE+index*Tune.GOOSE_DEPTH_SPACING)+c.spawn_sight_right()*lateral
 	point.y=maxf(point.y,app.world.ground_height(point.x,point.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
 	return point
@@ -324,11 +324,32 @@ func _spawn_visible(c: CombatDirector) -> bool:
 		if not c.spawn_point_clear(_wave_position(c,i)):return false
 	return true
 
+## Enforce radial separation from the plane, even when the altitude floor or
+## terrain moves a candidate away from the original camera ray.
+func _separate_wave_point(point: Vector3, minimum_range: float) -> Vector3:
+	var origin: Vector3=app.flight.position
+	var horizontal:=Vector2(point.x-origin.x,point.z-origin.z)
+	var direction: Vector2=horizontal.normalized() if horizontal.length()>.01 else Vector2(sin(app.flight.heading),-cos(app.flight.heading))
+	for attempt in range(4):
+		if origin.distance_to(point)>=minimum_range:return point
+		var vertical: float=point.y-origin.y
+		var radius: float=sqrt(maxf(0,minimum_range*minimum_range-vertical*vertical))+.1
+		point.x=origin.x+direction.x*radius;point.z=origin.z+direction.y*radius
+		point.y=maxf(point.y,app.world.ground_height(point.x,point.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
+	if origin.distance_to(point)<minimum_range:
+		point.x=origin.x+direction.x*(minimum_range+.1);point.z=origin.z+direction.y*(minimum_range+.1)
+		point.y=maxf(point.y,app.world.ground_height(point.x,point.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
+	return point
+
 func _spawn_slice(c: CombatDirector) -> void:
 	var count: int=skein_pending
+	var previous_range:=0.0
 	for i in range(count):
 		if c.enemies.size()>=MAX_WAVE_SIZE:break
-		var place: Vector3=_wave_position(c,i)
+		var place: Vector3=_wave_position(c,i)+c.spawn_sight_right()*randf_range(-25,25)
+		place.y=maxf(place.y,app.world.ground_height(place.x,place.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
+		if i>0:place=_separate_wave_point(place,previous_range+randf_range(400.5,550.0))
+		previous_range=app.flight.position.distance_to(place)
 		var previous_count: int=c.enemies.size()
 		c.spawn_contact("goose")
 		if c.enemies.size()<=previous_count:break

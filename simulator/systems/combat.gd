@@ -388,7 +388,7 @@ func _queue_wave_missile() -> void:
 		var a_beam: bool=beam_target_ids.has(int(a.id));var b_beam: bool=beam_target_ids.has(int(b.id))
 		if a_beam!=b_beam:return not a_beam
 		return app.flight.position.distance_squared_to(a.position)>app.flight.position.distance_squared_to(b.position))
-	wave_missile_number=mission.wave_number;missile_cooldown=10.0;salvo_count+=1
+	wave_missile_number=mission.wave_number;missile_cooldown=Tune.WAVE_INTERVAL;salvo_count+=1
 	var store: int=[0,2,1,3][(salvo_count-1)%4]
 	launch_queue.append({"target":int(choices[0].id),"side":-1.0 if store<2 else 1.0,"internal":false,"store":store,"slot":0,"salvo":salvo_count,"delay":Tune.MISSILE_RAIL_DELAY,"wave_missile":true,"wave_number":mission.wave_number})
 	event("salvo",app.flight.position,1)
@@ -514,7 +514,7 @@ func update_shots(dt: float) -> void:
 				var effect: Node3D = shot.node.get_node_or_null(effect_name)
 				if effect!=null:
 					effect.visible = ignited
-					effect.scale = Vector3(1,1,1+sin(shot.age*93)*.12)
+					effect.scale = Vector3(1.35,1.35,1.6+sin(shot.age*93)*.16)
 			for enemy: Dictionary in enemies:
 				if enemy.id==shot.target and (enemy.health>0 or enemy.dying<1.2):
 					var delta: Vector3=enemy.position-shot.position
@@ -758,15 +758,15 @@ func update_trail(shot: Dictionary) -> void:
 		var a: Vector3=points[i];var b: Vector3=points[i+1]
 		var p0: float=float(i)/maxf(points.size()-1,1);var p1: float=float(i+1)/maxf(points.size()-1,1)
 		var view_distance: float=app.camera.global_position.distance_to(a)
-		var width_a: float=maxf(lerpf(3.6,.32,p0),minf(view_distance*.0012,1.8))
-		var width_b: float=maxf(lerpf(3.6,.32,p1),minf(app.camera.global_position.distance_to(b)*.0012,1.8))
+		var width_a: float=maxf(lerpf(7.2,.64,p0),minf(view_distance*.0024,4.0))
+		var width_b: float=maxf(lerpf(7.2,.64,p1),minf(app.camera.global_position.distance_to(b)*.0024,4.0))
 		var side: Vector3=(b-a).normalized().cross((app.camera.global_position-a).normalized()).normalized()
 		if side.length()<.1:side=Vector3.RIGHT
 		var next_distance: float=distance_along+a.distance_to(b)
 		var tint: Color=Color(.48,.51,.54) if app.camera.global_position.y<shot.position.y else Color(.83,.87,.92)
 		for vertex: Array in [[a-side*width_a,Vector2(0,distance_along),p0],[a+side*width_a,Vector2(1,distance_along),p0],[b-side*width_b,Vector2(0,next_distance),p1],[b-side*width_b,Vector2(0,next_distance),p1],[a+side*width_a,Vector2(1,distance_along),p0],[b+side*width_b,Vector2(1,next_distance),p1]]:
 			var progress: float=vertex[2]
-			ribbon.surface_set_color(Color(tint,lerpf(.08,.60,progress)*smoothstep(0,.12,progress)))
+			ribbon.surface_set_color(Color(tint,lerpf(.16,.9,progress)*smoothstep(0,.12,progress)))
 			ribbon.surface_set_uv(vertex[1]);ribbon.surface_set_uv2(Vector2(progress,0))
 			ribbon.surface_add_vertex(vertex[0])
 		distance_along=next_distance

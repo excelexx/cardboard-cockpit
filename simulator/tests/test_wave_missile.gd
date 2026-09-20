@@ -20,11 +20,16 @@ func run()->void:
 	app.combat.fire_primary();app.combat.update_beam(0)
 	check(not app.combat.beam_target_ids.has(reserved),"Plasma leaves the reserved goose for the automatic missile")
 	app.combat.gun_firing_time=0
-	for i in range(540):app.combat.tick(1.0/60)
-	check(app.combat.kills==1,"Automatic missile destroys exactly one goose within the wave interval")
+	var peak_speed:=0.0;var impact_time:=-1.0
+	for i in range(270):
+		app.combat.tick(1.0/60)
+		for shot:Dictionary in app.combat.shots:peak_speed=maxf(peak_speed,Vector3(shot.velocity).length())
+		if impact_time<0 and app.combat.kills>0:impact_time=float(i+1)/60
+	check(peak_speed>=890 and impact_time>0 and impact_time<=4.5,"Faster missile reaches 900 m/s and intercepts within 4.5 seconds")
+	check(app.combat.kills==1,"Automatic missile destroys exactly one goose within 4.5 seconds")
 	check(app.combat.enemies.size()==2 and app.combat.enemies.all(func(e:Dictionary)->bool:return e.health==100),"Other two geese remain unharmed for the pilot")
 	check(app.combat.missiles_fired==1 and app.combat.launch_queue.is_empty(),"No second missile is launched during the same wave")
-	print("WAVE MISSILE kills=",app.combat.kills," fired=",app.combat.missiles_fired)
+	print("WAVE MISSILE kills=",app.combat.kills," fired=",app.combat.missiles_fired," peak_speed=",peak_speed," impact_seconds=",impact_time)
 	wave(4,3);app.combat.wave_missile_number=2;app.combat.update_swarm_missiles()
 	check(app.combat.launch_queue.size()==1,"A new three-goose wave gets its own missile")
 	app.combat.active=false;app.combat.engagement_enabled=false;app.combat.update_launches(.1)
@@ -38,7 +43,7 @@ func run()->void:
 	app.combat.detonate_missile({"wave_missile":true,"position":target.position,"life":1.0},int(target.id))
 	check(app.combat.kills==1 and app.combat.enemies[1].health==100 and app.combat.enemies[2].health==100,"Wave missile cannot kill or damage neighbours through splash")
 	wave(8,3)
-	for i in range(540):app.combat.fire_primary();app.combat.tick(1.0/60)
+	for i in range(270):app.combat.fire_primary();app.combat.tick(1.0/60)
 	check(app.combat.kills==3 and app.combat.missiles_fired==1,"Continuous plasma clears the other two while one missile handles its reserved goose")
 	app.queue_free();await process_frame
 	print("WAVE MISSILE: ",checks," checks / ",failures.size()," failures");quit(0 if failures.is_empty() else 1)
