@@ -77,6 +77,10 @@ async def run(relay,once=False):
     print('Phase feedback '+('available' if relay.phase_supported else 'not supported by installed firmware'),flush=True)
     relay.buttons(await client.read_gatt_char(BUTTON_UUID));relay.send()
     await client.start_notify(BUTTON_UUID,lambda _,data:relay.buttons(data))
+    supports_v2=False
+    if instrument and client.services.get_characteristic(INFO_UUID):
+     health=json.loads((await client.read_gatt_char(INFO_UUID)).decode())
+     supports_v2=health.get('protocol',1)>=2 and health.get('extension')==26
     last_poll=0.;last_phase=-1;phase_at=0.;telemetry_at=0.;info_at=0.
     if instrument:print("INSTRUMENT available; BLE write payload="+str(instrument.max_write_without_response_size),flush=True)
     while client.is_connected:
@@ -94,7 +98,7 @@ async def run(relay,once=False):
      if instrument and now-telemetry_at>=.05:
       snapshot=relay.telemetry if relay.telemetry is not None and now-relay.telemetry_at<1 else disconnected()
       relay.telemetry_sequence=(relay.telemetry_sequence+1)&65535
-      packet=encode(snapshot,relay.telemetry_sequence)
+      packet=encode(snapshot if supports_v2 else dict(snapshot,version=1),relay.telemetry_sequence)
       for fragment in fragments(packet,relay.telemetry_sequence,max(20,instrument.max_write_without_response_size)):
        await asyncio.wait_for(client.write_gatt_char(INSTRUMENT_UUID,fragment,response=False),timeout=.8)
       telemetry_at=now

@@ -15,13 +15,24 @@ async def main(seconds):
   print('CONNECTED instrument; write payload',c.max_write_without_response_size,flush=True)
   await client.start_notify(BUTTON_UUID,lambda _,data:print('BUTTON MASK',int.from_bytes(data[:2],'little'),flush=True))
   seq=0;began=time.monotonic();bytes_sent=0;last_phase=-1;last_phase_at=0.;last_health=0.;last_frames=0
-  d=disconnected();d.update(mode=0,name='PILOT',pilot=1)
+  d=disconnected();d.update(mode=0,name='PILOT',pilot=1,version=2,aim_yaw=18,aim_pitch=3,engine=98,systems=7,fpa_yaw=0,fpa_pitch=-1.3,climb=600,seconds=0,accuracy=76,throttle=100,world_x=0,world_z=0,g_load=1.4)
   while time.monotonic()-began<seconds:
    elapsed=time.monotonic()-began
    if elapsed<4:d.update(mode=0,flags=0)
    elif elapsed<seconds-7:
-    d.update(mode=1,roll=math.sin(elapsed*1.2)*55,pitch=math.sin(elapsed*.7)*18,heading=(elapsed*8)%360,speed=345,altitude=1250,flags=33 if int(elapsed)%8<4 else 35,range=740,contacts=[dict(x=600,y=1100,kind=2,selected=1),dict(x=-800,y=1900,kind=1,selected=0),dict(x=200,y=500,kind=3,selected=0)])
+    d.update(mode=1,roll=math.sin(elapsed*1.2)*55,pitch=math.sin(elapsed*.7)*18,heading=(elapsed*8)%360,speed=345,altitude=1250,flags=33 if int(elapsed)%8<4 else 35,range=740,contacts=[dict(x=600,y=1100,kind=2,selected=1),dict(x=-800,y=1900,kind=1,selected=0),dict(x=200,y=500,kind=3,selected=0),dict(x=-700,y=500,kind=4,selected=0)])
    else:d.update(mode=2,flags=64,score=4200,kills=18,landing=1,roll=0,pitch=0,contacts=[])
+   if d['mode']==2:d['detail']=94
+   elif 4<=elapsed<7:d['detail']=(1+int(elapsed-4))<<5;d['flags']=0
+   elif d['mode']==1:
+    d['detail']=min(15,max(0,int((elapsed-7)*3))) | (16 if 18<=elapsed<24 else 0)
+    if 13<=elapsed<15:d['flags']|=128
+   else:d['detail']=0
+   d.update(seconds=int(elapsed),world_x=int(600*math.sin(elapsed*.2)),world_z=int(-elapsed*130),g_load=1+abs(math.sin(elapsed))*.8)
+   if d['mode']==1 and elapsed>=7:
+    while len(d['contacts'])<12:
+     i=len(d['contacts']);d['contacts'].append(dict(x=-1800+i*260,y=1600+i*80,kind=1,selected=0))
+   for contact in d['contacts']:contact.update(vx=120 if contact['kind']==4 else -25,vy=-200 if contact['kind']==4 else 80,altitude=100 if contact['kind']==4 else 200)
    phase=0 if d['mode'] in (0,2) else 1 if elapsed<8 else 3 if elapsed>seconds-12 else 2
    if phase!=last_phase or elapsed-last_phase_at>=1:
     await client.write_gatt_char(PHASE_UUID,bytes([phase]),response=True);last_phase=phase;last_phase_at=elapsed

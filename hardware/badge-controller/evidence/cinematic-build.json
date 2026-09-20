@@ -1,0 +1,41 @@
+{
+  "firmware": "instrument-6",
+  "status": "compiled; final flash and live demo held for explicit user go-ahead",
+  "application_bytes": 691984,
+  "application_sha256": "d95db84753428f08f2e13a4d7cffdca33a9c8bb21bf1eba86a2fa9edc3d5b310",
+  "write_offset": "0x10000",
+  "application_slot_bytes": 1310720,
+  "protocol": {
+    "version": 2,
+    "extension_bytes": 26,
+    "maximum_frame_bytes": 216,
+    "legacy_v1_supported": true
+  },
+  "offline_checks": {
+    "firmware_compile": "passed",
+    "badge_python_tests": 13,
+    "actual_cpp_decoder_cross_language_tests": "passed",
+    "motion_undefined_behavior_checks": "passed",
+    "godot_snapshot_countdown_and_gesture_tests": "passed",
+    "kimi_visual_review": "no definite clipping, overlap or contrast issues reported in synthetic preview",
+    "integration_full_suite": "passed: all Godot checks and 77 Python tests",
+    "parallel_working_tree_suite": "A separate cannon test expects four rounds per packet while the parallel tuning currently configures two; badge-specific checks pass."
+  },
+  "earlier_foundation_hardware_test": {
+    "firmware": "instrument-5 preview, before final Kimi layout and 26-byte extension",
+    "seconds": 60,
+    "packets_sent": 1089,
+    "packets_accepted": 1089,
+    "bad_packets": 0,
+    "sampled_fps_min": 12.0,
+    "sampled_fps_max": 15.0,
+    "free_heap_bytes": 90636,
+    "bluetooth_reconnect": "passed",
+    "validates_final_firmware": false
+  },
+  "physical_final_visual_confirmation": "pending coordinated run",
+  "notes": [
+    "The final build has not been flashed or tested on the badge yet, per the user request to coordinate with teammates.",
+    "The canonical app also includes parallel gameplay work; its separate cannon-count assertion is documented above. This badge integration branch passes the complete verification suite."
+  ]
+}

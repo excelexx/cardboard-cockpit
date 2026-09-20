@@ -30,7 +30,7 @@ Aim near a visible contact. Intent scoring, prediction, hysteresis and smoothly 
 
 ## Cardboard and badge
 
-The **cardboard yoke** owns steering and both latched weapon switches. The **cardboard throttle** owns power, boost and braking. The **wireless badge** supplies occasional secondary controls: START start/replay, HOME pause, A gear, B assisted landing, LEFT view, RIGHT missile inset, UP route assist, DOWN text visibility. See [switch construction, mapping and evidence](docs/WEAPON_SWITCHES.md) and [printable switch faces](vision/markers/weapon-switches.html).
+The **cardboard yoke** owns steering and both latched weapon switches. The **cardboard throttle** owns power, boost and braking. The **wireless badge** supplies occasional secondary controls: START start/replay, HOME pause, A gear, B assisted landing, LEFT view, RIGHT missile inset, UP route assist, DOWN short press text visibility / hold tactical view. See [switch construction, mapping and evidence](docs/WEAPON_SWITCHES.md) and [printable switch faces](vision/markers/weapon-switches.html).
 
 Use [vision setup](docs/vision-setup.md) and [construction guide](docs/cardboard-build-guide.md) for yoke ID 7 and throttle ID 23. Flip-tab faces use 31/32 and 41/42 in the same `DICT_4X4_50` dictionary.
 
@@ -39,7 +39,7 @@ Use [vision setup](docs/vision-setup.md) and [construction guide](docs/cardboard
 ./tools/tracker.sh --camera 0 --calibrate
 ```
 
-Enable camera tracking with C. The tracker sends controls only over localhost and does not save or upload images. Synthetic detector and transport tests pass; actual printed switch faces and camera placement still need physical testing. The release app includes an offline BLE helper and reconnects to the existing badge firmware automatically. All eight physical badge buttons and simultaneous A+B were measured live. Phase feedback was written and read back. No badge firmware was flashed.
+Enable camera tracking with C. The tracker sends controls only over localhost and does not save or upload images. Synthetic detector and transport tests pass; actual printed switch faces and camera placement still need physical testing. The release app includes an offline BLE helper and reconnects to the existing badge firmware automatically. All eight physical badge buttons and simultaneous A+B were measured live. Phase feedback was written and read back. The badge now runs the verified live-instrument firmware; see [display, protocol and wireless handoff](hardware/badge-controller/INSTRUMENT.md).
 
 ## World, audio and performance
 
