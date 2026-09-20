@@ -6,7 +6,7 @@ var effects:=.5
 var voice:=.5
 func set_level(channel: String,value: float)->void:
 	if not DEFAULTS.has(channel):return
-	set(channel,clampf(value,0,2 if channel=="music" else 1) if is_finite(value) else DEFAULTS[channel])
+	set(channel,clampf(value,0,4 if channel=="music" else 2) if is_finite(value) else DEFAULTS[channel])
 func reset()->void:
 	for channel: String in DEFAULTS:set(channel,DEFAULTS[channel])
 func load_config(config: ConfigFile)->void:

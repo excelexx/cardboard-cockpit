@@ -424,7 +424,7 @@ func update(engine: float, speed: float, flying: bool, dt: float = 1.0/60.0) -> 
 	duck_level = move_toward(duck_level,wanted_duck,dt*(70 if wanted_duck<duck_level else 10))
 	burner.volume_db = move_toward(burner.volume_db,-80 if muted or not burner_wanted else -17+duck_level*0.65,dt*80)
 	burner.stream_paused = context_paused
-	music.volume_db = -80 if muted else lerpf(-26,-18,flow_intensity)+duck_level
+	music.volume_db = -80 if muted else lerpf(-26,-18,flow_intensity)
 	# The skein ambience follows how many birds are actually up there. It used
 	# to be loudest when the player was flying well and never stopped once the
 	# sky was empty.

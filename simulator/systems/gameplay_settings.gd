@@ -3,8 +3,8 @@ extends RefCounted
 const DEFAULT_AGILITY := 1.3
 const DEFAULT_AUTO_AIM := 1.4
 const MIN_AGILITY := .5
-const MAX_AGILITY := 3.0
-const MAX_AUTO_AIM := 3.0
+const MAX_AGILITY := 6.0
+const MAX_AUTO_AIM := 6.0
 
 var pitch_agility: float = DEFAULT_AGILITY:
 	set(value): pitch_agility = clampf(value,MIN_AGILITY,MAX_AGILITY) if is_finite(value) else DEFAULT_AGILITY

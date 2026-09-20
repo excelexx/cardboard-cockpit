@@ -323,17 +323,17 @@ func _spawn_slice(c: CombatDirector) -> void:
 	var forward: Vector3=f.forward()
 	var wing:=Vector3(cos(f.heading),0,sin(f.heading))
 	var count: int=mini(skein_pending,randi_range(1,4))
-	var anchor: Vector3=f.position+forward*1200+Vector3.UP*90
+	var anchor: Vector3=f.position+forward*1200
 	for i in range(count):
 		if c.enemies.size()>=MAX_WAVE_SIZE:break
 		var along: float=(float(i)+.5)*minf(stream_gap*.5,180.0)/float(count)+randf_range(-8,8)
-		var place: Vector3=anchor+forward*along+wing*randf_range(-130,130)+Vector3.UP*randf_range(-40,60)
+		var place: Vector3=anchor+forward*along+wing*randf_range(-130,130)
 		var previous_count: int=c.enemies.size()
 		c.spawn_contact("goose")
 		if c.enemies.size()<=previous_count:break
 		var bird: Dictionary=c.enemies.back()
 		bird.position=place
-		bird.position.y=maxf(place.y,app.world.ground_height(place.x,place.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
+		bird.position.y=maxf(f.position.y,app.world.ground_height(place.x,place.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
 		bird.node.position=bird.position
 		bird.formation_altitude=bird.position.y
 		bird.course=flock_course

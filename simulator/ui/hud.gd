@@ -77,7 +77,7 @@ func _ready() -> void:
 		add_child(slider); sensitivity_sliders[axis] = slider
 	for channel: String in AUDIO_CHANNELS:
 		var slider:=HSlider.new();slider.name=channel.capitalize()+"Volume"
-		slider.min_value=0;slider.max_value=2 if channel=="music" else 1;slider.step=.01;slider.scrollable=false
+		slider.min_value=0;slider.max_value=4 if channel=="music" else 2;slider.step=.01;slider.scrollable=false
 		slider.tooltip_text={"music":"Free Bird music volume","engine":"Engine, wind and wheel volume","effects":"Weapons, geese and other effects","voice":"Radio and instructor voice volume"}[channel]
 		var track:=StyleBoxFlat.new();track.bg_color=GLASS.lightened(.12);track.content_margin_top=4;track.content_margin_bottom=4;track.set_corner_radius_all(4)
 		slider.add_theme_stylebox_override("slider",track)

@@ -4,11 +4,11 @@ const Tune = preload("res://data/balance.gd")
 ## Fictional fly-by-wire dynamics: filtered angular rates, momentum and energy.
 var profile: Dictionary
 var pitch_agility: float = 1.0:
-	set(value): pitch_agility = clampf(value,.5,3.0) if is_finite(value) else 1.0
+	set(value): pitch_agility = clampf(value,.5,6.0) if is_finite(value) else 1.0
 var bank_agility: float = 1.0:
-	set(value): bank_agility = clampf(value,.5,3.0) if is_finite(value) else 1.0
+	set(value): bank_agility = clampf(value,.5,6.0) if is_finite(value) else 1.0
 var yaw_agility: float = 1.0:
-	set(value): yaw_agility = clampf(value,.5,3.0) if is_finite(value) else 1.0
+	set(value): yaw_agility = clampf(value,.5,6.0) if is_finite(value) else 1.0
 var position := Vector3.ZERO
 var velocity := Vector3.ZERO
 var speed := 0.0

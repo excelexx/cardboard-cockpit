@@ -16,7 +16,7 @@ class ControlSettings:
         if not isinstance(gains, dict) or set(gains) != {"pitch", "bank", "yaw"}:
             raise ValueError("Invalid sensitivity axes")
         if any(isinstance(value, bool) or not isinstance(value, (int, float))
-               or not math.isfinite(value) or not .25 <= value <= 3 for value in gains.values()):
+               or not math.isfinite(value) or not .25 <= value <= 6 for value in gains.values()):
             raise ValueError("Invalid sensitivity gain")
         self.sensitivity = dict(gains)
         return {"request_id": request_id, "sensitivity": dict(self.sensitivity)}

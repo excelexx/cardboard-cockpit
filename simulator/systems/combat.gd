@@ -81,7 +81,7 @@ var hit_flash := 0.0
 var hit_confirm := 0.0
 var assist := true
 var aim_strength: float=1.0:
-	set(value):aim_strength=clampf(value,0,3) if is_finite(value) else 1.0
+	set(value):aim_strength=clampf(value,0,6) if is_finite(value) else 1.0
 var enemies: Array[Dictionary] = []
 var shots: Array[Dictionary] = []
 var bursts: Array[Dictionary] = []
@@ -189,7 +189,7 @@ func spawn_contact(kind: String = "normal") -> void:
 	elif motif=="cloud_reveal":position_value+=forward()*180
 	elif motif=="chain":position_value+=right*(next_id%3-1)*30;course=forward()*app.flight.speed*.68
 	elif motif=="post_roll":position_value=app.flight.position+forward()*540+right*45
-	position_value.y=maxf(position_value.y+rng.randf_range(-10,15),app.world.ground_height(position_value.x,position_value.z)+90)
+	position_value.y=maxf(app.flight.position.y,app.world.ground_height(position_value.x,position_value.z)+90)
 	var hp: float=Tune.ELITE_HEALTH if kind=="elite" else Tune.CONTACT_HEALTH
 	var size_factor: float=1.45 if kind=="elite" else 1.0
 	if kind=="boss":
@@ -197,6 +197,7 @@ func spawn_contact(kind: String = "normal") -> void:
 		course=forward()*app.flight.speed*.82;boss_id=next_id;selected_motif="boss";event("boss_signature",position_value,4)
 	if training_target_limit>0:
 		position_value=demo_route_position(next_id);course=Vector3(sin(app.mission.airfield.heading),0,-cos(app.mission.airfield.heading))*20
+	position_value.y=maxf(app.flight.position.y,app.world.ground_height(position_value.x,position_value.z)+Tune.CONTACT_FLIGHT_CLEARANCE)
 	node.scale*=size_factor;node.position=position_value
 	var contact: Dictionary={"id":next_id,"node":node,"position":position_value,"health":hp,"max_health":hp,"kind":kind,"size_factor":size_factor,"hit_radius":22.0*size_factor,"velocity":course,"course":course,"right":right,"cooldown":999.0,"age":0.0,"phase":rng.randf_range(0,TAU),"fade":0.0,"retiring":false,"motif":selected_motif,"presented":next_id%3==0,"hit_flash":0.0,"damage_stage":0,"dying":-1.0,"sensor_occluded":false,"weak_side":-1.0,"near_passed":false}
 	enemies.append(contact);next_id+=1

@@ -19,3 +19,9 @@ Validation: HUD readouts (75 checks) and combat feel (16 checks) pass; native fl
 ## Low-detail geese
 
 Goose meshes now use 512 / 240 / 152 triangles, down from 7,808 / 1,232 / 376. Plumage uses vertex colors with simple lighting, no noise texture, feather shading, rim effects, or goose shadows. Size and animation are preserved. Red target brackets are restored without labels or distances. Geometry budget and combat checks pass; this verifies rendering workload reduction, not a measured whole-game FPS gain.
+
+## Altitude, scale, and settings
+
+Geese spawn at the aircraft altitude, subject to terrain clearance; horizontal placement and flock spacing are unchanged. Model scale is now 12, twice the preceding build. Control ceilings are 6x, music gain reaches 4x, and other mixer channels reach 2x. The Python tracker accepts the same extended input range. Music no longer ducks during instructor or radio speech.
+
+Validation: directional wave checks (72), mixer/settings checks (32), and Python control-settings tests (3) pass.

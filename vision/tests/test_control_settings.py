@@ -15,12 +15,18 @@ class ControlSettingsTests(unittest.TestCase):
         self.assertEqual(packet["raw_yoke"], {"roll": .4, "pitch": -.3, "yaw": .6})
         self.assertEqual(packet["throttle"], {"value": .7, "confidence": .9})
 
+    def test_extended_gain_range(self):
+        settings = ControlSettings()
+        gains = {"pitch": 6, "bank": 5, "yaw": 4}
+        settings.accept({"action": "set_sensitivity", "request_id": "extended", "sensitivity": gains})
+        self.assertEqual(settings.sensitivity, gains)
+
     def test_invalid_commands_are_atomic(self):
         settings = ControlSettings()
         before = dict(settings.sensitivity)
         command = {"action": "set_sensitivity", "request_id": "drag", "sensitivity": {"pitch": 2, "bank": .5, "yaw": 3}}
         invalid = [None, [], {}, dict(command, action="start"), dict(command, request_id=""), dict(command, extra=True)]
-        for value in [True, "1", None, float("nan"), float("inf"), .24, 3.01]:
+        for value in [True, "1", None, float("nan"), float("inf"), .24, 6.01]:
             bad = copy.deepcopy(command)
             bad["sensitivity"]["yaw"] = value
             invalid.append(bad)

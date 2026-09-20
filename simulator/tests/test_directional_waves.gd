@@ -16,9 +16,13 @@ func run()->void:
 			var spawned: int=app.combat.next_id-before
 			check(spawned>=1 and spawned<=4,"The next sampled distance produces one to four birds")
 			for bird: Dictionary in app.combat.enemies:
-				if bird.id>=before:check(app.flight.forward().dot((bird.position-app.flight.position).normalized())>.8,"New birds are ahead of the current heading and pitch")
+				if bird.id>=before:
+					check(app.flight.forward().dot((bird.position-app.flight.position).normalized())>.8,"New birds are ahead of the current heading")
+					check(is_equal_approx(bird.position.y,app.flight.position.y),"New birds match aircraft altitude even while pitched up")
 		check(app.mission.skein_total()==6 and app.combat.enemies.size()<=12,"Arrival counts stay honest and bounded")
 	app.flight.heading+=PI
+	# Place every bird behind the new heading explicitly; earlier groups may have been passed.
+	for bird: Dictionary in app.combat.enemies:bird.position=app.flight.position-app.flight.forward()*1000
 	var kills: int=app.combat.kills;app.mission.tick(Mission.EMPTY_VIEW_SECONDS+.01)
 	check(app.mission.phase=="wave_break","Leaving the whole stream behind schedules another encounter")
 	app.flight.position+=app.flight.forward()*(app.mission.stream_gap+1)
