@@ -1,6 +1,6 @@
 {
   "firmware": "instrument-6",
-  "status": "compiled; final flash and live demo held for explicit user go-ahead",
+  "status": "approved, flashed, readback verified and connected to the running game",
   "application_bytes": 691984,
   "application_sha256": "d95db84753428f08f2e13a4d7cffdca33a9c8bb21bf1eba86a2fa9edc3d5b310",
   "write_offset": "0x10000",
@@ -33,9 +33,24 @@
     "bluetooth_reconnect": "passed",
     "validates_final_firmware": false
   },
-  "physical_final_visual_confirmation": "pending coordinated run",
+  "physical_final_visual_confirmation": "Live game telemetry and physical START observed; final appearance awaits user feedback",
   "notes": [
-    "The final build has not been flashed or tested on the badge yet, per the user request to coordinate with teammates.",
+    "The user approved flashing, then explicitly requested immediate start. Final firmware is installed and the real game was launched.",
     "The canonical app also includes parallel gameplay work; its separate cannon-count assertion is documented above. This badge integration branch passes the complete verification suite."
-  ]
+  ],
+  "flash_verified": true,
+  "preserved_regions_unchanged": true,
+  "final_live_acceptance": {
+    "firmware": "instrument-6",
+    "protocol": 2,
+    "extension_bytes": 26,
+    "source": "actual running game, not synthetic demo",
+    "observed_received_packets": 3306,
+    "bad_packets": 0,
+    "sampled_flight_fps_min": 14.6,
+    "sampled_flight_fps_max": 15.0,
+    "free_heap_bytes": 90624,
+    "physical_start_button": "observed in live relay log",
+    "final_display_visual_confirmation": "awaiting user feedback"
+  }
 }
