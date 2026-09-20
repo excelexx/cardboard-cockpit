@@ -123,7 +123,7 @@ class FilterTests(unittest.TestCase):
     def test_startup_is_neutral(self):
         packet = self.make().step(1, 1000, None, None)
         self.assertFalse(packet["tracking"])
-        self.assertEqual(packet["yoke"], {"roll": 0, "pitch": 0, "confidence": 0})
+        self.assertEqual(packet["yoke"], {"roll": 0, "pitch": 0, "yaw":0, "confidence": 0})
         self.assertEqual(packet["throttle"], {"value": 0, "confidence": 0})
 
     def test_yoke_loss_then_neutral(self):

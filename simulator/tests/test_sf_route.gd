@@ -40,7 +40,7 @@ func run() -> void:
 				root.get_texture().get_image().save_png(destination+"/route-%02d.png" % previous_index)
 		if app.mode=="results": break
 		if frame%600==0: await process_frame
-	if not app.mission_success or not app.combat.boss_defeated: failures.append("Demo failed to defeat boss and reach outcome")
+	if not app.mission_success or app.skein_down()<ceili(app.skein_total()*.75) or app.flight.contact!="landed" or app.flight.speed>.1: failures.append("Demo failed the current branch's flock-and-safe-landing outcome")
 	if app.mission.clock>150: failures.append("Demo exceeded 150 second limit")
 	if app.mission.visited_route.size()<2: failures.append("Demo did not reach the coast waypoints")
 	if peak<350: failures.append("Did not reach the Bay Area touring altitude")

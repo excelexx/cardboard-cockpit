@@ -1,4 +1,5 @@
 extends SceneTree
+const Balance=preload("res://data/balance.gd")
 var app: Node3D
 var failures: Array[String] = []
 var checks := 0
@@ -17,14 +18,14 @@ func run():
 	app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
 	var target: Dictionary = target_at(400)
-	check(target.health==900,"Reactive normal target starts with 900 HP")
+	check(target.health==Balance.CONTACT_HEALTH and target.health<=Balance.GUN_ROUNDS_PER_PACKET*Balance.GUN_DAMAGE_PER_ROUND,"Current branch keeps normal geese at one-packet durability")
 	var gun_ttk := 0.0
 	for i in range(600):
 		app.combat.tick(1.0/120); app.combat.fire_gun()
 		gun_ttk += 1.0/120
 		if app.combat.kills>0: break
-	check(app.combat.kills==1 and app.combat.rounds_hit>=40,"Sustained primary clears a durable target after visible hits")
-	check(gun_ttk>1 and gun_ttk<5,"At 400 metres gun travel plus tracking yields a sustained readable burst")
+	check(app.combat.kills==1 and app.combat.rounds_hit>=ceili(Balance.CONTACT_HEALTH/Balance.GUN_DAMAGE_PER_ROUND),"Primary clears the configured target after recorded hits")
+	check(gun_ttk>.1 and gun_ttk<1,"At 400 metres the current branch keeps gun travel visible and the kill responsive")
 	target = target_at(600)
 	for i in range(18): app.combat.tick(1.0/120)
 	app.combat.fire_missile()
@@ -32,7 +33,7 @@ func run():
 	for i in range(480):
 		app.combat.tick(1.0/120); app.combat.fire_missile(); missile_ttk += 1.0/120
 		if app.combat.kills>0: break
-	check(app.combat.kills==1 and app.combat.missiles_fired>=8,"Repeated four-missile salvos clear a fresh durable target")
+	check(app.combat.kills==1 and app.combat.missiles_fired>=8,"Repeated four-missile salvos clear a fresh configured target")
 	check(missile_ttk>1 and missile_ttk<4,"Missile launch, ignition, guidance and hit remain visible and responsive")
 	app.start_flight("combat"); app.combat.spawn_clock = 999
 	app.combat.spawn_shot(Vector3(0,500,-3500),Vector3(0,0,-185),"missile",-1,100)

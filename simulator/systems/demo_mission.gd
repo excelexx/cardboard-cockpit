@@ -265,7 +265,7 @@ func _flock_course(heading: float) -> Vector3:
 		if flight_script!=null:
 			for entry: Dictionary in flight_script.get_script_method_list():
 				if entry.name=="skein_course" and entry.args.size()==1:
-					var supplied: Variant=flight_script.skein_course(heading)
+					var supplied: Variant=flight_script.skein_course(app.combat) if int(entry.args[0].get("type",TYPE_NIL))==TYPE_OBJECT else flight_script.skein_course(heading)
 					if supplied is Vector3:
 						var candidate: Vector3=supplied
 						candidate.y=0

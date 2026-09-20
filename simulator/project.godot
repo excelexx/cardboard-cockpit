@@ -39,3 +39,6 @@ driver/enable_input=false
 
 [physics]
 common/physics_ticks_per_second=60
+
+[editor]
+import/use_multiple_threads=false

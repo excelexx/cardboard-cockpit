@@ -32,6 +32,7 @@ var app: Node
 var active := false
 var engagement_enabled := true
 var managed_mission := false
+var training_target_limit:=-1
 var elapsed := 0.0
 var duration := Tune.PATROL_DURATION
 var hull := Tune.PLAYER_HEALTH
@@ -77,6 +78,8 @@ var threat_level := 0.0
 var hit_flash := 0.0
 var hit_confirm := 0.0
 var assist := true
+var aim_strength: float=1.0:
+	set(value):aim_strength=clampf(value,0,3) if is_finite(value) else 1.0
 var last_missile: Node3D
 var enemies: Array[Dictionary] = []
 var shots: Array[Dictionary] = []
@@ -91,6 +94,7 @@ var message := ""
 var message_time := 0.0
 
 func reset(enabled: bool = true) -> void:
+	training_target_limit=-1
 	for child: Node in get_children():
 		if child==visuals:continue
 		remove_child(child); child.queue_free()
@@ -140,6 +144,7 @@ func choose_motif() -> String:
 	return chosen
 
 func spawn_contact(kind: String = "normal") -> void:
+	if training_target_limit>=0 and next_id>=training_target_limit:return
 	if kind=="normal" and elapsed>28 and next_id%5==3:kind="elite"
 	if arrival_index%3==0:motif=choose_motif();event("scan",app.flight.position+forward()*700,.6)
 	var node := goose_model();add_child(node)
@@ -200,7 +205,7 @@ func tick(dt: float) -> void:
 		enemy.hit_flash=maxf(0,enemy.hit_flash-dt*5)
 		var to_plane: Vector3 = app.flight.position-enemy.position
 		var distance: float = to_plane.length()
-		if enemy.kind!="boss" and (enemy.age>24 or distance>2500 or forward().dot(-to_plane)<-90): enemy.retiring = true
+		if training_target_limit<0 and enemy.kind!="boss" and (enemy.age>24 or distance>2500 or forward().dot(-to_plane)<-90): enemy.retiring = true
 		var present: bool = (engagement_enabled or enemy.kind=="boss") and not enemy.retiring
 		enemy.fade = minf(.1 if enemy.kind=="boss" and enemy.age<4 else 1.0,enemy.fade+dt*Tune.CONTACT_FADE_IN) if present else maxf(0,enemy.fade-dt*Tune.CONTACT_FADE_OUT)
 		var lateral: Vector3 = enemy.get("right",Vector3.RIGHT)
@@ -258,17 +263,19 @@ func safe_direction_lerp(a: Vector3,b: Vector3,weight: float) -> Vector3:
 	return a.rotated(axis.normalized(),angle*weight).normalized()
 
 func assisted_direction() -> Vector3:
-	return aim_direction if assist else forward()
+	if not assist or aim_strength<=0 or aim_direction.length_squared()<.0001:return forward()
+	if aim_strength>=1:return aim_direction
+	return safe_direction_lerp(forward(),aim_direction,aim_strength)
 
 func update_aim(dt: float) -> void:
 	var desired: Vector3 = forward()
 	var enemy: Dictionary = target()
 	if assist and not enemy.is_empty():
 		var wanted: Vector3 = (lead_point(enemy)-app.flight.position).normalized()
-		if desired.angle_to(wanted)<deg_to_rad(intent.retain_degrees(self)): desired = forward().slerp(wanted,clampf(.45+intent.confidence*.7,0,1))
+		if desired.angle_to(wanted)<deg_to_rad(intent.retain_degrees(self)): desired = forward().slerp(wanted,clampf((.45+intent.confidence*.7)*aim_strength,0,1))
 	if aim_direction.length_squared()<.5: aim_direction = forward()
 	var angle: float = aim_direction.angle_to(desired)
-	var weight: float = minf(1-exp(-dt*Tune.AIM_RESPONSE),deg_to_rad(Tune.AIM_SLEW_DEGREES)*dt/maxf(angle,.0001))
+	var weight: float = minf(1-exp(-dt*Tune.AIM_RESPONSE*maxf(.1,aim_strength)),deg_to_rad(Tune.AIM_SLEW_DEGREES)*dt/maxf(angle,.0001))
 	aim_direction = safe_direction_lerp(aim_direction,desired,weight)
 	var visual: Vector3 = forward()
 	if assist and not enemy.is_empty() and forward().angle_to((enemy.position-app.flight.position).normalized())<deg_to_rad(intent.retain_degrees(self)):

@@ -26,9 +26,11 @@ class SyntheticCamera:
         self.hide_throttle = False
         self.closed = False
         self.reads = 0
+        self.fail_frame=False
 
     def read(self):
         self.reads += 1
+        if self.fail_frame:return None
         frame = self.frame.copy()
         if self.hide_yoke:
             frame[280:440, 220:380] = 255

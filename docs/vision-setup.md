@@ -2,6 +2,21 @@
 
 The native flight simulator works with keyboard and mouse by itself. This optional Python service tracks two printed ArUco markers and sends normalized controls locally. Camera images stay in memory on your computer; the service does not record or upload them. The webcam is opened only when you explicitly run a command containing `--camera`.
 
+## Two-camera cockpit (0.15)
+
+Run `./tools/setup_vision.sh` once, connect the phone as a camera, then open **Launch Two-Camera Cockpit.command**. It identifies the laptop and phone by their device names; ambiguous devices require explicit indices:
+
+```sh
+./tools/dual_camera_tracker.sh --list-cameras
+./tools/dual_camera_tracker.sh --yoke-camera 0 --throttle-camera 1
+```
+
+Camera indices above are examples; use the listing for your Mac. In the game choose **Set up cardboard**, enable tracking and choose **Calibrate neutral** while holding the yoke upright for three seconds. The laptop handles yoke ID 7 and weapons. The phone handles three coplanar throttle tags: ID 0 at idle, ID 1 on the moving handle, ID 2 at full. The relative throttle does not need saved endpoints. Gun tag ID 4 fires while visible; the existing two-sided switches (31/32 and 41/42) remain supported. Keyboard T still controls missiles when using the gun-only tag.
+
+The two previews have independent freshness and tracking status. A missing phone shows a disconnected phone panel; it never substitutes the laptop image. Live input sensitivity is sent from Settings to the tracker and reapplied after reconnect. Each axis also has a separate aircraft agility setting. Closing the launcher terminates its tracker and releases both cameras.
+
+The instructions below describe the retained single-camera ID 7 / ID 23 calibration workflow. The two-camera path, preview loss/recovery and settings transport are covered by synthetic tests; actual dual-camera placement still needs physical validation.
+
 ## Install once
 
 Use Python 3.9–3.12. From the `cardboard-cockpit` project folder:

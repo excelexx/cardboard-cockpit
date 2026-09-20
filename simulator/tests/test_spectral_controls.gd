@@ -61,7 +61,7 @@ func run() -> void:
 	check(app.combat.intent.choose(app.combat,.016)==-1,"Wide roll margin closes after recovery")
 	app.start_flight("combat");app.combat.spawn_contact("boss")
 	var boss: Dictionary=app.combat.enemies[0];boss.age=5;app.mission.phase="boss"
-	app.combat.hurt_enemy(boss,5000,"cannon",boss.position)
+	app.combat.hurt_enemy(boss,boss.max_health*.35,"cannon",boss.position)
 	check(boss.damage_stage>=1 and boss.health>0,"Primary damage breaks boss armor without instant kill")
 	var kills: int=app.combat.kills
 	app.combat.hurt_enemy(boss,100000,"missile",boss.position)

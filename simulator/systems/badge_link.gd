@@ -25,10 +25,11 @@ var _since := 0.0
 var telemetry_clock:=0.0
 
 func _init() -> void:
-	if DisplayServer.get_name()=="headless":return
+	if DisplayServer.get_name()=="headless" or OS.get_environment("COCKPIT_DISABLE_BADGE")=="1":return
 	_open = _udp.connect_to_host(HOST, PORT) == OK
 
 func phase_for(app: Node) -> String:
+	if app.has_method("overlay_visible") and app.overlay_visible():return "idle"
 	var flight: Object = app.flight
 	if app.mode == "rollout":
 		return "landing"
@@ -88,15 +89,16 @@ var awaiting_neutral := true
 var status := "BADGE OFFLINE"
 
 func open_inputs(port: int = 8771) -> bool:
+	if OS.get_environment("COCKPIT_DISABLE_BADGE")=="1" and port!=0:return false
 	if receiver_open: return true
 	receiver_open = receiver.bind(port,"127.0.0.1")==OK
 	var helper: String=OS.get_executable_path().get_base_dir().path_join("../Resources/BadgeBridge/BadgeBridge")
-	if receiver_open and FileAccess.file_exists(helper):
+	if receiver_open and port==8771 and DisplayServer.get_name()!="headless" and OS.get_environment("COCKPIT_DISABLE_BADGE")!="1" and FileAccess.file_exists(helper):
 		helper_pid=OS.create_process(helper,PackedStringArray(["--parent-pid",str(OS.get_process_id())]))
 	return receiver_open
 func poll() -> void:
 	pressed = 0; released = 0
-	if DisplayServer.get_name()!="headless":
+	if DisplayServer.get_name()!="headless" and OS.get_environment("COCKPIT_DISABLE_BADGE")!="1":
 		if receiver_open and helper_pid>0 and not OS.is_process_running(helper_pid):
 			receiver.close();receiver_open=false;helper_pid=-1
 		if not receiver_open and Time.get_ticks_msec()>=input_retry_at:
@@ -139,7 +141,7 @@ func _objective_contact(app: Node,enemy: Dictionary) -> bool:
 func instrument_snapshot(app: Node) -> Dictionary:
 	var f: FlightDynamics=app.flight
 	var c: CombatDirector=app.combat
-	var mode_value: int=2 if app.mode=="results" else 3 if app.mode=="paused" else 1 if app.mode in ["flight","rollout","crashed","ejected"] else 0
+	var mode_value: int=2 if app.mode=="results" else 3 if app.mode=="paused" or app.mode in ["flight","rollout"] and app.overlay_visible() else 1 if app.mode in ["flight","rollout","crashed","ejected"] else 0
 	var flags:=0
 	if c.target_id>=0 and c.lock_progress>=1 and c.active:flags|=1
 	if c.active and c.incoming_distance<2200:flags|=2
@@ -148,7 +150,7 @@ func instrument_snapshot(app: Node) -> Dictionary:
 	if f.flaps>0:flags|=16
 	if app.copilot:flags|=32
 	if app.mode=="results" and app.mission_success:flags|=64
-	if app.mode=="flight" and c.active and c.gun_firing_time>0:flags|=128
+	if mode_value==1 and app.mode=="flight" and c.active and c.gun_firing_time>0:flags|=128
 	var right:=Vector3(cos(f.heading),0,sin(f.heading));var forward:=Vector3(sin(f.heading),0,-cos(f.heading))
 	var contacts: Array=[]
 	if app.mode in ["flight","paused"] and c.active:

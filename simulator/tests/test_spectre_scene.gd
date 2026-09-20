@@ -53,7 +53,7 @@ func run_tests() -> void:
 	for i in range(24): app.combat.update_aim(1.0/120)
 	check(app.combat.assisted_direction().angle_to(app.flight.forward())>deg_to_rad(3),"Narrow assistance corrects a near-centre shot")
 	check(app.combat.assisted_direction().angle_to((enemy.position-app.flight.position).normalized())<deg_to_rad(2),"Assisted shots converge on the visible goose")
-	check(app.combat.fire_gun() and app.combat.rounds_fired==4 and app.combat.ammo==-1,"Cannon records shots without depleting ammunition")
+	check(app.combat.fire_gun() and app.combat.rounds_fired==preload("res://data/balance.gd").GUN_ROUNDS_PER_PACKET and app.combat.ammo==-1,"Cannon records shots without depleting ammunition")
 	app.combat.spawn_shot(app.flight.position+Vector3(0,0,-600),Vector3(0,0,280),"hostile_missile",-1,24)
 	check(app.combat.deploy_flares() and app.combat.flares==-1 and app.combat.flares_fired==1,"Countermeasures record a burst without running out")
 	check(app.combat.shots.back().has("decoy"),"Incoming missile is redirected toward a decoy")

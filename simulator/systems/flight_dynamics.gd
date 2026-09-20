@@ -10,6 +10,12 @@ const Tune = preload("res://data/balance.gd")
 ## is ever fed back into the trajectory, the drag or the stall logic. Autopilots
 ## therefore keep commanding `pitch` exactly as before and MUST NOT add `aoa` to
 ## their demands - doing so would make the aircraft climb.
+var pitch_agility: float=1.0:
+	set(value):pitch_agility=clampf(value,.5,3.0) if is_finite(value) else 1.0
+var bank_agility: float=1.0:
+	set(value):bank_agility=clampf(value,.5,3.0) if is_finite(value) else 1.0
+var yaw_agility: float=1.0:
+	set(value):yaw_agility=clampf(value,.5,3.0) if is_finite(value) else 1.0
 var profile: Dictionary
 var position := Vector3.ZERO
 var velocity := Vector3.ZERO
@@ -184,8 +190,8 @@ func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> voi
 		var handling: float = 1+Tune.THROTTLE_HANDLING_SCALAR*(1-2*throttle)
 		var authority: float = clampf(speed/effective_rotation_speed(),0.15,1.25)
 		var roll_authority: float = clampf(speed/ROLL_AUTHORITY_SPEED,ROLL_AUTHORITY_MIN,ROLL_AUTHORITY_MAX)
-		roll_velocity = lerpf(roll_velocity,controls.x*float(profile.roll_rate)*handling*roll_authority,1-exp(-dt*Tune.ROLL_RESPONSE))
-		pitch_velocity = lerpf(pitch_velocity,controls.y*float(profile.pitch_rate)*authority*handling,1-exp(-dt*Tune.PITCH_RESPONSE))
+		roll_velocity = lerpf(roll_velocity,controls.x*float(profile.roll_rate)*handling*bank_agility*roll_authority,1-exp(-dt*Tune.ROLL_RESPONSE))
+		pitch_velocity = lerpf(pitch_velocity,controls.y*float(profile.pitch_rate)*authority*handling*pitch_agility,1-exp(-dt*Tune.PITCH_RESPONSE))
 		var rolling: bool = barrel_remaining>0
 		var barrel_phase := 0.0
 		if rolling:
@@ -208,7 +214,7 @@ func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> voi
 			barrel_pitch_offset = pitch_offset
 			barrel_heading_offset = heading_offset
 		var coordinated: float = sin(roll)*Tune.BANK_TURN_FORCE/maxf(speed,55.0)
-		var desired_yaw: float = coordinated+controls.z*Tune.YAW_RATE*handling
+		var desired_yaw: float = coordinated*bank_agility+controls.z*Tune.YAW_RATE*handling*yaw_agility
 		yaw_velocity = lerpf(yaw_velocity,0.0 if rolling else desired_yaw,1-exp(-dt*Tune.YAW_RESPONSE))
 		heading = wrapf(heading+yaw_velocity*dt,-PI,PI)
 		var lift: float = clampf(speed/(effective_rotation_speed()*0.82),0,1)
@@ -219,7 +225,7 @@ func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> voi
 		# high speed no longer asks the path for tens of g. The limiter may only
 		# ever SMOOTH the answer, never delay it past the old first-order lag.
 		var legacy: float = lerpf(vertical_speed,desired_vertical,1-exp(-dt*LEGACY_VERTICAL_RESPONSE))
-		var eager: float = lerpf(vertical_speed,desired_vertical,1-exp(-dt*Tune.VERTICAL_RESPONSE))
+		var eager: float = lerpf(vertical_speed,desired_vertical,1-exp(-dt*Tune.VERTICAL_RESPONSE*pitch_agility))
 		var load: float = cos(pitch)*maxf(cos(roll),0.0)
 		var up_rate: float = 9.81*maxf(G_LIMIT-load,0.5)*dt
 		var down_rate: float = 9.81*maxf(load-G_LIMIT_NEG,0.5)*dt

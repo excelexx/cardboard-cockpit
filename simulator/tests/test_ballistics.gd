@@ -25,7 +25,8 @@ func run():
 	var shot: Dictionary = app.combat.shots.back()
 	for i in range(60): app.combat.update_shots(1.0/60)
 	check(shot.position.y<start.y-4 and shot.position.y>start.y-6,"Cannon trajectory includes one second of gravitational drop")
-	check(shot.velocity.length()<1200 and shot.velocity.length()>1100,"Air drag slows the projectile")
+	var drag_speed: float=1250.0/(1.0+preload("res://data/balance.gd").GUN_DRAG*1250.0)
+	check(absf(shot.velocity.length()-drag_speed)<drag_speed*.015,"Air drag follows the configured quadratic-drag law")
 	app.start_flight("combat"); app.combat.spawn_contact()
 	var enemy: Dictionary = app.combat.enemies[0]
 	enemy.position = start+Vector3(0,0,-20); enemy.health = 28
