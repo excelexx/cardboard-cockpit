@@ -325,9 +325,18 @@ func _panorama() -> void:
 	var top := 78.0; var tall: float = size.y-top-16
 	# Weapons and airframe.
 	var a := Rect2(16,top,380,tall); _portal(a,"WEAPONS")
-	_p(label_font,a.position+Vector2(16,104),"PRIMARY",28,P_WHITE); _chip(a.position+Vector2(232,62),bool(tactical.get("gun",false)))
-	_p(label_font,a.position+Vector2(16,184),"MISSILE",24,P_WHITE)
-	_p(label_font,a.position+Vector2(210,184),"READY" if bool(tactical.get("missile_ready",false)) else "%.1fs" % float(tactical.get("missile_cooldown",0)),20,P_GREEN)
+	var plasma_active: bool=bool(tactical.get("beam_active",false))
+	var beam_ids: Variant=tactical.get("beam_target_ids",[])
+	var plasma: String="FIRING" if plasma_active else "OFF"
+	if plasma_active and beam_ids is Array and beam_ids.size()>=2:
+		if int(beam_ids[0])>=0 and int(beam_ids[1])>=0:plasma="FOCUS" if beam_ids[0]==beam_ids[1] else "SPLIT"
+		elif int(beam_ids[0])>=0 or int(beam_ids[1])>=0:plasma="FOCUS"
+	_p(label_font,a.position+Vector2(16,104),"DUAL PLASMA",24,P_WHITE)
+	_p(label_font,a.position+Vector2(232,104),plasma,22,P_GREEN if plasma_active else P_SOFT)
+	var swarm: bool=bool(tactical.get("swarm_active",false))
+	var cooldown: float=float(tactical.get("missile_cooldown",0))
+	_p(label_font,a.position+Vector2(16,184),"AUTO MISSILES",21,P_WHITE)
+	_p(label_font,a.position+Vector2(232,184),("READY" if cooldown<=0 else "%.1fs" % cooldown) if swarm else "STANDBY",20,P_GREEN if swarm else P_SOFT)
 	var lock: float = float(tactical.get("lock",0.0)); var tracking: bool = bool(tactical.get("tracking",false))
 	var lock_rect := Rect2(a.position+Vector2(16,226),Vector2(348,78))
 	if tracking and lock>=1.0:

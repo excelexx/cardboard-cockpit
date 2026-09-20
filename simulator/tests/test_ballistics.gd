@@ -10,51 +10,41 @@ func run():
 	app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
 	app.start_flight("combat")
-	app.cockpit = false # This assertion tests exterior muzzle effects, hidden in cockpit view.
-	check(is_instance_valid(app.fighter_fx.gun_rotor) and is_instance_valid(app.fighter_fx.gun_muzzle),"Imported rotary gun retains animated rotor and physical muzzle")
-	app.combat.fire_gun(); app.fighter_fx.update_gun(.05)
-	check(app.fighter_fx.rotor_speed>0 and app.fighter_fx.gun_flash.visible,"Gun fires immediately with rotating barrels and attached muzzle flash")
-	var live_muzzle: Vector3 = app.fighter_fx.gun_muzzle_position(Vector3.ZERO)
-	check(live_muzzle.distance_to(app.flight.position)>2 and live_muzzle.distance_to(app.flight.position)<9,"Projectile origin uses actual barrel tip")
-	app.combat.gun_firing_time = 0
-	for i in range(60): app.fighter_fx.update_gun(1.0/60)
-	check(app.fighter_fx.rotor_speed==0 and not app.fighter_fx.gun_flash.visible,"Releasing fire stops flash and lets rotor coast to a stop")
+	app.cockpit = false
+	check(app.fighter_fx.plasma_models.size()==2 and app.fighter_fx.plasma_muzzles.size()==2,"Both mounted plasma emitters have physical muzzle anchors")
+	app.combat.fire_primary();app.combat.update_beam(.016);app.fighter_fx.update_plasma(.016)
+	check(app.combat.beam_active and app.combat.beam_ends.size()==2,"Primary immediately activates two forward plasma beams")
+	var left: Vector3=app.fighter_fx.plasma_muzzle_position(Vector3.ZERO,0)
+	var right: Vector3=app.fighter_fx.plasma_muzzle_position(Vector3.ZERO,1)
+	check(left.distance_to(right)>1,"Plasma originates from two distinct mounted emitters")
+	app.combat.gun_firing_time=0;app.combat.update_beam(.1)
+	check(not app.combat.beam_active and app.combat.rounds_fired==0,"Release stops plasma without leaving bullet fire")
 	app.start_flight("combat")
-	var start := Vector3(0,500,-3500)
-	app.combat.spawn_shot(start,Vector3(0,0,-1250),"cannon",-1,28)
-	var shot: Dictionary = app.combat.shots.back()
-	for i in range(60): app.combat.update_shots(1.0/60)
-	check(shot.position.y<start.y-4 and shot.position.y>start.y-6,"Cannon trajectory includes one second of gravitational drop")
-	var drag_speed: float=1250.0/(1.0+preload("res://data/balance.gd").GUN_DRAG*1250.0)
-	check(absf(shot.velocity.length()-drag_speed)<drag_speed*.015,"Air drag follows the configured quadratic-drag law")
-	app.start_flight("combat"); app.combat.spawn_contact()
-	var enemy: Dictionary = app.combat.enemies[0]
-	enemy.position = start+Vector3(0,0,-20); enemy.health = 28
-	app.combat.spawn_shot(start,Vector3(0,0,-5000),"cannon",-1,28)
+	var start:=Vector3(0,500,-3500)
+	app.combat.spawn_shot(start,Vector3(0,0,-180),"missile",-1,135)
+	var shot: Dictionary=app.combat.shots.back()
+	app.combat.update_shots(.05)
+	check(shot.velocity.length()<190,"Missile separates before its motor accelerates")
+	for i in range(30):app.combat.update_shots(1.0/60)
+	check(shot.velocity.length()>200,"Missile motor accelerates after its ignition delay")
+	app.start_flight("combat");app.combat.spawn_contact()
+	var enemy: Dictionary=app.combat.enemies[0]
+	enemy.position=start+Vector3(0,0,-50);enemy.health=100
+	app.combat.spawn_shot(start,Vector3(0,0,-5000),"missile",-1,135)
 	app.combat.update_shots(1.0/60)
-	check(app.combat.kills==1,"Swept collision detects a target crossed between frames")
-	check(app.combat.has_method("fire_missile") and app.fighter_fx.stores.size()==4,"Independent missiles retain four visible mounted stores")
+	check(app.combat.kills==1,"Swept missile collision detects a target crossed between frames")
 	app.start_flight("combat")
-	app.combat.spawn_shot(Vector3(0,5,-3500),Vector3(0,-600,-100),"cannon",-1,28)
+	app.combat.spawn_shot(Vector3(0,5,-3500),Vector3(0,-600,-100),"missile",-1,135)
 	app.combat.update_shots(.03)
-	check(app.combat.shots.is_empty() and not app.combat.bursts.is_empty(),"Projectiles hit terrain and produce an impact")
-	app.start_flight("combat"); app.combat.spawn_contact()
-	enemy = app.combat.enemies[0]; enemy.position = app.flight.position+app.flight.forward()*430
-	enemy.health = 100000; enemy.cooldown = 999; app.combat.spawn_clock = 999
-	for code in [KEY_SPACE]:
-		var event := InputEventKey.new(); event.keycode = code; event.physical_keycode = code; event.pressed = true
-		Input.parse_input_event(event); Input.flush_buffered_events()
-	for i in range(1500):
-		app._physics_process(1.0/60)
-		if i%90==0: await process_frame
-	for code in [KEY_SPACE]:
-		var event := InputEventKey.new(); event.keycode = code; event.physical_keycode = code; event.pressed = false
-		Input.parse_input_event(event); Input.flush_buffered_events()
-	check(app.combat.rounds_fired>=800 and app.combat.rounds_fired<=1004,"Holding Space sustains the slower cannon cadence for twenty-five seconds")
-	check(app.combat.ammo==-1 and app.combat.missiles_fired==0,"Unlimited primary fire does not launch the independent missiles")
-	var released_rounds: int=app.combat.rounds_fired
+	check(app.combat.shots.is_empty() and app.combat.visuals.active_blast_count()==1,"Missiles hit terrain and produce an impact")
+	app.start_flight("combat");app.combat.spawn_clock=999;app.fire_guard=0
+	var press:=InputEventKey.new();press.keycode=KEY_SPACE;press.physical_keycode=KEY_SPACE;press.pressed=true
+	Input.parse_input_event(press);Input.flush_buffered_events()
+	for i in range(240):app._physics_process(1.0/60)
+	press=press.duplicate();press.pressed=false;Input.parse_input_event(press);Input.flush_buffered_events()
+	check(app.combat.primary_used and app.combat.beam_active and app.combat.rounds_fired==0,"Holding Space sustains only the dual plasma weapon")
 	for i in range(30):app._physics_process(1.0/60)
-	check(app.combat.rounds_fired==released_rounds and app.combat.gun_firing_time<=0 and not app.combat.beam_active,"Releasing Space stops new rounds and plasma after the firing tail")
+	check(app.combat.gun_firing_time<=0 and not app.combat.beam_active,"Releasing Space stops both beams after the short release tail")
 	app.start_flight("combat"); app.combat.spawn_contact(); enemy = app.combat.enemies[0]
 	enemy.position = app.flight.position+Vector3(35,0,-500); app.combat.target_id = enemy.id
 	var initial: Vector3 = app.combat.assisted_direction()

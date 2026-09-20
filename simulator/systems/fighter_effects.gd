@@ -51,20 +51,10 @@ var parachute: Node3D
 var chute_clock := 0.0
 var sonic_armed := true
 var clock := 0.0
-var gun_model: Node3D
-var plasma_model: Node3D
-var plasma_muzzle: Node3D
-var gun_heat := 0.0
+var plasma_models: Array[Node3D] = []
+var plasma_muzzles: Array[Node3D] = []
 var plasma_charge := 0.0
-var gun_gimbal: Node3D
-var gun_rotor: Node3D
-var gun_muzzle: Node3D
-var gun_flash: Node3D
-var gun_light: OmniLight3D
-var gun_gas: GPUParticles3D
-var gun_gas_anchor: Node3D
 var tyre_puffs: Array[GPUParticles3D] = []
-var rotor_speed := 0.0
 var last_store := 0
 var store_timers: Array[float] = [0,0,0,0]
 var wind_field: MeshInstance3D
@@ -83,7 +73,7 @@ static var _soft_puff: GradientTexture2D
 
 ## assets/sourced_flight/smoke.png carries opaque pixels right up to its border, so any
 ## sprite scaled past a metre or two draws a visible square card. Everything that stretches
-## - gun gas, tyre smoke, the wingtip ribbons, the speed streaks - uses this instead.
+## - tyre smoke, wingtip ribbons and speed streaks - uses this instead.
 static func soft_puff() -> GradientTexture2D:
 	if _soft_puff==null:
 		var ramp := Gradient.new()
@@ -111,30 +101,12 @@ func build() -> void:
 	for store: Node3D in stores:
 		if is_instance_valid(store): store.queue_free()
 	for child: Node in get_children(): child.queue_free()
-	gun_gas = null; gun_gas_anchor = null; tyre_puffs.clear()
-	gun_model = app.aircraft.find_child("CG26",true,false)
-	plasma_model = app.aircraft.find_child("PC26",true,false)
-	plasma_muzzle = app.aircraft.find_child("BeamMuzzle",true,false)
-	gun_heat = 0.0; plasma_charge = 0.0
-	gun_gimbal = app.aircraft.find_child("GunGimbal",true,false)
-	gun_rotor = app.aircraft.find_child("GatlingRotor",true,false)
-	gun_muzzle = app.aircraft.find_child("GunMuzzle",true,false)
-	gun_flash = Node3D.new(); add_child(gun_flash)
-	var flash_material := StandardMaterial3D.new()
-	flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	flash_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	flash_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	flash_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	flash_material.albedo_texture = load("res://assets/sourced_flight/muzzle.png")
-	for angle in [0.0,PI/2]:
-		var plane := MeshInstance3D.new(); var quad := QuadMesh.new(); quad.size = Vector2(2.1,.64)
-		plane.mesh = quad; plane.material_override = flash_material
-		plane.basis = Basis(Vector3.BACK,angle)*Basis(Vector3.UP,PI/2)
-		plane.position.z = -1.02; plane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		gun_flash.add_child(plane)
-	gun_light = OmniLight3D.new(); gun_light.light_color = Color(1,.62,.20)
-	gun_light.omni_range = 14; gun_light.omni_attenuation = 1.6
-	gun_light.shadow_enabled = false; add_child(gun_light)
+	tyre_puffs.clear()
+	plasma_models.clear(); plasma_muzzles.clear(); plasma_charge = 0.0
+	for name in ["PC26Left", "PC26Right"]:
+		var model: Node3D = app.aircraft.find_child(name, true, false)
+		plasma_models.append(model)
+		plasma_muzzles.append(model.find_child("BeamMuzzle", true, false) if is_instance_valid(model) else null)
 	condensation.clear(); trails.clear(); stores.clear(); particles.clear(); trail_points = [[],[]]
 	vapor_wings.clear()
 	_build_burner()
@@ -346,7 +318,7 @@ func missile_launch(_side: float, index: int = -1) -> void:
 
 func update(dt: float) -> void:
 	clock += dt
-	update_gun(dt)
+	update_plasma(dt)
 	for i in range(stores.size()):
 		store_timers[i] = maxf(0,store_timers[i]-dt)
 		stores[i].visible = store_timers[i]<.22
@@ -601,13 +573,8 @@ func tick_ejection(dt: float) -> void:
 	parachute.scale = Vector3.ONE*clampf(chute_clock/0.7,0.1,1)
 
 func reset() -> void:
-	rotor_speed = 0
-	gun_heat = 0.0; plasma_charge = 0.0
-	WeaponModels.set_heat(gun_model, 0.0)
-	WeaponModels.set_charge(plasma_model, 0.0, 0.0)
-	if is_instance_valid(gun_flash): gun_flash.visible = false
-	if is_instance_valid(gun_light): gun_light.visible = false
-	if is_instance_valid(gun_gas): gun_gas.emitting = false
+	plasma_charge = 0.0
+	for model in plasma_models: WeaponModels.set_charge(model, 0.0, 0.0)
 	for puff: GPUParticles3D in tyre_puffs:
 		if is_instance_valid(puff): puff.emitting = false
 	clock = 0; sonic_armed = true; last_store = 0; store_timers = [0,0,0,0]
@@ -653,72 +620,16 @@ func update_wind(dt: float, basis: Basis) -> void:
 			mesh.surface_set_color(Color(.86,.93,1,alpha)); mesh.surface_set_uv(vertex[1]); mesh.surface_add_vertex(vertex[0])
 	mesh.surface_end()
 
-func gun_muzzle_position(fallback: Vector3) -> Vector3:
-	return gun_muzzle.global_position if is_instance_valid(gun_muzzle) else fallback
+func plasma_muzzle_position(fallback: Vector3, index: int = 0) -> Vector3:
+	if index < 0 or index >= plasma_muzzles.size(): return fallback
+	var muzzle: Node3D = plasma_muzzles[index]
+	return muzzle.global_position if is_instance_valid(muzzle) else fallback
 
-func plasma_muzzle_position(fallback: Vector3) -> Vector3:
-	return plasma_muzzle.global_position if is_instance_valid(plasma_muzzle) else fallback
-
-func update_gun(dt: float) -> void:
-	var firing: bool = app.combat.active and app.combat.gun_firing_time>0 and app.mode=="flight"
-	var plasma_firing: bool = app.combat.active and app.combat.beam_active and app.mode=="flight"
-	gun_heat = move_toward(gun_heat, 1.0 if firing else 0.0, dt * (0.70 if firing else 0.30))
-	plasma_charge = move_toward(plasma_charge, 1.0 if plasma_firing else 0.0, dt * (3.5 if plasma_firing else 1.8))
-	WeaponModels.set_heat(gun_model, gun_heat)
-	WeaponModels.set_charge(plasma_model, plasma_charge, 1.0 if plasma_firing else 0.0)
-	rotor_speed = move_toward(rotor_speed,62.0 if firing else 0.0,dt*(480 if firing else 110))
-	# The cannon is fixed in the wing root; it does NOT slew toward the aim point.
-	if is_instance_valid(gun_gimbal):
-		gun_gimbal.position.z = .018*(.5+.5*sin(clock*145)) if firing else 0.0
-	if is_instance_valid(gun_rotor): gun_rotor.rotate_z(rotor_speed*dt)
-	# Visible in the cockpit too - just smaller. A cardboard-yoke player flies from here.
-	gun_flash.visible = firing
-	gun_light.visible = firing
-	if is_instance_valid(gun_muzzle):
-		gun_flash.global_transform = gun_muzzle.global_transform.orthonormalized()
-		gun_flash.scale = Vector3.ONE*(.78+.22*sin(clock*137))*(0.45 if app.cockpit else 1.0)
-		gun_light.global_position = gun_muzzle.global_position
-	gun_light.light_energy = (3.2+sin(clock*137)*.7) if firing else 0.0
-	if DisplayServer.get_name()!="headless":
-		if gun_gas==null: _build_gun_gas()
-		if is_instance_valid(gun_gas):
-			if is_instance_valid(gun_muzzle): gun_gas_anchor.global_transform = gun_muzzle.global_transform.orthonormalized()
-			gun_gas.emitting = firing and is_instance_valid(gun_muzzle)
-
-func _build_gun_gas() -> void:
-	gun_gas_anchor = Node3D.new(); add_child(gun_gas_anchor)
-	gun_gas = GPUParticles3D.new()
-	gun_gas.amount = 28
-	gun_gas.lifetime = 0.42
-	gun_gas.local_coords = true        # pinned to the jet, so FSR2 never smears it across the view
-	gun_gas.fixed_fps = 30
-	gun_gas.interpolate = true
-	gun_gas.emitting = false
-	gun_gas.visibility_aabb = AABB(Vector3(-4,-4,-9),Vector3(8,8,11))
-	var process := ParticleProcessMaterial.new()
-	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-	process.emission_sphere_radius = 0.12
-	process.direction = Vector3(0,0,-1)
-	process.spread = 17.0
-	process.initial_velocity_min = 9.0
-	process.initial_velocity_max = 23.0
-	process.damping_min = 15.0
-	process.damping_max = 24.0
-	process.gravity = Vector3.ZERO
-	process.scale_min = 0.30; process.scale_max = 0.85
-	process.angular_velocity_min = -90.0; process.angular_velocity_max = 90.0
-	var growth := Curve.new()
-	growth.add_point(Vector2(0,0.35)); growth.add_point(Vector2(1,1.7))
-	var growth_texture := CurveTexture.new(); growth_texture.curve = growth
-	process.scale_curve = growth_texture
-	var ramp := Gradient.new()
-	ramp.set_color(0,Color(0.86,0.74,0.56,0.34)); ramp.set_offset(0,0.0)
-	ramp.set_color(1,Color(0.50,0.50,0.48,0.0)); ramp.set_offset(1,1.0)
-	var ramp_texture := GradientTexture1D.new(); ramp_texture.gradient = ramp
-	process.color_ramp = ramp_texture
-	gun_gas.process_material = process
-	gun_gas.draw_pass_1 = _puff_mesh(0.55)
-	gun_gas_anchor.add_child(gun_gas)
+func update_plasma(dt: float) -> void:
+	var firing: bool = app.combat.active and app.combat.beam_active and app.mode == "flight"
+	plasma_charge = move_toward(plasma_charge, 1.0 if firing else 0.0, dt * (3.5 if firing else 1.8))
+	for model in plasma_models:
+		WeaponModels.set_charge(model, plasma_charge, 1.0 if firing else 0.0)
 
 func _puff_mesh(size: float) -> QuadMesh:
 	var quad := QuadMesh.new(); quad.size = Vector2(size,size)

@@ -58,7 +58,7 @@ func _ready() -> void:
 		elif axis=="auto_aim": slider.min_value = 0; slider.max_value = GAMEPLAY_SETTINGS.MAX_AUTO_AIM
 		slider.step = .05
 		slider.scrollable = false
-		slider.tooltip_text = {"pitch":"Pitch sensitivity: nose up / down", "bank":"Bank sensitivity: wings left / right", "yaw":"Yaw sensitivity: nose left / right", "pitch_agility":"Speed of pitching up and down", "bank_agility":"Speed of banking and banked turns", "yaw_agility":"Speed of swivelling the nose left and right", "auto_aim":"Gun aiming assistance. Zero shoots straight ahead."}[axis]
+		slider.tooltip_text = {"pitch":"Pitch sensitivity: nose up / down", "bank":"Bank sensitivity: wings left / right", "yaw":"Yaw sensitivity: nose left / right", "pitch_agility":"Speed of pitching up and down", "bank_agility":"Speed of banking and banked turns", "yaw_agility":"Speed of swivelling the nose left and right", "auto_aim":"Plasma aiming assistance. Zero aims straight ahead."}[axis]
 		var track := StyleBoxFlat.new()
 		track.bg_color = GLASS.lightened(.12)
 		track.content_margin_top = 4; track.content_margin_bottom = 4
@@ -436,21 +436,25 @@ func draw_sight(f: FlightDynamics,c: CombatDirector) -> void:
 			if pip.distance_to(center)>9: line(center,pip,Color(tone.r,tone.g,tone.b,0.55),2)
 		else:
 			diamond(point,8,Color(RED.r,RED.g,RED.b,0.9),2)
-func draw_weapons(_c: CombatDirector) -> void:
+func plasma_status(active: bool, ids: Variant) -> String:
+	if not active:return "OFF"
+	if ids is Array and ids.size()>=2:
+		if int(ids[0])>=0 and int(ids[1])>=0:return "FOCUS" if ids[0]==ids[1] else "SPLIT"
+		if int(ids[0])>=0 or int(ids[1])>=0:return "FOCUS"
+	return "FIRING"
+func draw_weapons(c: CombatDirector) -> void:
 	if hidden_in_flight(): return
-	var gun_on: bool = app.gun_requested() or _c.gun_firing_time>0
-	put(mono,Vector2(56,900),"PRIMARY",20,GREEN)
-	var chip := Rect2(204,873,64 if gun_on else 72,36)
-	if gun_on:
-		draw_rect(chip,GREEN)
-		draw_string(display_bold,chip.position+Vector2(13,28),"ON",HORIZONTAL_ALIGNMENT_LEFT,-1,30,GLASS)
-	else:
-		draw_rect(chip,Color(GLASS.r,GLASS.g,GLASS.b,0.62));draw_rect(chip,Color(GREEN.r,GREEN.g,GREEN.b,0.7),false,1)
-		draw_string(display_bold,chip.position+Vector2(13,28),"OFF",HORIZONTAL_ALIGNMENT_LEFT,-1,30,SOFT)
-	put(body,Vector2(292,898),"MINIGUN + PLASMA / SHOW TAG OR HOLD SPACE",16,WHITE)
-	put(mono,Vector2(56,943),"MISSILE",20,GREEN)
-	put(mono,Vector2(204,943),"READY" if _c.missile_cooldown<=0 else "%.1fs" % _c.missile_cooldown,18,GREEN if _c.missile_cooldown<=0 else SOFT)
-	put(body,Vector2(330,941),"T / right mouse · one every 3 seconds",16,WHITE)
+	var status: String=plasma_status(c.beam_active,c.get("beam_target_ids"))
+	put(mono,Vector2(56,900),"DUAL PLASMA",18,GREEN)
+	var chip := Rect2(204,873,110,36)
+	draw_rect(chip,GREEN if c.beam_active else Color(GLASS.r,GLASS.g,GLASS.b,.62))
+	if not c.beam_active:draw_rect(chip,Color(GREEN.r,GREEN.g,GREEN.b,.7),false,1)
+	put(mono,chip.position+Vector2(10,26),status,19,GLASS if c.beam_active else SOFT)
+	put(body,Vector2(334,898),"SHOW ID 4 / HOLD SPACE OR LEFT MOUSE",16,WHITE)
+	var swarm: bool=bool(c.get("swarm_active"))
+	put(mono,Vector2(56,943),"AUTO MISSILES",18,GREEN)
+	put(mono,Vector2(240,943),("READY" if c.missile_cooldown<=0 else "%.1fs" % c.missile_cooldown) if swarm else "STANDBY",17,GREEN if swarm else SOFT)
+	put(body,Vector2(370,941),"FLOCK SUPPORT / FOUR EVERY SECOND" if swarm else "ACTIVATE AUTOMATICALLY IN LARGE FLOCKS",15,WHITE)
 ## How much of the skein is down, in the span the old health bar used to hold:
 ## one pip per bird, amber as it goes down. No named individual, no health bar.
 func draw_objective(c: CombatDirector) -> void:
@@ -561,9 +565,9 @@ func draw_yoke_recovery() -> void:
 	put(mono,Vector2(220,177),"FLIGHT HELD / YOKE TRACKING",17,AMBER)
 	put(display_bold,Vector2(216,243),"BRING THE YOKE BACK INTO VIEW",48,WHITE)
 	put(body,Vector2(220,288),"Hold the yoke visible and steady to resume. Your flight stays here while tracking returns.",19,SOFT)
-	camera_card(Rect2(220,324,558,340),"LAPTOP / YOKE + GUN",app.yoke_preview,app.vision.tracking)
+	camera_card(Rect2(220,324,558,340),"LAPTOP / YOKE + ID 4",app.yoke_preview,app.vision.tracking)
 	camera_card(Rect2(802,324,578,340),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4)
-	put(body,Vector2(220,713),"Keep the yoke pattern uncovered. Cover the gun tag to stop shooting.",18,SOFT)
+	put(body,Vector2(220,713),"Keep the yoke pattern uncovered. Cover the plasma gun tag to stop firing.",18,SOFT)
 	button("keyboard",Rect2(220,757,330,62),"USE KEYBOARD",true)
 	put(mono,Vector2(580,796),"ARROWS STEER / W S POWER / HOLD SPACE TO FIRE",16,GREEN)
 func draw_pause() -> void:
@@ -600,7 +604,7 @@ func draw_results() -> void:
 func draw_help() -> void:
 	zones.clear(); dim(); panel(Rect2(330,110,940,790),.9)
 	put(display_bold,Vector2(384,196),"CONTROLS",64,WHITE)
-	var rows: Array[Array] = [["ARROWS","Climb, dive and bank"],["A  D","Rudder: slide left and right"],["W  S","Faster, slower"],["SHIFT","Hold for afterburner"],["SPACE / CLICK","Hold minigun + plasma; release to stop"],["T / RIGHT CLICK","Slow guided missiles"],["GUN TAG ID 4","Show to fire; cover to stop"],["Z","Flares"],["Q","Barrel roll"],["V","Cockpit or chase view"],["G  F","Landing gear, flaps"],["H","Auto-fly on / off"],["HOLD E","Eject"],["C  M  ESC","Set up cardboard, mute, pause"]]
+	var rows: Array[Array] = [["ARROWS","Climb, dive and bank"],["A  D","Rudder: slide left and right"],["W  S","Faster, slower"],["SHIFT","Hold for afterburner"],["SPACE / CLICK","Hold dual plasma; release to stop"],["AUTO MISSILES","Four per second during large flocks"],["GUN TAG ID 4","Show for plasma; cover to stop"],["Z","Flares"],["Q","Barrel roll"],["V","Cockpit or chase view"],["G  F","Landing gear, flaps"],["H","Auto-fly on / off"],["HOLD E","Eject"],["C  M  ESC","Set up cardboard, mute, pause"]]
 	for i in range(rows.size()):
 		put(mono,Vector2(388,252+i*40),rows[i][0],18,GREEN)
 		put(body,Vector2(610,252+i*40),rows[i][1],18,WHITE)
@@ -644,19 +648,19 @@ func camera_card(rect: Rect2,title: String,preview,tracking: bool) -> void:
 	put(mono,rect.position+Vector2(12,rect.size.y-10),"TRACKING" if tracking and preview.texture!=null else "LIVE / TAG NOT FOUND" if preview.texture!=null else "DISCONNECTED",13,GREEN if tracking and preview.texture!=null else AMBER)
 func draw_camera_previews() -> void:
 	if app.mode=="paused":
-		camera_card(Rect2(56,340,360,248),"LAPTOP / YOKE + GUN",app.yoke_preview,app.vision.tracking)
+		camera_card(Rect2(56,340,360,248),"LAPTOP / YOKE + ID 4",app.yoke_preview,app.vision.tracking)
 		camera_card(Rect2(1184,340,360,248),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4)
 		return
-	camera_card(Rect2(56,162,258,196),"LAPTOP / YOKE + GUN",app.yoke_preview,app.vision.tracking)
+	camera_card(Rect2(56,162,258,196),"LAPTOP / YOKE + ID 4",app.yoke_preview,app.vision.tracking)
 	camera_card(Rect2(328,162,258,196),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4)
 func draw_camera_setup() -> void:
 	zones.clear();dim();panel(Rect2(180,90,1240,820),.95)
 	put(display_bold,Vector2(218,166),"TWO-CAMERA COCKPIT",56,WHITE)
-	put(body,Vector2(220,201),"Laptop: yoke and gun. Phone: throttle. Both previews stay independent.",18,SOFT)
-	camera_card(Rect2(220,234,558,362),"LAPTOP / YOKE + GUN",app.yoke_preview,app.vision.tracking)
+	put(body,Vector2(220,201),"Laptop: yoke and plasma gun tag. Phone: throttle. Both previews stay independent.",18,SOFT)
+	camera_card(Rect2(220,234,558,362),"LAPTOP / YOKE + ID 4",app.yoke_preview,app.vision.tracking)
 	camera_card(Rect2(802,234,578,362),"PHONE / THROTTLE",app.throttle_preview,app.vision.throttle_confidence>.4)
 	put(body,Vector2(220,640),"Keep the yoke tag visible; show the throttle handle and both end tags to the phone.",18,WHITE)
-	put(mono,Vector2(220,675),"GUN %s  /  SHOW ID 4 OR HOLD SPACE / LEFT MOUSE" % ("ON" if app.gun_requested() else "OFF"),16,GREEN)
+	put(mono,Vector2(220,675),"PLASMA %s  /  SHOW ID 4 OR HOLD SPACE / LEFT MOUSE" % ("ON" if app.gun_requested() else "OFF"),16,GREEN)
 	put(body,Vector2(220,706),"Badge: A gear · B landing assist · HOME back/pause · hold DOWN for tactical view.",16,SOFT)
 	var calibration=app.vision.yoke_calibration
 	var neutral_status: String="READY TO CALIBRATE / HOLD THE YOKE UPRIGHT"
@@ -754,7 +758,7 @@ func draw_tutorial_cue(rect: Rect2, key: String, group: String) -> void:
 	elif group == "weapons":
 		var covering := key.begins_with("cover")
 		var lifting := key == "show"
-		var tag := "GUN"
+		var tag := "ID 4"
 		if key == "grip":
 			draw_circle(center+Vector2(-42,0),28,GREEN)
 			draw_circle(center+Vector2(42,0),28,Color(.28,.58,1))
@@ -782,14 +786,14 @@ func draw_control_setup() -> void:
 	draw_rect(Rect2(0,0,1600,1000),GLASS)
 	put(display_bold,Vector2(64,73),"SET UP YOUR CARDBOARD COCKPIT",46,WHITE)
 	put(mono,Vector2(1132,62),"LIVE CAMERA CHECKS",16,GREEN)
-	var labels: Array[String]=["01 / CALIBRATE","02 / THROTTLE","03 / YOKE","04 / GUN"]
+	var labels: Array[String]=["01 / CALIBRATE","02 / THROTTLE","03 / YOKE","04 / PLASMA"]
 	var groups: Array[String]=["calibrate","throttle","yoke","weapons"]
 	for i in range(4):
 		var selected: bool=i==0 if lesson.calibrating else group==groups[i] or done and i==3
 		var rect:=Rect2(64+i*374,101,350,43)
 		panel(rect,.9,GREEN if selected else HAIRLINE)
 		put(mono,rect.position+Vector2(14,28),labels[i],17,GREEN if selected else SOFT)
-	camera_card(Rect2(64,164,724,300),"LAPTOP / YOKE + GUN",app.yoke_preview,v.tracking)
+	camera_card(Rect2(64,164,724,300),"LAPTOP / YOKE + ID 4",app.yoke_preview,v.tracking)
 	camera_card(Rect2(812,164,724,300),"PHONE / THROTTLE",app.throttle_preview,v.throttle_confidence>.4)
 	panel(Rect2(64,486,1472,342),.95)
 	draw_tutorial_cue(Rect2(90,517,226,190),"ready" if done else str(step[0]),"ready" if done else group)
@@ -803,7 +807,7 @@ func draw_control_setup() -> void:
 	var hint: String=("Hold steady for one second to resume your flight." if app.setup_next_action.is_empty() else "Hold steady for one second to start your flight.") if done else str(step[4])
 	for value: String in tutorial_lines(hint,1120,17):
 		put(body,at,value,17,SOFT);at.y+=26
-	var values: String="THROTTLE %3d%%   BANK %+.0f%%   PITCH %+.0f%%   YAW %+.0f%%   GUN %s" % [roundi(v.throttle*100),v.steering().x*100,v.steering().y*100,v.steering().z*100,"ON" if v.gun_trigger else "OFF"]
+	var values: String="THROTTLE %3d%%   BANK %+.0f%%   PITCH %+.0f%%   YAW %+.0f%%   PLASMA %s" % [roundi(v.throttle*100),v.steering().x*100,v.steering().y*100,v.steering().z*100,"ON" if v.gun_trigger else "OFF"]
 	put(mono,Vector2(360,720),values,17,GREEN)
 	var status: String=lesson.status
 	if not app.control_setup_picture():status="Waiting for both live cameras." if done else "Waiting for the phone camera." if group=="throttle" else "Waiting for the laptop camera."

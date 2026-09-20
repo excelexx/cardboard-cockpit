@@ -25,7 +25,7 @@ func run() -> void:
 	app._physics_process(.2);check(app.flight.position==position_before and app.mission.clock==clock_before and app.badge_launch_remaining<1.4)
 	var old_count: int=app.combat.enemies.size()
 	for i in range(15):app.combat.enemies.append({"id":1000+i,"health":1,"position":app.flight.position+Vector3(i*10,0,-1000),"kind":"goose"})
-	app.combat.shots.append({"kind":"cannon","position":app.flight.position+Vector3(-200,0,-400)})
+	app.combat.shots.append({"kind":"missile","position":app.flight.position+Vector3(-200,0,-400)})
 	s=app.badge.instrument_snapshot(app);check(s.contacts.size()==12 and s.contacts[0].selected==1 and not s.systems&4,"Badge secondary-controls protocol remains independent of missile readiness")
 	for contact in s.contacts:check(contact.kind!=4,"Projectiles never become badge tracks")
 	app.combat.enemies.resize(old_count);app.combat.shots.clear()

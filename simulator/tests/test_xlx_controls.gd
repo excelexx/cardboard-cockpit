@@ -32,12 +32,12 @@ func run() -> void:
 	app.vision=LocalVision.new();app.vision.enabled=true
 	app.start_flight("combat");app.flight.spawn_airborne(Vector3(0,5000,0),180);app.combat.spawn_clock=999;app.fire_guard=0
 	packet(true);tick(60)
-	check(app.combat.rounds_fired>0 and app.combat.beam_active,"Visible printed gun tag fires minigun and plasma continuously")
+	check(app.combat.primary_used and app.combat.beam_active and app.combat.beam_ends.size()==2,"Visible printed gun tag fires both plasma emitters continuously")
 	var fired: int=app.combat.rounds_fired
 	packet(false);tick(30)
 	check(app.combat.rounds_fired==fired and not app.combat.beam_active,"Covering the tag stops both primary effects without a toggle")
-	check(app.combat.has_method("fire_missile") and app.combat.has_method("update_beam") and app.fighter_fx.stores.size()==4,"Plasma and independent missile path retain four mounted stores")
-	for shot: Dictionary in app.combat.shots:check(shot.kind=="cannon","Primary trigger emits cannon projectiles, not independent missiles")
+	check(not app.combat.has_method("fire_missile") and not app.combat.has_method("fire_gun") and app.combat.has_method("update_swarm_missiles") and app.fighter_fx.stores.size()==4,"Dual plasma and automatic missile support retain four mounted stores without manual ordnance APIs")
+	check(app.combat.rounds_fired==0 and app.combat.shots.is_empty(),"Manual plasma creates no minigun bullets")
 	packet(true,false)
 	var at: Vector3=app.flight.position;var elapsed: float=app.flight.elapsed
 	tick(60)

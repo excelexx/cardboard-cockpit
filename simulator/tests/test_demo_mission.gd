@@ -34,7 +34,7 @@ func run():
 	check(jump<max_speed/60+1,"No position discontinuity through mission transitions")
 	check(app.flight.contact=="landed" and app.flight.speed==0 and app.is_on_runway(app.flight.position),"Flight finishes stopped on the destination runway")
 	check(app.mission.clock>100 and app.mission.clock<180,"Complete guided demo fits inside three minutes")
-	check(app.combat.kills>=3 and app.combat.rounds_fired>0 and plasma_seen,"Combat uses minigun and plasma against multiple contacts")
+	check(app.combat.kills>=3 and app.combat.primary_used and app.combat.rounds_fired==0 and plasma_seen,"Combat uses adaptive dual plasma against multiple contacts")
 	check(app.aircraft_visuals.gear_progress>.99,"Visible landing gear finishes fully deployed")
 	check(app.combat.hull==100 and app.combat.hostile_launches==0,"Relaxed demo has no enemy attacks or incoming damage")
 	check(app.combat.best_combo>=3 and app.combat.score>app.combat.kills*100,"Rapid clears earn visible streak rewards")
@@ -50,7 +50,7 @@ func run():
 		var event := InputEventKey.new(); event.keycode = code; event.physical_keycode = code; event.pressed = false
 		Input.parse_input_event(event); Input.flush_buffered_events()
 	check(app.flight.airborne and app.mission.phase=="combat","Holding fire through departure does not apply takeoff brakes")
-	check(app.combat.rounds_fired>0 and app.combat.missiles_fired==0,"Play mode fires the held primary without automatic secondary launches")
+	check(app.combat.primary_used and app.combat.rounds_fired==0 and app.combat.missiles_fired==0,"Play mode fires the held primary without automatic secondary launches")
 	print("PLAY INPUT: 2 additional checks / total ",checks," / failures ",failures.size())
 	app.queue_free(); await process_frame
 	quit(0 if failures.is_empty() else 1)

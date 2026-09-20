@@ -281,8 +281,6 @@ func _input(event: InputEvent) -> void:
 			KEY_Q:
 				if mode=="flight":
 					if flight.start_barrel_roll(-1 if control.x<0 else 1):combat.event("roll",flight.position,1);audio.play_effect("sonic",-23,1.5);camera_rig.impulse(.10)
-			KEY_T:
-				if mode=="flight" and fire_guard<=0:combat.fire_missile()
 			KEY_Z:
 				if mode=="flight": combat.deploy_flares()
 			KEY_J:
@@ -292,7 +290,7 @@ func _input(event: InputEvent) -> void:
 			KEY_F8: text_hud=not text_hud
 			KEY_SPACE:
 				if mode=="flight" and flight.airborne and fire_guard<=0:
-					combat.fire_gun()
+					combat.fire_primary()
 		if mode=="flight":
 			var physical: int = event.physical_keycode if event.physical_keycode else event.keycode
 			if physical in [KEY_LEFT,KEY_RIGHT,KEY_UP,KEY_DOWN,KEY_A,KEY_D,KEY_W,KEY_S]: take_manual_control(physical not in [KEY_W,KEY_S])
@@ -301,8 +299,7 @@ func _input(event: InputEvent) -> void:
 		look.x = clampf(look.x-event.relative.x*0.003,-1.4,1.4)
 		look.y = clampf(look.y-event.relative.y*0.003,-0.6,0.6)
 	if event is InputEventMouseButton and event.pressed and fire_guard<=0 :
-		if event.button_index==MOUSE_BUTTON_LEFT:combat.fire_gun()
-		elif event.button_index==MOUSE_BUTTON_RIGHT:combat.fire_missile()
+		if event.button_index==MOUSE_BUTTON_LEFT:combat.fire_primary()
 
 func take_manual_control(steering: bool) -> void:
 	copilot = false
@@ -442,7 +439,7 @@ func _process(dt: float) -> void:
 			cockpit_frame.set_tactical(tactical_state())
 			cockpit_frame.set_navigation("sf" if route_id=="sf" else "free",mission.route_index)
 	audio.beam_wanted=active and combat.beam_active
-	audio.gun_wanted = active and combat.active and combat.gun_firing_time>0
+	audio.gun_wanted = false
 	audio.instructor_speaking=tutorial.speaking()
 	audio.flow_intensity=combat.intent.intensity
 	audio.acquisition=combat.lock_progress if combat.target_id>=0 and combat.lock_progress<1 else 0
@@ -530,8 +527,7 @@ func _physics_process(dt: float) -> void:
 	if combat.active:
 		combat.tick(dt)
 		if mode!="flight": return
-		if gun_requested():combat.fire_gun()
-		if not test_mode and fire_guard<=0 and (Input.is_physical_key_pressed(KEY_T) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)):combat.fire_missile()
+		if gun_requested():combat.fire_primary()
 	var input := Vector3(float(Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_UP))-float(Input.is_physical_key_pressed(KEY_DOWN)),float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)))
 	input.x *= Tune.KEYBOARD_SCALE; input.y *= Tune.KEYBOARD_SCALE
 	var power: float = float(Input.is_physical_key_pressed(KEY_W))-float(Input.is_physical_key_pressed(KEY_S))
@@ -550,7 +546,7 @@ func _physics_process(dt: float) -> void:
 			if not tracked.is_empty():
 				var lead: Vector3 = combat.lead_point(tracked)-flight.position
 				if flight.forward().angle_to(lead.normalized())<(deg_to_rad(25) if combat.assist else atan2(10.0,maxf(lead.length(),100))):
-					combat.fire_gun();combat.fire_missile()
+					combat.fire_primary()
 	else:
 		if mouse_yoke and not vision.enabled and not Input.is_key_pressed(KEY_ALT):
 			var mouse: Vector2 = (get_viewport().get_mouse_position()-Vector2(800,470))/Tune.MOUSE_RANGE
@@ -816,6 +812,6 @@ func tactical_state() -> Dictionary:
 	if mission.active and mission.phase in ["opening","combat","return"]:
 		var target: Vector3 = mission.route_target()-flight.position
 		waypoint = Vector2(target.x,target.z).rotated(-flight.heading)
-	return {"gun":gun_requested() or combat.gun_firing_time>0,"missile_ready":combat.active and combat.missile_cooldown<=0,"missile_cooldown":combat.missile_cooldown,"tracking":combat.target_id>=0 and combat.assist,
+	return {"gun":gun_requested() or combat.gun_firing_time>0,"beam_active":combat.beam_active,"beam_target_ids":combat.beam_target_ids,"swarm_active":combat.swarm_active,"missile_ready":combat.swarm_active and combat.missile_cooldown<=0,"missile_cooldown":combat.missile_cooldown,"tracking":combat.target_id>=0 and combat.assist,
 		"lock":combat.lock_progress,"contacts":contacts,"skein":Vector2(down,skein_total()),"waypoint":waypoint,"damaged":combat.hull<=65,
 		"objective":hud.mission_line(),"clock":hud.clock_text()}

@@ -111,7 +111,7 @@ func instruction() -> String:
 		return "Fly through the guide rings"
 	if phase=="combat":
 		if app.combat.kills>=TARGET_COUNT: return "Geese cleared · follow the guide rings toward the airfield"
-		return ("Uncover the gun tag to fire; cover it to stop" if app.vision.enabled else "HOLD SPACE / LEFT MOUSE: gun")+(" · hold badge DOWN: tactical view" if app.badge_prompts else "")
+		return ("Show plasma gun tag ID 4 to fire; cover it to stop" if app.vision.enabled else "HOLD SPACE / LEFT MOUSE: dual plasma")+(" · hold badge DOWN: tactical view" if app.badge_prompts else "")
 	if phase in ["return","approach"]:
 		if f.throttle>.3 or f.speed>(90 if phase=="approach" else 125): return "Reduce throttle and slow down · follow the landing guides"
 		if not f.gear: return "A / G: lower landing gear · B / L: landing assist" if app.badge_prompts else "Lower landing gear or enable landing assist"

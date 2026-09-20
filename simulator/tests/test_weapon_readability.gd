@@ -1,6 +1,5 @@
 extends SceneTree
 const Tune=preload("res://data/balance.gd")
-const Art=preload("res://systems/weapon_visuals.gd")
 var app: Node
 var checks:=0
 var failures: Array[String]=[]
@@ -13,41 +12,39 @@ func run() -> void:
 	app.set_process(false);app.set_physics_process(false)
 	check(not app.audio.muted,"Sound starts enabled")
 	app.audio.muted=true;app.start_flight("combat");app.flight.spawn_airborne(Vector3(0,3000,0),180);app.apply_aircraft_pose();app.combat.spawn_clock=999
-	for i in range(60):app.combat.tick(1.0/60);app.combat.fire_gun()
-	var packets: float=float(app.combat.rounds_fired)/Tune.GUN_ROUNDS_PER_PACKET
-	check(packets>=9 and packets<=11,"Primary draws about ten separate bullet packets per second")
-	check(Art.TRACER_TAIL-Art.TRACER_HEAD<Tune.GUN_MUZZLE_SPEED*Tune.GUN_INTERVAL*.1,"Bullet streaks are compact, not long beam segments")
-	for shot: Dictionary in app.combat.shots:
-		check(shot.trail_node==null,"Cannon cannot leave a ribbon connected to an old muzzle position")
-	check(app.combat.beam_active,"Continuous plasma accompanies held primary fire")
-	check(app.combat.visuals.beams.size()==3,"Plasma has a core, braid and halo")
-	check(float(app.combat.visuals.beams[0].material_override.get_shader_parameter("radius"))>=.2,"Plasma core is visibly thicker")
+	app.combat.fire_primary();app.combat.update_beam(.016);app.combat.visuals.draw_plasma()
+	check(app.combat.beam_active and app.combat.visuals.beams.size()==6,"Two plasma emitters each have a core, braid and halo")
+	check(app.combat.shots.is_empty() and app.combat.rounds_fired==0,"Primary creates no minigun bullets or trailing cannon ribbon")
+	check(app.fighter_fx.plasma_models.size()==2 and app.fighter_fx.plasma_muzzles.size()==2,"Two visible plasma assemblies have separate muzzle anchors")
+	var first_muzzle: Vector3=app.fighter_fx.plasma_muzzle_position(Vector3.ZERO,0)
+	var second_muzzle: Vector3=app.fighter_fx.plasma_muzzle_position(Vector3.ZERO,1)
+	check(first_muzzle.distance_to(second_muzzle)>1,"Emitter separation remains visibly distinct")
+	for index in range(2):
+		var muzzle: Vector3=app.fighter_fx.plasma_muzzle_position(Vector3.ZERO,index)
+		var beam=app.combat.visuals.beams[index*3]
+		check(beam.visible and beam.position.distance_to((muzzle+app.combat.beam_ends[index])*.5)<.001,"Each beam stays anchored to its own mounted machinery")
+		check(float(beam.material_override.get_shader_parameter("radius"))>=.2,"Each plasma core is visibly thick")
+		check((app.combat.beam_ends[index]-muzzle).dot(app.flight.forward())>Tune.BEAM_RANGE*.95,"Unassigned plasma projects ahead of the aircraft")
+	app.flight.position+=Vector3(25,3,-150);app.flight.roll=.4;app.apply_aircraft_pose()
+	app.combat.fire_primary();app.combat.update_beam(.016);app.combat.visuals.draw_plasma()
+	for index in range(2):
+		var muzzle: Vector3=app.fighter_fx.plasma_muzzle_position(Vector3.ZERO,index)
+		check(app.combat.visuals.beams[index*3].position.distance_to((muzzle+app.combat.beam_ends[index])*.5)<.001,"Moving and banking updates both emitter anchors without stale trails")
 	app.combat.gun_firing_time=0;app.combat.update_beam(.1);app.combat.visuals.draw_plasma()
-	check(not app.combat.beam_active and not app.combat.visuals.beams[0].visible,"Releasing primary stops the plasma projector")
-	app.start_flight("combat");app.flight.spawn_airborne(Vector3(0,3000,0),180);app.apply_aircraft_pose();app.combat.spawn_clock=999
-	check(app.combat.fire_missile() and app.combat.launch_queue.size()==1,"One missile per trigger interval")
-	check(not app.combat.fire_missile(),"Missiles cannot bypass their long cooldown")
+	for beam in app.combat.visuals.beams:check(not beam.visible,"Release hides every plasma layer")
+	check(not app.combat.beam_active,"Release clears plasma activity")
+	for i in range(8):
+		app.combat.spawn_contact();var enemy: Dictionary=app.combat.enemies.back()
+		enemy.position=app.flight.position+Vector3((i-3)*35,0,-800-i*50);enemy.fade=1;enemy.retiring=false
+	app.combat.update_swarm_missiles()
+	check(app.combat.swarm_active and app.combat.launch_queue.size()==4,"An eligible large flock schedules an automatic four-missile burst without a manual trigger")
+	var stores: Dictionary={}
+	var targets: Dictionary={}
+	for request: Dictionary in app.combat.launch_queue:stores[request.store]=true;targets[request.target]=true
+	check(stores.size()==4 and targets.size()==4,"The burst uses all four hardpoints and four distinct targets")
 	app.combat.update_launches(.1)
-	check(app.combat.missiles_fired==1 and app.combat.shots.size()==1,"One scheduled missile actually launches")
-	check(app.combat.shots[0].node.scale.x>=3.0,"Launched missile uses the enlarged model")
-	for i in range(120):app.combat.tick(1.0/60)
-	check(not app.combat.fire_missile(),"A two-second hold cannot fire a second missile")
-	for i in range(61):app.combat.tick(1.0/60)
-	check(app.combat.fire_missile(),"Missile becomes available after three seconds")
-	app.start_flight("combat");app.flight.spawn_airborne(Vector3(0,3000,0),180);app.apply_aircraft_pose();app.combat.spawn_clock=999
-	var muzzle: Vector3=app.fighter_fx.gun_muzzle_position(Vector3.ZERO)
-	app.combat.fire_gun()
-	check(app.combat.shots[0].position.is_equal_approx(muzzle),"Gun shots originate at the mounted barrel tip")
-	for i in range(15):
-		app.flight.position+=app.flight.velocity/60;app.apply_aircraft_pose();app.combat.update_shots(1.0/60)
-		for shot: Dictionary in app.combat.shots:
-			var tail: Vector3=shot.node.to_global(Vector3(0,0,Art.TRACER_TAIL))
-			check((tail-app.flight.position).dot(app.flight.forward())>0,"Straight-flight tracer tail remains ahead of the aircraft")
-	app.combat.gun_firing_time=.1;app.combat.update_beam(.016)
-	var emitter: Vector3=app.fighter_fx.plasma_muzzle_position(Vector3.ZERO)
-	check(emitter.distance_to(app.fighter_fx.gun_muzzle_position(Vector3.ZERO))>1,"Gun and plasma have distinct mounted emitters")
-	app.combat.visuals.draw_plasma()
-	var beam=app.combat.visuals.beams[0]
-	check(beam.position.distance_to((emitter+app.combat.beam_end)*.5)<.001,"Plasma beam is anchored to its actual machinery")
+	check(app.combat.missiles_fired==4 and app.combat.shots.size()==4,"All four automatic missiles leave their stores")
+	for shot: Dictionary in app.combat.shots:check(shot.kind=="missile" and shot.node.scale.x>=3,"Automatic missiles use enlarged, readable models")
+	check(not app.combat.has_method("fire_gun") and not app.combat.has_method("fire_missile"),"Only the plasma weapon has a manual firing API")
 	app.queue_free();await process_frame
 	print("WEAPON READABILITY: ",checks," checks / ",failures.size()," failures");quit(0 if failures.is_empty() else 1)

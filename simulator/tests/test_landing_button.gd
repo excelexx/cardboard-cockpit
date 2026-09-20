@@ -11,7 +11,7 @@ func run() -> void:
 	var app=load("res://scenes/main.tscn").instantiate();root.add_child(app)
 	app.set_process(false);app.set_physics_process(false);app.audio.muted=true
 	app.on_action("keyboard_play");app.flight.spawn_airborne(Vector3(15000,400,-13000),300)
-	app.combat.score=700;app.combat.kills=4;app.combat.fire_gun()
+	app.combat.score=700;app.combat.kills=4;app.combat.fire_primary()
 	app.badge.close();app.badge=ScriptedBadge.new();app.badge.next_press=1<<1
 	app._physics_process(.016)
 	check(app.landing_started and app.mission.phase=="approach","Synthetic badge B starts landing")

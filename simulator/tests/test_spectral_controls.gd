@@ -14,23 +14,23 @@ func run() -> void:
 	app.start_flight("combat");app.flight.position.y=600;app.fire_guard=0;app.combat.spawn_clock=999
 	var fire:=InputEventKey.new();fire.keycode=KEY_SPACE;fire.physical_keycode=KEY_SPACE;fire.pressed=true
 	Input.parse_input_event(fire);Input.flush_buffered_events()
-	check(app.gun_requested(),"Held Space requests gun fire")
+	check(app.gun_requested(),"Held Space requests dual plasma")
 	for i in range(180):app._physics_process(1.0/60)
 	fire=fire.duplicate();fire.pressed=false;Input.parse_input_event(fire);Input.flush_buffered_events()
-	check(app.combat.rounds_fired>=100 and app.combat.rounds_fired<=124 and app.combat.missiles_fired==0 and app.combat.beam_active,"Held Space sustains slower minigun and plasma without launching missiles")
+	check(app.combat.rounds_fired==0 and app.combat.missiles_fired==0 and app.combat.beam_active and app.combat.beam_ends.size()==2,"Held Space sustains both plasma beams without bullets or small-encounter missiles")
 	var fired: int=app.combat.rounds_fired
 	for i in range(60):app._physics_process(1.0/60)
 	check(app.combat.rounds_fired==fired and not app.gun_requested() and app.combat.gun_firing_time<=0 and not app.combat.beam_active,"Released input never latches either primary effect")
 	var mouse:=InputEventMouseButton.new();mouse.button_index=MOUSE_BUTTON_LEFT;mouse.pressed=true
 	Input.parse_input_event(mouse);Input.flush_buffered_events()
-	check(app.gun_requested(),"Held left mouse requests cannon fire")
+	check(app.gun_requested(),"Held left mouse requests dual plasma")
 	mouse=mouse.duplicate();mouse.pressed=false;Input.parse_input_event(mouse);Input.flush_buffered_events()
 	check(not app.gun_requested(),"Releasing left mouse immediately clears fire request")
 	mouse=InputEventMouseButton.new();mouse.button_index=MOUSE_BUTTON_RIGHT;mouse.pressed=true
 	Input.parse_input_event(mouse);Input.flush_buffered_events()
 	for i in range(400):app._physics_process(1.0/60)
 	mouse=mouse.duplicate();mouse.pressed=false;Input.parse_input_event(mouse);Input.flush_buffered_events()
-	check(app.combat.missiles_fired==3 and not app.gun_requested(),"Holding right mouse launches one missile every three seconds independently of primary")
+	check(app.combat.missiles_fired==0 and app.combat.launch_queue.is_empty() and not app.gun_requested(),"Right mouse cannot manually launch missiles or plasma")
 	var launches: int=app.combat.missiles_fired
 	for i in range(240):app._physics_process(1.0/60)
 	check(app.combat.missiles_fired==launches,"Releasing right mouse stops repeated launches without a latch")
@@ -38,7 +38,7 @@ func run() -> void:
 	Input.parse_input_event(fire);Input.flush_buffered_events()
 	for i in range(195):app._physics_process(1.0/60)
 	fire=fire.duplicate();fire.pressed=false;Input.parse_input_event(fire);Input.flush_buffered_events()
-	check(app.combat.missiles_fired==launches+2 and not app.gun_requested(),"Held T launches independent single missiles at the same slow cadence")
+	check(app.combat.missiles_fired==launches and app.combat.launch_queue.is_empty() and not app.gun_requested(),"Held T cannot manually launch missiles or plasma")
 	launches=app.combat.missiles_fired
 	for i in range(240):app._physics_process(1.0/60)
 	check(app.combat.missiles_fired==launches,"Releasing T stops repeated launches")
@@ -52,7 +52,7 @@ func run() -> void:
 	check(app.mode=="paused" and app.combat.elapsed==t,"Pause freezes combat")
 	app.start_flight("combat")
 	check(not app.gun_requested() and app.combat.shots.is_empty(),"Replay clears firing and projectiles")
-	check(app.combat.visuals.projectile_pool.cannon.size()>0 and app.combat.visuals.sprite_pool.size()==96,"Replay returns warmed resources to pools")
+	check(app.combat.visuals.projectile_pool.missile.size()==24 and app.combat.visuals.sprite_pool.size()==96,"Replay returns warmed resources to pools")
 	app.fire_guard=0;app.copilot=false;app.vision.enabled=true;app.vision.tracking=true;app.vision.yoke=Vector2.ZERO;app.vision.throttle_confidence=1;app.vision.throttle=1
 	app._physics_process(1.0/60)
 	check(app.flight.throttle>0 and app.flight.power_input==0 and not app.flight.afterburner,"Physical throttle sets power without implicit boost")
@@ -72,11 +72,11 @@ func run() -> void:
 	check(app.combat.intent.choose(app.combat,.016)==-1,"Wide roll margin closes after recovery")
 	app.start_flight("combat");app.combat.spawn_contact("boss")
 	var boss: Dictionary=app.combat.enemies[0];boss.age=5;app.mission.phase="boss"
-	app.combat.hurt_enemy(boss,boss.max_health*.35,"cannon",boss.position)
+	app.combat.hurt_enemy(boss,boss.max_health*.35,"plasma",boss.position)
 	check(boss.damage_stage>=1 and boss.health>0,"Primary damage breaks boss armor without instant kill")
 	var kills: int=app.combat.kills
-	app.combat.hurt_enemy(boss,100000,"cannon",boss.position)
-	app.combat.hurt_enemy(boss,100000,"cannon",boss.position)
-	check(app.combat.boss_defeated and app.combat.kills==kills+1,"Repeated cannon impacts never double-count a contact death")
+	app.combat.hurt_enemy(boss,100000,"plasma",boss.position)
+	app.combat.hurt_enemy(boss,100000,"plasma",boss.position)
+	check(app.combat.boss_defeated and app.combat.kills==kills+1,"Repeated plasma impacts never double-count a contact death")
 	print("SPECTRAL CONTROLS: ",checks," checks / ",failures.size()," failures")
 	app.queue_free();await process_frame;quit(0 if failures.is_empty() else 1)

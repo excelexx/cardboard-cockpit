@@ -12,10 +12,10 @@ const STEPS := [
 	["idle", "throttle", "Slide the throttle to 0%", "Slide toward the idle end until the power reads 0%.", "Keep the handle tag and both end tags visible."],
 	["full", "throttle", "Slide the throttle to 100%", "Move the handle along the rail to the full-power end.", "The power bar should rise as you slide."],
 	["idle", "throttle", "Bring the throttle back to 0%", "Slide back toward the idle end until the power reads 0%.", "Leave the throttle here for the next checks."],
-	["yoke_info", "yoke", "The yoke controls your flight", "Turn to bank, tilt to climb or descend, and swivel to steer left or right.", "No movement check needed. The gun checks are next."],
-	["grip", "weapons", "Set your shooting grip", "Put your middle finger on the green elastic band and ring finger on the blue elastic band.", "Show the gun tag. Keep your left hand free for the throttle."],
-	["cover_gun", "weapons", "Cover the gun tag with your pointer finger", "Cover most of the printed pattern. Keep the yoke tag visible.", "The gun should turn OFF. Middle finger stays on green; ring finger stays on blue."],
-	["show", "weapons", "Lift your pointer finger to shoot", "Lift your pointer finger off the gun tag so the camera can see it.", "Minigun and plasma turn ON. Cover the tag to stop both."],
+	["yoke_info", "yoke", "The yoke controls your flight", "Turn to bank, tilt to climb or descend, and swivel to steer left or right.", "No movement check needed. The plasma trigger checks are next."],
+	["grip", "weapons", "Set your shooting grip", "Put your middle finger on the green elastic band and ring finger on the blue elastic band.", "Show plasma gun tag ID 4. Keep your left hand free for the throttle."],
+	["cover_gun", "weapons", "Cover plasma gun tag ID 4 with your pointer finger", "Cover most of the printed pattern. Keep the yoke tag visible.", "Both plasma beams should turn OFF. Middle finger stays on green; ring finger stays on blue."],
+	["show", "weapons", "Lift your pointer finger to shoot", "Lift your pointer finger off the gun tag so the camera can see it.", "Both adaptive plasma beams turn ON. Cover the tag to stop."],
 ]
 var index := 0
 var calibrating := true

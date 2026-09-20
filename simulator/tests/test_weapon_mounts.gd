@@ -5,10 +5,24 @@ extends SceneTree
 const Fighter = preload("res://systems/fighter_model.gd")
 const Effects = preload("res://systems/fighter_effects.gd")
 const Utils = preload("res://systems/model_utils.gd")
+const Visuals = preload("res://systems/combat_visuals.gd")
+const Tune = preload("res://data/balance.gd")
+
+class CombatHarness extends Node:
+	var app: Node
+	var active := true
+	var beam_active := false
+	var beam_ends: Array[Vector3] = [Vector3(-100,0,-500), Vector3(100,0,-500)]
+	var flares_fired := 0
 
 class Harness extends Node3D:
 	var aircraft: Node3D
-	var combat := {"active": true, "gun_firing_time": 0.0, "beam_active": false}
+	var combat: Node
+	var fighter_fx: Node
+	var flight := {"position": Vector3.ZERO}
+	var overlay := false
+	func overlay_visible() -> bool: return overlay
+	func yoke_recovery_visible() -> bool: return false
 	var mode := "flight"
 	var cockpit := false
 
@@ -28,52 +42,81 @@ func check(value: bool, label: String) -> void:
 func run() -> void:
 	stage = Harness.new()
 	root.add_child(stage)
+	stage.combat = CombatHarness.new()
+	stage.combat.app = stage
+	stage.add_child(stage.combat)
 	stage.aircraft = Fighter.create()
 	stage.add_child(stage.aircraft)
 	effects = Effects.new()
 	effects.app = stage
+	stage.fighter_fx = effects
 	stage.add_child(effects)
 	effects.build()
-	var gun: Node3D = stage.aircraft.find_child("CG26", true, false)
-	var plasma: Node3D = stage.aircraft.find_child("PC26", true, false)
-	check(gun != null and gun.has_meta("heat_materials"), "Authored rotary cannon is mounted")
-	check(plasma != null and plasma.has_meta("charge_materials"), "Authored plasma cannon is mounted")
-	check(effects.gun_rotor != null and effects.gun_gimbal.is_ancestor_of(effects.gun_rotor), "Only named barrel assembly spins inside recoil gimbal")
-	check(effects.gun_muzzle_position(Vector3.ZERO).is_equal_approx(Fighter.MUZZLE), "Gun fallback agrees with actual scaled barrel tip")
-	check(effects.plasma_muzzle_position(Vector3.ZERO).is_equal_approx(Fighter.PLASMA_MUZZLE), "Plasma fallback agrees with actual scaled emitter")
-	check(effects.gun_muzzle.global_position.x < -1.5 and effects.plasma_muzzle.global_position.x > 1.5, "Both emitters sit outboard of the forward hull")
-	check(Utils.bounds(gun).size.z > 4.5 and Utils.bounds(plasma).size.z > 2.5, "Mounted machinery has readable aircraft scale")
-	for weapon: Node3D in [gun, plasma]:
-		for geometry: Node in weapon.find_children("*", "GeometryInstance3D", true, false):
+	check(stage.aircraft.find_child("CG26",true,false) == null, "No rotary cannon is mounted")
+	check(stage.aircraft.find_child("GatlingRotor",true,false) == null and stage.aircraft.find_child("GunMuzzle",true,false) == null, "No rotor or gun muzzle survives")
+	check(effects.plasma_models.size() == 2 and effects.plasma_muzzles.size() == 2, "Two plasma emitters are bound")
+	for index in range(2):
+		var plasma: Node3D = effects.plasma_models[index]
+		check(plasma != null and plasma.has_meta("charge_materials"), "Authored plasma cannon is mounted")
+		check(effects.plasma_muzzle_position(Vector3.ZERO,index).is_equal_approx(Fighter.PLASMA_MUZZLES[index]), "Fallback agrees with actual scaled emitter")
+		check(Utils.bounds(plasma).size.z > 2.5, "Mounted machinery has readable aircraft scale")
+		for geometry: Node in plasma.find_children("*", "GeometryInstance3D", true, false):
 			check(geometry.layers == 2, "Weapon geometry preserves aircraft rendering layer")
+	check(effects.plasma_muzzle_position(Vector3.ZERO,0).x < -1.5 and effects.plasma_muzzle_position(Vector3.ZERO,1).x > 1.5, "Left and right emitters sit outside forward hull")
 	stage.aircraft.position = Vector3(10, 20, 30)
 	stage.aircraft.rotation.y = 0.7
-	check(effects.plasma_muzzle_position(Vector3.ZERO).is_equal_approx(stage.aircraft.to_global(Fighter.PLASMA_MUZZLE)), "Plasma origin follows aircraft world transform")
+	for index in range(2):
+		check(effects.plasma_muzzle_position(Vector3.ZERO,index).is_equal_approx(stage.aircraft.to_global(Fighter.PLASMA_MUZZLES[index])), "Plasma origin follows aircraft world transform")
 	stage.aircraft.transform = Transform3D.IDENTITY
-	var emitter: Node3D = effects.plasma_muzzle
-	effects.plasma_muzzle = null
+	var emitter: Node3D = effects.plasma_muzzles[0]
+	effects.plasma_muzzles[0] = null
 	check(effects.plasma_muzzle_position(Vector3(4,5,6)) == Vector3(4,5,6), "Missing emitter uses caller fallback")
-	effects.plasma_muzzle = emitter
-	stage.combat.gun_firing_time = 1.0
+	effects.plasma_muzzles[0] = emitter
+	check(effects.plasma_muzzle_position(Vector3(4,5,6),2) == Vector3(4,5,6), "Unknown emitter uses caller fallback")
 	stage.combat.beam_active = true
-	for frame in range(30): effects.update_gun(1.0/60.0)
-	check(effects.rotor_speed > 0 and effects.gun_flash.visible, "Actual gun firing state spins rotor and lights flash")
-	check(effects.gun_heat > 0.3 and effects.plasma_charge > 0.9, "Actual firing states drive heat and plasma charge")
-	var heat_material: ShaderMaterial = gun.get_meta("heat_materials")[0]
-	var charge_material: ShaderMaterial = plasma.get_meta("charge_materials")[0]
-	check(float(heat_material.get_shader_parameter("heat")) > 0.3, "Heat reaches the mounted gun shader")
-	check(float(charge_material.get_shader_parameter("firing")) == 1.0, "Beam discharge reaches the mounted plasma shader")
-	stage.combat.gun_firing_time = 0.0
+	for frame in range(30): effects.update_plasma(1.0/60.0)
+	check(effects.plasma_charge > 0.9, "Beam firing charges the mounted pair")
+	for plasma in effects.plasma_models:
+		var material: ShaderMaterial = plasma.get_meta("charge_materials")[0]
+		check(float(material.get_shader_parameter("firing")) == 1.0, "Discharge reaches each cannon shader")
 	stage.combat.beam_active = false
-	for frame in range(90): effects.update_gun(1.0/60.0)
-	check(effects.rotor_speed == 0 and not effects.gun_flash.visible, "Release stops muzzle effects and coasts rotor down")
-	check(is_zero_approx(effects.gun_heat) and is_zero_approx(effects.plasma_charge), "Inactive machinery cools and discharges")
+	for frame in range(90): effects.update_plasma(1.0/60.0)
+	check(is_zero_approx(effects.plasma_charge), "Inactive machinery discharges")
+	for plasma in effects.plasma_models:
+		var material: ShaderMaterial = plasma.get_meta("charge_materials")[0]
+		check(float(material.get_shader_parameter("firing")) == 0.0, "Release stops each discharge")
 	check(effects.stores.size() == 4, "Four missile stores are attached")
 	effects.missile_launch(-1, 0)
 	check(not effects.stores[0].visible and effects.store_timers[0] > 0, "Missile launch hides the selected store")
 	check(effects.stores[1].visible and effects.stores[2].visible and effects.stores[3].visible, "Other stores remain mounted")
 	effects.reset()
 	check(effects.stores[0].visible and effects.store_timers[0] == 0, "Reset replenishes the missile stores")
+	var visuals := Visuals.new()
+	visuals.combat = stage.combat
+	stage.add_child(visuals)
+	check(visuals.beams.size() == 6 and visuals.beam_lights.size() == 2, "Two independent three-layer beam sets")
+	stage.combat.beam_active = true
+	visuals.draw_plasma()
+	for index in range(2):
+		var origin: Vector3 = effects.plasma_muzzle_position(Vector3.ZERO,index)
+		for layer in range(3):
+			var beam: MeshInstance3D = visuals.beams[index*3+layer]
+			check(beam.visible and beam.global_position.is_equal_approx(origin.lerp(stage.combat.beam_ends[index],0.5)), "Split beam uses its actual emitter and its own endpoint")
+	stage.combat.beam_ends[1] = stage.combat.beam_ends[0]
+	visuals.draw_plasma()
+	check(not visuals.beams[0].global_position.is_equal_approx(visuals.beams[3].global_position), "Focused beams keep separate emitter origins")
+	stage.overlay = true
+	visuals.draw_plasma()
+	check(not visuals.beams[0].visible and not visuals.beams[3].visible, "Overlay suppresses both beam groups")
+	stage.overlay = false
+	check(visuals.projectile_pool.keys() == ["missile"], "Only missile projectiles are pooled")
+	check(visuals.take_projectile("cannon") == null, "Retired cannon cannot allocate a projectile")
+	var missile: Node3D = visuals.take_projectile("missile")
+	check(missile.visible and visuals.projectile_pool.missile.size() == Tune.MAX_MISSILES-1, "Missile checkout uses configured pool")
+	visuals.reset()
+	check(not missile.visible and visuals.projectile_pool.missile.size() == Tune.MAX_MISSILES, "Reset restores configured missile pool")
+	stage.combat.beam_active = false
+	visuals.queue_free()
 	if "--visual" in OS.get_cmdline_user_args() and DisplayServer.get_name() != "headless":
 		await capture_views()
 	print("WEAPON MOUNTS: %d checks, %d failures" % [checks, failures.size()])
@@ -114,14 +157,14 @@ func capture_views() -> void:
 	DirAccess.make_dir_recursive_absolute(folder)
 	for view: Dictionary in [
 		{"name": "mounted-overview", "from": Vector3(-15, 9, -19), "at": Vector3(0, 0, -1), "fov": 42.0},
-		{"name": "mounted-cannon", "from": Vector3(-6, 2.6, -8.5), "at": Vector3(-1.55, 0.2, -2.75), "fov": 42.0},
-		{"name": "mounted-plasma", "from": Vector3(6, 2.6, -8.5), "at": Vector3(1.55, 0.2, -2.9), "fov": 42.0}]:
+		{"name": "mounted-plasma-left", "from": Vector3(-6, 2.6, -8.5), "at": Vector3(-1.55, 0.2, -2.75), "fov": 42.0},
+		{"name": "mounted-plasma-right", "from": Vector3(6, 2.6, -8.5), "at": Vector3(1.55, 0.2, -2.9), "fov": 42.0}]:
 		camera.position = view.from
 		camera.look_at(view.at)
 		camera.fov = view.fov
-		stage.combat.beam_active = view.name == "mounted-plasma"
+		stage.combat.beam_active = view.name != "mounted-overview"
 		for frame in range(20):
-			effects.update_gun(1.0/60.0)
+			effects.update_plasma(1.0/60.0)
 			await process_frame
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png(folder + "/" + view.name + ".png")

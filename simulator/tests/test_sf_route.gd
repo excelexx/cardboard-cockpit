@@ -56,7 +56,7 @@ func run() -> void:
 	if app.profile().name!="SPECTRE X-26": failures.append("Current fighter was replaced")
 	if app.combat.hostile_launches!=0 or app.combat.ammo!=-1: failures.append("Current arcade rules were replaced")
 	if coast_frames<1800: failures.append("Route did not spend at least thirty simulated seconds along the Pacific coast and Golden Gate")
-	if app.combat.kills<1 or app.combat.rounds_fired<1 or not plasma_seen: failures.append("Demo did not demonstrate minigun, plasma and an actual hit")
+	if app.combat.kills<1 or app.combat.rounds_fired!=0 or app.combat.missiles_fired<4 or not plasma_seen: failures.append("Demo did not demonstrate dual plasma, automatic four-missile bursts and actual hits")
 	print("SF COMBAT: wave1=",first_wave_down,"/12 objective=",app.skein_down(),"/32 kills=",app.combat.kills," rounds=",app.combat.rounds_fired," missiles=",app.combat.missiles_fired)
 	print("COAST SECONDS: ",coast_frames/60.0)
 	print("SF ROUTE RESULT: ","PASS" if failures.is_empty() else "FAIL"," seconds=",app.flight.elapsed," peak=",peak," landmarks=",app.mission.visited_route.size()," corrections=",floor_corrections)

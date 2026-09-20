@@ -26,6 +26,9 @@ var missile_cooldown := 0.0
 var launch_queue: Array[Dictionary] = []
 var last_missile: Node3D
 var salvo_count := 0
+var beam_ends: Array[Vector3]=[Vector3.ZERO,Vector3.ZERO]
+var beam_target_ids: Array[int]=[-1,-1]
+var swarm_active:=false
 var beam_active := false
 var beam_end := Vector3.ZERO
 var beam_hit_id := -1
@@ -92,7 +95,7 @@ var message := ""
 var message_time := 0.0
 
 func reset(enabled: bool = true) -> void:
-	missile_cooldown=0;launch_queue.clear();last_missile=null;salvo_count=0;beam_active=false;beam_hit_id=-1;beam_clock=0;detached_trails.clear()
+	missile_cooldown=0;launch_queue.clear();last_missile=null;salvo_count=0;beam_active=false;beam_hit_id=-1;beam_clock=0;beam_target_ids.assign([-1,-1]);beam_ends.assign([Vector3.ZERO,Vector3.ZERO]);swarm_active=false;detached_trails.clear()
 	training_target_limit=-1
 	for child: Node in get_children():
 		if child==visuals:continue
@@ -276,7 +279,7 @@ func tick(dt: float) -> void:
 	if not locked_before and lock_progress>=1:
 		intent.metrics.locks+=1;app.audio.radio.say("target_locked");event("lock",target().get("position",app.flight.position),1)
 	update_aim(dt)
-	update_shots(dt); update_beam(dt);update_bursts(dt);update_detached_trails(dt)
+	update_shots(dt); update_beam(dt);update_swarm_missiles();update_bursts(dt);update_detached_trails(dt)
 	if is_instance_valid(visuals):visuals.tick(dt)
 	incoming_distance = INF;threat_level=0
 	if hull<=0:
@@ -318,54 +321,67 @@ func reticle_point() -> Vector3:
 
 
 func lead_point(enemy: Dictionary) -> Vector3:
-	var delta: Vector3 = enemy.position-app.flight.position
-	var relative: Vector3 = enemy.velocity-app.flight.velocity
-	var a: float = relative.length_squared()-Tune.GUN_MUZZLE_SPEED*Tune.GUN_MUZZLE_SPEED
-	var b: float = 2*delta.dot(relative)
-	var discriminant: float = maxf(0,b*b-4*a*delta.length_squared())
-	var time: float = (-b-sqrt(discriminant))/(2*a) if absf(a)>.001 else delta.length()/Tune.GUN_MUZZLE_SPEED
-	time = clampf(time,.0,3.0)
-	time *= 1+.5*Tune.GUN_DRAG*Tune.GUN_MUZZLE_SPEED*time
-	return enemy.position+relative*time+Vector3.UP*4.905*time*time
+	# Plasma is instantaneous; projectile drop/velocity prediction would mis-aim it.
+	return enemy.position
 
-func fire_gun() -> bool:
-	if not active or not app.flight.airborne: return false
-	var starting: bool=gun_firing_time<=0
+func fire_primary() -> bool:
+	if not active or not app.flight.airborne:return false
 	gun_firing_time=Tune.GUN_RELEASE_TAIL;primary_used=true
-	if gun_cooldown>0:return false
-	if shots.size()>=Tune.MAX_SHOTS:return false
-	if starting: app.audio.play_effect("gatling_attack",-15,1.0)
-	gun_cooldown = Tune.GUN_INTERVAL
-	gun_firing_time = Tune.GUN_RELEASE_TAIL
-	var round_count := Tune.GUN_ROUNDS_PER_PACKET
-	rounds_fired += round_count
-	var direction: Vector3 = assisted_direction()
-	var basis: Basis = Basis.from_euler(Vector3(app.flight.pitch,-app.flight.heading,-app.flight.roll))
-	var muzzle: Vector3 = app.fighter_fx.gun_muzzle_position(app.flight.position+basis*Fighter.MUZZLE)
-	spawn_shot(muzzle,direction*Tune.GUN_MUZZLE_SPEED+app.flight.velocity,"cannon",-1,Tune.GUN_DAMAGE_PER_ROUND*round_count)
-	shots.back().round_count = round_count
-	app.camera_rig.impulse(0.022)
 	return true
 
-func fire_missile() -> bool:
-	if not active or not app.flight.airborne or missile_cooldown>0:return false
-	var airborne_missiles:=0
+func _missile_assignments() -> Dictionary:
+	var assigned: Dictionary={}
 	for shot: Dictionary in shots:
-		if shot.kind=="missile":airborne_missiles+=1
-	if airborne_missiles+launch_queue.size()>=Tune.MAX_MISSILES:return false
-	var tracked: Dictionary=target()
-	var chosen: int=target_id if not tracked.is_empty() and lock_progress>=.65 else -1
-	var store: int=[1,3,0,2][salvo_count%4]
+		if shot.kind=="missile" and shot.life>0 and shot.target>=0:assigned[int(shot.target)]=true
+	for request: Dictionary in launch_queue:
+		if request.target>=0:assigned[int(request.target)]=true
+	return assigned
+
+func _visible_targets(reach: float,half_angle: float) -> Array[Dictionary]:
+	var found: Array[Dictionary]=[]
+	var facing: Vector3=forward()
+	var threshold: float=cos(deg_to_rad(half_angle))
+	for enemy: Dictionary in enemies:
+		if enemy.health<=0 or enemy.get("retiring",false) or enemy.get("fade",1.0)<.4:continue
+		var delta: Vector3=enemy.position-app.flight.position
+		if delta.length_squared()<1 or delta.length()>reach or facing.dot(delta.normalized())<threshold:continue
+		found.append(enemy)
+	return found
+
+func update_swarm_missiles() -> void:
+	swarm_active=false
+	if not active or not engagement_enabled or not app.flight.airborne:return
+	var candidates: Array[Dictionary]=_visible_targets(Tune.SWARM_RANGE,Tune.SWARM_HALF_ANGLE)
+	swarm_active=candidates.size()>=Tune.SWARM_MIN_TARGETS
+	if not swarm_active or missile_cooldown>0:return
+	var assigned: Dictionary=_missile_assignments()
+	var choices: Array[Dictionary]=[]
+	for enemy: Dictionary in candidates:
+		if not assigned.has(int(enemy.id)) and not beam_target_ids.has(int(enemy.id)):choices.append(enemy)
+	# Avoid firing blindly, duplicating an in-flight assignment, or stealing the plasma target.
+	if choices.size()<Tune.SWARM_BURST_SIZE:return
+	choices.sort_custom(func(a: Dictionary,b: Dictionary) -> bool:return app.flight.position.distance_squared_to(a.position)>app.flight.position.distance_squared_to(b.position))
+	var count:=0
+	for shot: Dictionary in shots:
+		if shot.kind=="missile":count+=1
+	if count+launch_queue.size()+Tune.SWARM_BURST_SIZE>Tune.MAX_MISSILES:return
 	missile_cooldown=Tune.MISSILE_INTERVAL;salvo_count+=1
-	launch_queue.append({"target":chosen,"side":-1.0 if store<2 else 1.0,"internal":false,"store":store,"slot":0,"salvo":salvo_count,"delay":Tune.MISSILE_RAIL_DELAY})
+	for index in range(Tune.SWARM_BURST_SIZE):
+		var store: int=[0,2,1,3][index]
+		launch_queue.append({"target":int(choices[index].id),"side":-1.0 if store<2 else 1.0,"internal":false,"store":store,"slot":index,"salvo":salvo_count,"delay":Tune.MISSILE_RAIL_DELAY})
 	event("salvo",app.flight.position,1);app.audio.play_effect("gear_motor",-15,1.2)
-	return true
 
 func update_launches(dt: float) -> void:
+	if not active or not engagement_enabled or not app.flight.airborne or _visible_targets(Tune.SWARM_RANGE,Tune.SWARM_HALF_ANGLE).size()<Tune.SWARM_MIN_TARGETS:
+		launch_queue.clear();return
 	for i in range(launch_queue.size()-1,-1,-1):
 		var request: Dictionary = launch_queue[i]
 		request.delay -= dt
 		if request.delay>0: continue
+		var viable:=false
+		for enemy: Dictionary in enemies:
+			if enemy.id==request.target and enemy.health>0 and not enemy.get("retiring",false):viable=true;break
+		if not viable:launch_queue.remove_at(i);continue
 		var basis: Basis = app.flight.pose_basis()
 		var at: Vector3 = app.flight.position+basis*Vector3(request.side*0.58,-1.5,-1.0)
 		if not request.internal and request.store<app.fighter_fx.stores.size(): at = app.fighter_fx.stores[request.store].global_position
@@ -385,11 +401,42 @@ func deploy_flares() -> bool:
 	app.audio.play_effect("flare",-14)
 	return true
 
+func detonate_missile(shot: Dictionary,direct_target: int=-1) -> void:
+	if shot.get("detonated",false):return
+	shot.detonated=true;shot.life=0;shot.hit=true
+	var at: Vector3=shot.position
+	for enemy: Dictionary in enemies:
+		if enemy.health<=0:continue
+		var distance: float=Vector3(enemy.position).distance_to(at)
+		if enemy.id!=direct_target and distance>Tune.MISSILE_BLAST_RADIUS:continue
+		var damage: float=Tune.MISSILE_DAMAGE if enemy.id==direct_target else Tune.MISSILE_SPLASH_DAMAGE*lerpf(1,.35,clampf(distance/Tune.MISSILE_BLAST_RADIUS,0,1))
+		hurt_enemy(enemy,damage,"missile_splash",at)
+	if is_instance_valid(visuals) and visuals.has_method("missile_blast"):visuals.missile_blast(at,Tune.MISSILE_BLAST_RADIUS)
+	app.audio.play_effect("explosion",-11,.80)
+	event_log.append({"event":"missile_blast","time":elapsed})
+	if event_log.size()>120:event_log.pop_front()
+
+func _retarget_missile(shot: Dictionary) -> void:
+	for enemy: Dictionary in enemies:
+		if enemy.id==shot.target and enemy.health>0 and not enemy.get("retiring",false):return
+	var assigned: Dictionary=_missile_assignments()
+	var choice: Dictionary={};var best:=INF
+	for enemy: Dictionary in enemies:
+		if enemy.health<=0 or enemy.get("retiring",false) or assigned.has(int(enemy.id)):continue
+		var delta: Vector3=enemy.position-shot.position
+		if delta.length()>Tune.SWARM_RANGE or delta.length()<1:continue
+		var angle: float=shot.velocity.normalized().angle_to(delta.normalized())
+		if angle>deg_to_rad(85):continue
+		var cost: float=angle*800+delta.length()*.1+(2000 if beam_target_ids.has(int(enemy.id)) else 0)
+		if cost<best:choice=enemy;best=cost
+	shot.target=int(choice.id) if not choice.is_empty() else -1
+
 func update_shots(dt: float) -> void:
 	for shot: Dictionary in shots:
 		shot.life -= dt
 		shot.age += dt
 		if shot.life<=0: continue
+		_retarget_missile(shot)
 		var previous: Vector3 = shot.position
 		if shot.kind=="cannon":
 			var air_velocity: Vector3 = shot.velocity-app.flight.wind
@@ -451,7 +498,7 @@ func update_shots(dt: float) -> void:
 				if at.y<=app.world.ground_height(at.x,at.z): hi = t
 				else: lo = t
 			shot.position = previous.lerp(shot.position,hi); shot.life = 0
-			burst(shot.position,Color(1,.70,.32),1.6 if shot.kind=="cannon" else 12)
+			detonate_missile(shot)
 			continue
 		if shot.kind=="missile" and is_instance_valid(visuals):visuals.update_projectile(shot,dt)
 		if shot.kind=="cannon": shot.node.scale.z = clampf(shot.age*shot.velocity.length()/3.2,.01,1)
@@ -467,11 +514,7 @@ func update_shots(dt: float) -> void:
 		else:
 			for enemy: Dictionary in enemies:
 				if (enemy.health>0 or (shot.kind=="missile" and enemy.dying<.8)) and segment_distance(enemy.position,previous,shot.position)<(float(enemy.hit_radius)+5.0 if shot.kind=="missile" else Tune.GUN_HIT_RADIUS):
-					if enemy.health<=0:event("impact",enemy.position,.7)
-					hurt_enemy(enemy,shot.damage,shot.kind,shot.position);shot.life=0;shot.hit=true;hit_confirm=1
-					app.audio.play_effect("impact",-24,1.15)
-					if shot.kind=="cannon": rounds_hit += int(shot.get("round_count",1))
-					burst(enemy.position,Color(1,0.66,0.27),3 if shot.kind=="cannon" else 9)
+					detonate_missile(shot,int(enemy.id));hit_confirm=1
 					break
 	for i in range(shots.size()-1,-1,-1):
 		if shots[i].life<=0:
@@ -507,22 +550,56 @@ func hurt_enemy(enemy: Dictionary,damage: float,source: String,at: Vector3) -> v
 	if enemy.kind=="boss":boss_defeated=true
 	else:spawn_clock=minf(spawn_clock,.75);app.audio.radio.say("target_down" if kills%2 else "target_down_alt")
 
+func _plasma_targets() -> Array[int]:
+	var ids: Array[int]=[-1,-1]
+	if not assist or aim_strength<=0:return ids
+	var candidates: Array[Dictionary]=_visible_targets(Tune.BEAM_RANGE,clampf(Tune.PLASMA_HALF_ANGLE*aim_strength,5,55))
+	if candidates.is_empty():return ids
+	var assigned: Dictionary=_missile_assignments()
+	candidates.sort_custom(func(a: Dictionary,b: Dictionary) -> bool:
+		var da: Vector3=a.position-app.flight.position;var db: Vector3=b.position-app.flight.position
+		var ca: float=forward().angle_to(da.normalized())*700+da.length()*.15
+		var cb: float=forward().angle_to(db.normalized())*700+db.length()*.15
+		if assigned.has(int(a.id)):ca+=5000
+		if assigned.has(int(b.id)):cb+=5000
+		if beam_target_ids.has(int(a.id)):ca-=150
+		if beam_target_ids.has(int(b.id)):cb-=150
+		return ca<cb)
+	var first: Dictionary=candidates[0]
+	if candidates.size()==1 or float(first.health)>Tune.PLASMA_FOCUS_HEALTH or first.get("kind","")=="boss":
+		ids.assign([int(first.id),int(first.id)]);return ids
+	ids.assign([int(first.id),int(candidates[1].id)])
+	# Keep two retained targets on their original emitters instead of flickering swaps.
+	if ids[1]==beam_target_ids[0]:ids.reverse()
+	return ids
+
 func update_beam(dt: float) -> void:
 	beam_active=active and app.flight.airborne and gun_firing_time>0
 	beam_hit_id=-1;beam_clock-=dt
-	if not beam_active:return
+	if not beam_active:beam_target_ids.assign([-1,-1]);return
+	beam_target_ids=_plasma_targets()
 	var basis: Basis=app.flight.pose_basis()
-	var start: Vector3=app.fighter_fx.plasma_muzzle_position(app.flight.position+basis*Fighter.PLASMA_MUZZLE)
-	var direction: Vector3=assisted_direction();var length: float=Tune.BEAM_RANGE;var hit: Dictionary={}
-	for enemy: Dictionary in enemies:
-		if enemy.health<=0:continue
-		var along: float=(enemy.position-start).dot(direction)
-		if along>0 and along<length and Vector3(enemy.position).distance_to(start+direction*along)<float(enemy.hit_radius)+4+intent.help_amount*5:
-			length=along;hit=enemy
-	beam_end=start+direction*length
-	if not hit.is_empty():
-		beam_hit_id=hit.id;hurt_enemy(hit,Tune.BEAM_DPS*dt,"beam",beam_end)
-		if beam_clock<=0:burst(beam_end,Color(.35,.85,1),3);beam_clock=.09
+	for index in range(2):
+		var start: Vector3=app.fighter_fx.plasma_muzzle_position(app.flight.position+basis*Fighter.PLASMA_MUZZLES[index],index)
+		var end: Vector3=start+forward()*Tune.BEAM_RANGE
+		var hit: Dictionary={}
+		for enemy: Dictionary in enemies:
+			if enemy.id==beam_target_ids[index] and enemy.health>0:hit=enemy;end=enemy.position;break
+		if hit.is_empty():
+			# With aim assistance off, each cannon is still a real forward-firing beam.
+			var reach: float=Tune.BEAM_RANGE
+			for enemy: Dictionary in enemies:
+				if enemy.health<=0:continue
+				var along: float=(enemy.position-start).dot(forward())
+				if along>0 and along<reach and Vector3(enemy.position).distance_to(start+forward()*along)<float(enemy.hit_radius):
+					reach=along;hit=enemy;end=start+forward()*reach
+		beam_ends[index]=end
+		if not hit.is_empty():
+			beam_target_ids[index]=int(hit.id);beam_hit_id=int(hit.id)
+			hurt_enemy(hit,Tune.BEAM_DPS*dt,"beam",end)
+			if beam_clock<=0:burst(end,Color(.35,.85,1),2.5)
+	if beam_clock<=0:beam_clock=.09
+	beam_end=beam_ends[0]
 
 func pilot_controls() -> Vector3:
 	var at: Vector3 = app.flight.position
@@ -583,7 +660,8 @@ func segment_distance(point: Vector3, a: Vector3, b: Vector3) -> float:
 	return point.distance_to(a+delta*t)
 
 func spawn_shot(at: Vector3, velocity: Vector3, kind: String, target_value: int, damage: float, variant: String = "gatling") -> void:
-	assert(kind in ["cannon","missile"],"Unsupported projectile kind")
+	assert(kind=="missile","Only automatic missiles are ballistic projectiles")
+	if kind!="missile":return
 	var node: Node3D = visuals.take_projectile(kind) if is_instance_valid(visuals) else WeaponArt.projectile(kind,variant)
 	if node.get_parent()==null:add_child(node)
 	node.position = at
