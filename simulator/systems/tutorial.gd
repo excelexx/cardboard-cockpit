@@ -4,8 +4,8 @@ class_name FlightTutorial
 const LESSONS: Array[Dictionary]=[
  {"title":"FIRST THREE GEESE","lines":["We will shoot down your first three geese together.","After that: shoot down 12 geese, then land at SFO."]},
  {"title":"HOW TO FLY","lines":["Turn the yoke to bank. Tilt it toward you to climb, away to dive.","Push the throttle to speed up, pull to slow down. Arrow keys and W / S work too."]},
- {"title":"THE GUN","lines":["Flip yoke switch 1 ON, or tap Space, to fire the gun.","Put the ring on a goose. Flip it OFF or tap again to stop."]},
- {"title":"MISSILES","lines":["Flip yoke switch 2 ON, or tap T, to fire missiles four at a time.","They follow the red LOCKED box. You never run out of ammo."]},
+ {"title":"THE GUN","lines":["Show the printed gun tag ID 4, or hold Space or left mouse, to fire.","Put the ring on a goose. Cover the tag or release the button to stop."]},
+ {"title":"AIM AND RELEASE","lines":["Keep the aiming ring on a goose while you fire.","Now cover the gun tag or release Space and left mouse to stop firing."]},
  {"title":"KEEP GOING","lines":["Keep geese near the ring and shoot down three.","Badge LEFT changes the view, HOME pauses, UP turns auto-fly on or off."]},
  {"title":"YOU ARE READY","lines":["Three geese down. The rest is up to you.","A big flock comes in at the end. Clear it, then press badge B or L to land."]},
  {"title":"LANDING AT SFO","lines":["Gear and flaps are down and the weapons are off.","The jet lands and brakes by itself. Enjoy the view."]}
@@ -45,12 +45,12 @@ func landing_begun() -> void:
 	active=true;app.audio.radio.reset();app.audio.radio.enabled=false;show(6)
 func speak() -> void:
 	spoken_text=str(lesson().title)+". "+" ".join(lesson().lines)
-	if voice_id.is_empty() or app.audio.muted or app.mode=="paused" or app.overlay_visible():return
+	if voice_id.is_empty() or app.audio.muted or app.mode=="paused" or app.overlay_visible() or app.yoke_recovery_visible():return
 	DisplayServer.tts_speak(spoken_text,voice_id,85,1.0,.96,index,true)
 func speaking() -> bool:return active and not voice_id.is_empty() and DisplayServer.tts_is_speaking() and not DisplayServer.tts_is_paused()
 func tick(dt: float) -> void:
 	if not active:return
-	var paused: bool=app.mode=="paused" or app.overlay_visible()
+	var paused: bool=app.mode=="paused" or app.overlay_visible() or app.yoke_recovery_visible()
 	if not voice_id.is_empty():
 		if app.audio.muted and not last_muted:DisplayServer.tts_stop()
 		elif not app.audio.muted and last_muted and not paused:speak()
@@ -67,4 +67,4 @@ func tick(dt: float) -> void:
 	if index==0 and age>=5:show(1)
 	elif index==1 and age>=9:show(2)
 	elif index==2 and app.combat.primary_used and age>=4:show(3)
-	elif index==3 and app.combat.salvo_count>0 and age>=4:show(4)
+	elif index==3 and app.combat.primary_used and not app.gun_requested() and app.combat.gun_firing_time<=0 and age>=4:show(4)

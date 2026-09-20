@@ -3,7 +3,7 @@ func _initialize() -> void:call_deferred("run")
 func run() -> void:
 	var app=load("res://scenes/main.tscn").instantiate();app.set_meta("route_override","sf");root.add_child(app)
 	app.set_process(false);app.set_physics_process(false);app.audio.muted=true;app.vision.enabled=false
-	app.on_action("training");app.copilot=true;app.demo_auto_fire=true
+	app.on_action("keyboard_training");app.copilot=true;app.demo_auto_fire=true
 	var raised:=false;var assisted:=false;var seen: Array[String]=[]
 	for frame in range(36000):
 		if app.mission.phase not in seen:seen.append(app.mission.phase);print("TRAINING PHASE ",app.mission.phase," t=",app.mission.clock," kills=",app.combat.kills)

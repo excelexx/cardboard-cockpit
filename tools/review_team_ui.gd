@@ -21,6 +21,8 @@ func run() -> void:
 	app.start_flight("combat");app.camera_rig.update(1);app.vision.enabled=true;app.vision.connected=true;app.vision.tracking=true;app.vision.throttle_confidence=.95
 	app.yoke_preview.texture=test_frame(Color(.14,.24,.30),"LAPTOP");app.throttle_preview.texture=test_frame(Color(.23,.22,.13),"PHONE")
 	app.mode="flight";await snapshot("flight-cameras")
+	app.vision.tracking=false;app.yoke_recovery=true;await snapshot("yoke-recovery")
+	app.vision.tracking=true;app.yoke_recovery=false
 	app.mode="paused";app.resume_mode="flight";await snapshot("pause")
 	app.on_action("settings");await snapshot("settings")
 	app.on_action("camera");await snapshot("camera-setup")

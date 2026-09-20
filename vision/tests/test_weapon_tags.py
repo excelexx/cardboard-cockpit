@@ -40,6 +40,12 @@ class WeaponTagTests(unittest.TestCase):
         self.assertEqual(self.detect(weapon_frame()), {"gun": False})
         self.assertEqual(self.arm(weapon_frame((3,))), {"gun": False})
 
+    def test_retired_switch_ids_cannot_emit_weapon_actions(self):
+        for marker_id in (31, 32, 41, 42):
+            with self.subTest(marker_id=marker_id):
+                self.assertEqual(self.arm(weapon_frame((marker_id,))), {"gun": False})
+        self.assertEqual(self.arm(weapon_frame((4, 31))), {"gun": True})
+
     def test_small_partial_covers_that_still_decode_keep_firing(self):
         for marker_id in (4,):
             for x, y in ((126, 162), (126, 270), (122, 210), (230, 210), (165, 185),

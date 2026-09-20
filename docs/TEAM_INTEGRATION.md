@@ -1,3 +1,5 @@
+> Updated behavior: [XLX parity 0.16.0](XLX_PARITY.md). The entries below describe the preceding selective merge; gun-only controls now supersede its legacy switch and missile compatibility.
+
 # Team integration — 0.15.0
 
 The integration branch starts from GitHub main `64011f3` (excelex), which includes `5737463` (Festyve / Michael Zhang) and the dual-camera work. Commit `a5af9f0` preserves the current local visual build, including its uncommitted work at the integration snapshot, on that shared history. Feature changes are applied on top. The original working directory remains available for concurrent visual work.

@@ -9,8 +9,6 @@ class_name FighterCameraRig
 ## and the cockpit eye travel is clamped under the 0.12 m near plane.
 var app: Node
 var camera: Camera3D
-var pip_viewport: SubViewport
-var pip_camera: Camera3D
 var clock := 0.0
 var trauma := 0.0
 var yaw := 0.0
@@ -19,9 +17,6 @@ var offset := Vector3(0,6.4,23)
 var last_speed := 0.0
 var acceleration := 0.0
 var initialized := false
-var missile_link := false
-var missile_requested := false
-var pip_texture: Texture2D
 
 ## --- feel state -------------------------------------------------------------
 var noise: FastNoiseLite
@@ -70,18 +65,7 @@ func _ready() -> void:
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	noise.seed = 20260919
 	noise.frequency = 1.0
-	pip_viewport = SubViewport.new()
-	pip_viewport.size = Vector2i(480,270)
-	pip_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	pip_viewport.world_3d = app.get_world_3d()
-	add_child(pip_viewport)
-	pip_camera = Camera3D.new()
-	pip_camera.current = true
-	pip_camera.fov = 78
-	pip_camera.near = 0.2
-	pip_camera.far = 14000
-	pip_viewport.add_child(pip_camera)
-	pip_texture = pip_viewport.get_texture()
+
 func impulse(amount: float) -> void: trauma = minf(1,trauma+amount)
 ## The one impact in the mission the player is meant to enjoy: mains on concrete.
 ## Clamped at both ends so a greaser still registers and a firm arrival never hurts.
@@ -91,12 +75,10 @@ func touchdown(strength: float) -> void:
 	settle_clock = 0.0
 func reset() -> void:
 	initialized = false; trauma = 0; last_speed = app.flight.speed; acceleration = 0
-	missile_link = false; missile_requested = false
 	aim = Vector3.ZERO; head = Vector3.ZERO; head_pitch = 0; head_yaw = 0
 	ground_lift = 0; settle = 0; settle_clock = 0
 	results_clock = 0; rollout_clock = 0; inhale = 0; burner_latch = false
 	if is_instance_valid(camera): camera.attributes = null
-	if is_instance_valid(pip_viewport): pip_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 func update(dt: float) -> void:
 	if app.mode=="paused": return
 	clock += dt
@@ -141,12 +123,7 @@ func update(dt: float) -> void:
 	else:
 		_chase_view(dt,f,plane_basis,ground,speed_norm,angular,wobble*SHAKE_SHIFT_CHASE,showcase)
 	app.cockpit_frame.set_presentation_visible(app.cockpit and not showcase)
-	missile_link = missile_requested and is_instance_valid(app.combat.last_missile) and app.mode=="flight"
-	pip_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if missile_link else SubViewport.UPDATE_DISABLED
-	if missile_link:
-		var missile: Node3D = app.combat.last_missile
-		pip_camera.position = missile.global_position+missile.global_basis*Vector3(1,1.0,7)
-		pip_camera.look_at(missile.global_position-missile.global_basis.z*35)
+
 
 ## FOV as a transient. Base plus a signed punch off the low-passed acceleration,
 ## a reheat step, and a ground-rush term, opening fast and closing slowly. A short
@@ -270,6 +247,3 @@ func _apply_results_dof(f: FlightDynamics) -> void:
 	attributes.dof_blur_far_distance = span+26.0
 	attributes.dof_blur_far_transition = maxf(span*0.6,12.0)
 	if camera.attributes!=attributes: camera.attributes = attributes
-
-func _exit_tree() -> void:
-	if is_instance_valid(pip_viewport): pip_viewport.world_3d = null

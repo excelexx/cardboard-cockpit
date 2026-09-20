@@ -1,14 +1,14 @@
-# Flight coaching — 0.15.0
+# Flight coaching — 0.16.0
 
 ## Badge-guided Tutorial
 
-Choose **Tutorial** from the title screen for the team’s takeoff, sixteen-target engagement and landing route. Follow the rings, use the yoke or keyboard to fire, then reduce throttle for landing. Badge A / G configures gear and flaps; badge B / L enables landing assistance after all sixteen targets are cleared. HOME pauses; LEFT changes view, RIGHT toggles the missile inset, and holding DOWN shows the tactical instrument. The lesson succeeds only after all sixteen kills and a stopped landing. It is a longer route (about five simulated minutes with assistance), separate from normal Play.
+Choose **Tutorial** from the title screen, complete the cardboard checks (or choose Use keyboard), for the team’s takeoff, sixteen-target engagement and landing route. Follow the rings, use the yoke or keyboard to fire, then reduce throttle for landing. Badge A / G configures gear and flaps; badge B / L enables landing assistance after all sixteen targets are cleared. HOME pauses; LEFT changes view, RIGHT toggles the tactical view, and holding DOWN shows the tactical instrument. The lesson succeeds only after all sixteen kills and a stopped landing. It is a longer route (about five simulated minutes with assistance), separate from normal Play.
 
 ## Existing Play coaching
 
-Choose **Play** normally. The instructor teaches the actual cardboard yoke/throttle and weapon switches while you fly and clear the first three geese. There are no separate training screens, paused lessons or Continue buttons. On the third kill, the instructor says you are ready and leaves you to clear the flock and land. The same run, score, weapon state and route assistance continue.
+Choose **Play**, then complete cardboard setup or select **Use keyboard**. The instructor teaches the actual cardboard yoke/throttle and weapon switches while you fly and clear the first three geese. There are no separate training screens, paused lessons or Continue buttons. On the third kill, the instructor says you are ready and leaves you to clear the flock and land. The same run, score, weapon state and route assistance continue.
 
-Coaching explains yoke rotation/tilt, throttle acceleration/braking, primary switch 1 (Space), missile switch 2 (T), aiming and badge controls. Landing guidance explains badge B / keyboard L, gear, flaps and automatic braking. Headphone/speaker output follows the Mac's selected audio device. Pause and mute also affect narration. Captions remain readable.
+Coaching explains yoke rotation/tilt, throttle acceleration/braking, show/cover gun tag firing (or held Space/left mouse), releasing fire, aiming and badge controls. Landing guidance explains badge B / keyboard L, gear, flaps and automatic braking. Headphone/speaker output follows the Mac's selected audio device. Pause and mute also affect narration. Captions remain readable.
 
 The initial instructor uses local OS English speech, preferring Daniel, with music ducking and a captions-only fallback. This is synthesized speech, not a studio recording. No microphone, recording or cloud voice service is used. Native start/pause/resume/stop was verified; physical headphone routing was not independently tested.
 

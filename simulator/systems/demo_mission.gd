@@ -136,10 +136,6 @@ func controls() -> Vector3:
 	f.throttle = clampf(.2+(speed-f.speed)*.045,0,1)
 	f.afterburner = phase=="combat" and phase_clock<1.8
 	if f.afterburner: f.throttle = 1
-	if app.combat.incoming_distance<650:
-		for shot: Dictionary in app.combat.shots:
-			if shot.kind=="hostile_missile" and not shot.has("decoy") and shot.position.distance_to(f.position)<650:
-				app.combat.deploy_flares(); break
 	return Vector3(clampf((bank-f.roll)*1.6-f.roll_velocity*.3,-1,1),clampf((pitch-f.pitch)*3.0-f.pitch_velocity*.25,-1,1),clampf(error*.8,-1,1))
 
 func route_target() -> Vector3:

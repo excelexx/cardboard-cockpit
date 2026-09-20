@@ -171,14 +171,6 @@ func build() -> void:
 	add_child(wind_field)
 	for i in range(28):
 		wind_points.append(Vector3(wind_rng.randf_range(-24,24),wind_rng.randf_range(-18,18),wind_rng.randf_range(-45,24)))
-	for i in range(4):
-		var store: Node3D = WeaponArt.missile()
-		for geometry: Node in store.find_children("*","GeometryInstance3D",true,false): geometry.layers = 2
-		var mount := Node3D.new()
-		mount.add_child(store)
-		app.aircraft.add_child(mount)
-		mount.position = Vector3((-1 if i<2 else 1)*(2.8+(i%2)*1.25),-1.14,2.85)
-		stores.append(mount)
 
 ## The burner is five cooperating pieces, cross-faded by view angle so it reads from the
 ## side AND from straight up the pipe: an axial slice that carries the shock train, a
@@ -324,11 +316,6 @@ func _build_vapour() -> void:
 		node.custom_aabb = AABB(Vector3(-3,-1,-4),Vector3(6,3,8))
 		node.visible = false
 		add_child(node); vapor_wings.append(node)
-
-func missile_launch(_side: float, index: int = -1) -> void:
-	last_store += 1
-	if index>=0 and index<stores.size():
-		store_timers[index] = Tune.MISSILE_INTERVAL; stores[index].visible = false
 
 func update(dt: float) -> void:
 	clock += dt

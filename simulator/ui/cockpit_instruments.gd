@@ -326,7 +326,7 @@ func _panorama() -> void:
 	# Weapons and airframe.
 	var a := Rect2(16,top,380,tall); _portal(a,"WEAPONS")
 	_p(label_font,a.position+Vector2(16,104),"GUN",28,P_WHITE); _chip(a.position+Vector2(232,62),bool(tactical.get("gun",false)))
-	_p(label_font,a.position+Vector2(16,184),"MISSILES",28,P_WHITE); _chip(a.position+Vector2(232,142),bool(tactical.get("missiles",false)))
+	_p(label_font,a.position+Vector2(16,184),"CANNON ONLY",24,P_SOFT)
 	var lock: float = float(tactical.get("lock",0.0)); var tracking: bool = bool(tactical.get("tracking",false))
 	var lock_rect := Rect2(a.position+Vector2(16,226),Vector2(348,78))
 	if tracking and lock>=1.0:

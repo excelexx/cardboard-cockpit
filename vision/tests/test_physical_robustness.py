@@ -8,7 +8,7 @@ from unittest.mock import patch
 import cv2
 import numpy as np
 
-from vision import tracker
+from vision import legacy_tracker as tracker
 from vision.calibration import AxisCalibration, Calibration, ThrottleCalibration, YokeObservation, ThrottleObservation
 from vision.placement import FAIL, PASS, WARN, PlacementCheck, format_report
 from vision.tests.synthetic import cockpit

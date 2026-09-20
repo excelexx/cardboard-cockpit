@@ -1,16 +1,13 @@
-# SF demo — 0.12.0
+# Two flight modes — 0.16.0
 
-1. Open `build/Cardboard Cockpit.app`; wait for BADGE CONNECTED if using the badge.
-2. Choose **Play** for assisted flight with player weapons, or **Watch demo** for automated flight and firing.
-3. Flip cardboard primary ON (minigun + continuous beam), then salvo ON (repeated four-missile volleys). Space and T are equivalent keyboard toggles.
-4. Q rolls; W/S accelerate/brake; V changes camera; X opens the missile inset. Keep flight assistance on for a predictable judge presentation.
-5. The run escalates through SF into the boss encounter at 76 seconds. Defeating the boss leaves seven seconds of aftermath with a LAND AT SFO button. Badge B or keyboard L also starts landing immediately. Gear and flaps deploy, a short transition moves to SFO final, and assistance handles touchdown and braking. The final landing ends the demo below 150 seconds, including a no-fire run.
-6. R replays immediately; Escape pauses; M mutes. Switching applications pauses the game. F8 hides text while retaining world cues.
+1. Open the packaged **Cardboard Cockpit.app**. Its helper connects the powered badge over Bluetooth. For camera control, start **Launch Two-Camera Cockpit.command** with the phone connected.
+2. Choose **Play** for the current SF flock route or **Tutorial** for XLX’s sixteen-target takeoff/combat/landing route. Both begin with cardboard checks. **Use keyboard** bypasses cameras; **Watch demo** flies and fires automatically.
+3. Hold the yoke upright for neutral capture, slide the throttle idle/full/idle, read the yoke explanation, then show/cover/show the gun tag. Centre the yoke, idle the throttle and cover the gun to start.
+4. Uncover printed gun ID 4 to fire; cover it to stop. Keyboard users hold Space or left mouse and release to stop. There are no missile, plasma or toggle-switch weapons.
+5. If the yoke disappears, flight pauses. Bring it back and hold steady, or choose **Use keyboard**. Throttle changes blend smoothly after reacquisition.
+6. **Settings** saves pitch/bank/yaw sensitivity and independent agility plus aim assistance. Reset defaults restores the XLX values.
+7. Badge A / G changes gear; B / L assists landing (Tutorial requires all sixteen targets first). HOME / Escape pauses. LEFT / V changes view; RIGHT or held DOWN selects badge tactical view. R restarts the selected mode; M mutes.
 
-Badge: START start/replay/resume, HOME pause, A gear, B assisted landing, LEFT view, RIGHT inset, UP route assistance, DOWN short press text visibility / hold tactical view. All steering/throttle/firing belongs to the cardboard controls. [Construction and switch sheet](WEAPON_SWITCHES.md).
+The normal SF mode retains its short route and flock objective. Tutorial is a longer route to a separate landing strip and succeeds only after sixteen kills and a stopped landing. Cardboard owns steering, throttle and firing; the electronic badge owns secondary actions.
 
-Prepare the physical props and calibration before showing the camera mode. Real badge button input has been verified; real printed yoke-switch operation still requires a physical run. If the badge is off, the game remains playable. The release owns its bundled relay; do not launch another badge tool simultaneously.
-
-Use one SF map throughout the presentation. Landing practice remains an optional mode. The timed boss demo now includes landing: about 126 seconds for the guided win and 140 seconds with no firing.
-
-Play includes spoken coaching during the first three goose kills, followed by an instructor handoff. There is no separate training mode or Continue button. Crashes recover to stable flight; a landing mishap retries final approach. Score and mission progress remain intact. Safe landing without the boss remains an incomplete objective.
+Software tests use simulated cameras and badge inputs. Physical camera placement and a new badge demonstration are separate checks; do not represent the software preview as live hardware verification. The packaged game owns its Bluetooth relay; do not run another badge tool simultaneously.

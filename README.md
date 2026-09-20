@@ -1,53 +1,41 @@
 # Goose Protocol — SPECTRE X-26
 
-Version **0.15.1** combines the current San Francisco visuals and gameplay with the team’s two-camera controls, settings and pause screens, plus a separate badge-guided **Tutorial**. Normal Play retains the current flock encounter and assisted SFO landing. Tutorial takes off, clears sixteen targets and follows a longer route to land. Both have unlimited ammunition and forgiving flight assistance.
+Version **0.16.0** combines the current San Francisco visuals and gameplay with the team’s two-camera controls, settings and pause screens, plus a separate badge-guided **Tutorial**. Normal Play retains the current flock encounter and assisted SFO landing. Tutorial takes off, clears sixteen targets and follows a longer route to land. Both have unlimited ammunition and forgiving flight assistance.
 
-Open **Launch Cardboard Cockpit.command** or **build/Cardboard Cockpit.app**. **Play / Enter** guides takeoff and the SF route while you shoot. Tap **Space** to switch the minigun and continuous energy cannon on; tap **T** to switch repeated four-missile salvos on. Tap either again to stop. **Watch demo** flies and shoots automatically. Keyboard steering takes over from route assistance; **H** rejoins it. **R** immediately replays.
-
-**Play teaches you during the mission:** spoken tips guide the first three geese, then the instructor hands the rest to you. Choose **Tutorial** for the separate takeoff–sixteen-targets–landing lesson. Flight never pauses for lessons. Crashes recover to stable flight; landing mishaps retry final approach. [Coaching and voice details](docs/TUTORIAL.md).
+Open **Launch Cardboard Cockpit.command** or the packaged **Cardboard Cockpit.app**. Both flight modes use XLX's gun-only cardboard controls and settings, with the current graphics and aircraft presentation. **Watch demo** flies and shoots automatically.
 
 ## Controls
 
+**Play** and **Tutorial** both begin with XLX's cardboard calibration and control checks. Choose **Use keyboard** in setup to fly without cameras. Play keeps the current SF flock route; Tutorial keeps the sixteen-target takeoff/combat/landing route.
+
 | Input | Action |
 |---|---|
-| Arrows / A D | Pitch and bank / rudder; release toward level |
-| W / S / hold Shift | Accelerate / airbrake / afterburner |
-| Space or left mouse | Toggle continuous minigun + energy cannon |
-| T or right mouse | Toggle repeated four-missile salvos |
-| Q | Fast recoverable barrel roll |
-| V / X | Cockpit or chase / missile camera inset |
-| Alt + mouse / middle drag | Look around |
-| G / F | Gear / flap detent |
-| B / J / H | Mouse yoke / aim assistance / route assistance |
-| Hold E / Z | Eject / optional flares |
-| C / F1 | Cardboard setup / controls |
-| Escape / R / M | Pause / replay / mute |
-| F8 / F9 / F10 | Hide text / telemetry / graphics quality |
+| Printed gun tag ID 4 visible / covered | Fire the gun / stop firing |
+| Hold Space or left mouse / release | Fire the gun / stop firing |
+| Yoke rotation, tilt, swivel | Bank, pitch, yaw |
+| Relative throttle tags 0 / 1 / 2 | Idle endpoint / moving handle / full endpoint |
+| Arrows / A D | Pitch and bank / rudder |
+| W / S / Shift | Keyboard power / brake / afterburner |
+| Q / V | Barrel roll / cockpit or chase view |
+| G / F / L | Gear / flaps / landing assistance |
+| H / hold E / Z | Route assist / eject / cosmetic flares |
+| C / Escape / R / M | Cardboard setup / pause / replay / mute |
 
-Normal Play follows the current SF route and flock encounter. Badge B, keyboard L or the landing button deploys gear/flaps and starts assisted final approach, touchdown and braking. Tutorial keeps the team’s longer outbound and landing route, requires all sixteen targets, and only succeeds after a stopped landing. Its badge prompts explain A for gear, B for landing assistance, HOME for pause, and the view controls. [Team integration notes](docs/TEAM_INTEGRATION.md).
-
-Aim near a visible contact. Intent scoring, prediction, hysteresis and smoothly varying assistance make tracking forgiving without turning the aircraft automatically in manual flight. Missiles guide only toward their original selected target; free shots remain free shots. Four hardpoints launch with staggered separation and divergent paths. Hit reactions, physical smoke, spectral world cues, audio and local light reinforce real impacts.
+There are **no missiles, plasma/laser firing, or latched weapon switches**. Covering the gun tag or releasing the keyboard/mouse stops new shots. Yoke tracking loss pauses the flight; holding it steadily in view resumes it, with a keyboard fallback. Camera throttle changes are blended smoothly and do not automatically engage afterburner.
 
 ## Cardboard and badge
 
-The **cardboard yoke** owns steering and both latched weapon switches. The **cardboard throttle** owns power, boost and braking. The **wireless badge** supplies occasional secondary controls: START start/replay, HOME pause, A gear, B assisted landing, LEFT view, RIGHT missile inset, UP route assist, DOWN short press text visibility / hold tactical view. See [switch construction, mapping and evidence](docs/WEAPON_SWITCHES.md) and [printable switch faces](vision/markers/weapon-switches.html).
+Open **Launch Two-Camera Cockpit.command** (or **Launch Cardboard Tracker.command**) with the phone connected. The laptop tracks yoke ID 7 and gun ID 4; the phone tracks the relative throttle's IDs 0/1/2. Setup checks calibration, throttle idle/full/idle, yoke instructions, and gun show/cover/show before starting. [Vision setup and print masters](docs/vision-setup.md).
 
-For the laptop yoke and phone throttle, use **Launch Two-Camera Cockpit.command**, open **Set up cardboard**, and calibrate neutral before starting. Two independent previews appear in setup, flight and pause. Setup now restores excelex’s guided checks: three-second yoke calibration, throttle idle/full/idle, yoke instructions, and gun show/cover/show. Checks advance from fresh camera observations. Hold the centred yoke with idle throttle and the gun off to start. Camera Play and Tutorial both run setup first; **Use keyboard** remains available. **Settings** saves pitch/bank/yaw sensitivity, separate agility sliders, aim assistance, camera previews and badge hints.
+Settings retains separate pitch, bank and yaw sensitivity and agility, plus aim assistance. XLX defaults are restored: agility **1.30×** per axis and aim assistance **1.40×**; saved pilot preferences remain intact until Reset defaults is selected. Sensitivity changes apply live to the tracker, with no double gain.
 
-For the original single-camera controls, use [vision setup](docs/vision-setup.md) and [construction guide](docs/cardboard-build-guide.md) for yoke ID 7 and throttle ID 23. Flip-tab faces use 31/32 and 41/42 in the same `DICT_4X4_50` dictionary.
-
-```sh
-./tools/setup_vision.sh
-./tools/tracker.sh --camera 0 --calibrate
-```
-
-Enable camera tracking with C. The tracker sends controls only over localhost and does not save or upload images. Synthetic detector and transport tests pass; actual printed switch faces and camera placement still need physical testing. The release app includes an offline BLE helper and reconnects to the existing badge firmware automatically. All eight physical badge buttons and simultaneous A+B were measured live. Phase feedback was written and read back. The badge now runs the verified live-instrument firmware; see [display, protocol and wireless handoff](hardware/badge-controller/INSTRUMENT.md).
+The electronic badge remains a secondary instrument: START start/replay, HOME pause/back, A gear, B landing assistance, LEFT cockpit/chase, RIGHT tactical view, UP route assist, short DOWN text visibility / held DOWN tactical view. It never fires or steers the aircraft. The packaged app includes its Bluetooth helper. [Badge instrument and wireless handoff](hardware/badge-controller/INSTRUMENT.md).
 
 ## World, audio and performance
 
 The sourced SF region includes SFO, downtown, residential streets, hills, Golden Gate Bridge, Bay Bridge and Alcatraz. The playable menu exposes one map. Historical coastal/alpine fixtures remain in source for regression testing. [SF coverage and source licenses](docs/san-francisco.md).
 
-Forward+ rendering retains streamed native meshes, LODs and filtered foliage. Local fog, selective glow, reflective missiles and bounded pools of sprites, projectile meshes, lights and spatial sounds support combat. High and Balanced modes retain independent HUD resolution. The physical terrain guard and soft protection around compact tall landmarks keep low flight forgiving; SF buildings do not use solid mesh collision.
+Forward+ rendering retains streamed native meshes, LODs and filtered foliage. Local fog, selective glow, gun tracers and bounded pools of sprites, projectile meshes, lights and spatial sounds support combat. High and Balanced modes retain independent HUD resolution. The physical terrain guard and soft protection around compact tall landmarks keep low flight forgiving; SF buildings do not use solid mesh collision.
 
 Radio uses licensed human voices processed with military-style band-pass filtering, compression, saturation, RF hiss and push-to-talk squelch. Ground-base and pilot cues have priority, expiry, subtitles and music ducking. The music track adjusts with encounter intensity without restarting. These are processed Kenney recordings, not generated voice clones.
 
