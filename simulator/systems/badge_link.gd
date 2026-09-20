@@ -34,7 +34,7 @@ func phase_for(app: Node) -> String:
 	if flight.airborne:
 		# Only call it an approach once the gear is out and we are low.
 		if flight.gear:
-			var agl: float = flight.position.y - app.world.ground_height(flight.position.x, flight.position.z)
+			var agl: float = flight.position.y - (app.surface_height(flight.position.x,flight.position.z) if app.has_method("surface_height") else app.world.ground_height(flight.position.x, flight.position.z))
 			if agl < APPROACH_AGL:
 				return "landing"
 		return "sky"

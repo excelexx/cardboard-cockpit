@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 from collections import defaultdict
 sf.OUT=sf.ROOT/'simulator/assets/sourced_flight';sf.OUT.mkdir(exist_ok=True);sf.TEX=sf.OUT/'textures';sf.TEX.mkdir(exist_ok=True)
-for name,file in [('cockpit','Cockpit.ac'),('cannon','A10.ac'),('missile','AIM-120.ac')]:
+for name,file in [('cockpit','Cockpit.ac'),('cannon','A10.ac')]:
  model=sf.GLTF();groups=defaultdict(lambda:[[],[]])
  for o in ac3d(sf.SRC/file):
   if name=='cannon' and o['name']!='Cannon':continue

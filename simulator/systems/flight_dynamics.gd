@@ -3,6 +3,12 @@ class_name FlightDynamics
 const Tune = preload("res://data/balance.gd")
 ## Fictional fly-by-wire dynamics: filtered angular rates, momentum and energy.
 var profile: Dictionary
+var pitch_agility: float = 1.0:
+	set(value): pitch_agility = clampf(value,.5,3.0) if is_finite(value) else 1.0
+var bank_agility: float = 1.0:
+	set(value): bank_agility = clampf(value,.5,3.0) if is_finite(value) else 1.0
+var yaw_agility: float = 1.0:
+	set(value): yaw_agility = clampf(value,.5,3.0) if is_finite(value) else 1.0
 var position := Vector3.ZERO
 var velocity := Vector3.ZERO
 var speed := 0.0
@@ -92,29 +98,33 @@ func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> voi
 	if airborne:
 		var handling: float = 1+Tune.THROTTLE_HANDLING_SCALAR*(1-2*throttle)
 		var authority: float = clampf(speed/effective_rotation_speed(),0.15,1.25)
-		roll_velocity = lerpf(roll_velocity,controls.x*float(profile.roll_rate)*handling,1-exp(-dt*Tune.ROLL_RESPONSE))
-		pitch_velocity = lerpf(pitch_velocity,controls.y*float(profile.pitch_rate)*authority*handling,1-exp(-dt*Tune.PITCH_RESPONSE))
+		# Aircraft angular rates, independent of yoke input sensitivity and angle limits.
+		roll_velocity = lerpf(roll_velocity,controls.x*float(profile.roll_rate)*handling*bank_agility,1-exp(-dt*Tune.ROLL_RESPONSE))
+		pitch_velocity = lerpf(pitch_velocity,controls.y*float(profile.pitch_rate)*authority*handling*pitch_agility,1-exp(-dt*Tune.PITCH_RESPONSE))
 		var rolling: bool = barrel_remaining>0
 		if rolling:
-			barrel_remaining = maxf(0,barrel_remaining-dt)
+			barrel_remaining = maxf(0,barrel_remaining-dt*bank_agility)
 			roll = wrapf(barrel_start+barrel_direction*TAU*smoothstep(0,1,1-barrel_remaining/BARREL_DURATION),-PI,PI)
 			if barrel_remaining==0: roll = barrel_start
 		else:
 			roll = wrapf(roll+roll_velocity*dt,-PI,PI)
 		pitch = clampf(pitch+pitch_velocity*dt,-1.10,1.20)
 		var coordinated: float = sin(roll)*Tune.BANK_TURN_FORCE/maxf(speed,55.0)
-		var desired_yaw: float = coordinated+controls.z*Tune.YAW_RATE*handling
+		var rudder: float = controls.z*Tune.YAW_RATE*handling
+		var desired_yaw: float = coordinated*bank_agility+rudder*yaw_agility
+		var turn_weight: float = absf(coordinated)+absf(rudder)
+		var turn_agility: float = (absf(coordinated)*bank_agility+absf(rudder)*yaw_agility)/turn_weight if turn_weight>0.0001 else 1.0
 		yaw_velocity = lerpf(yaw_velocity,0.0 if rolling else desired_yaw,1-exp(-dt*Tune.YAW_RESPONSE))
 		heading = wrapf(heading+yaw_velocity*dt,-PI,PI)
 		var lift: float = clampf(speed/(effective_rotation_speed()*0.82),0,1)
 		var sink: float = (1-lift)*28.0+(1-maxf(cos(roll),0.0))*6.0
 		var desired_vertical: float = sin(pitch)*speed-sink
 		if airborne_time<5 and position.y-ground<25: desired_vertical = maxf(desired_vertical,2)
-		vertical_speed = lerpf(vertical_speed,desired_vertical,1-exp(-dt*Tune.VERTICAL_RESPONSE))
+		vertical_speed = lerpf(vertical_speed,desired_vertical,1-exp(-dt*Tune.VERTICAL_RESPONSE*pitch_agility))
 		var horizontal := Vector3(sin(heading),0,-cos(heading))*speed*cos(pitch)+wind
 		if velocity.length()<0.01 and speed>1: velocity = Vector3(horizontal.x,vertical_speed,horizontal.z)
-		velocity.x = lerpf(velocity.x,horizontal.x,1-exp(-dt*Tune.VELOCITY_RESPONSE))
-		velocity.z = lerpf(velocity.z,horizontal.z,1-exp(-dt*Tune.VELOCITY_RESPONSE))
+		velocity.x = lerpf(velocity.x,horizontal.x,1-exp(-dt*Tune.VELOCITY_RESPONSE*turn_agility))
+		velocity.z = lerpf(velocity.z,horizontal.z,1-exp(-dt*Tune.VELOCITY_RESPONSE*turn_agility))
 		velocity.y = vertical_speed
 		position += velocity*dt
 		airborne_time += dt
@@ -123,8 +133,8 @@ func integrate(dt: float, controls: Vector3, brakes: bool, ground: float) -> voi
 		var acceleration: float = (velocity-previous_velocity).length()/maxf(dt,0.001)
 		g_load = lerpf(g_load,clampf(1+acceleration/9.81,0.2,9.0),1-exp(-dt*3))
 	else:
-		heading = wrapf(heading+controls.z*0.38*clampf(speed/20,0,1)*dt,-PI,PI)
-		pitch = move_toward(pitch,maxf(controls.y,0)*0.14,dt*0.13)
+		heading = wrapf(heading+controls.z*0.38*clampf(speed/20,0,1)*dt*yaw_agility,-PI,PI)
+		pitch = move_toward(pitch,maxf(controls.y,0)*0.14,dt*0.13*pitch_agility)
 		roll = 0; vertical_speed = 0; g_load = 1
 		position.y = ground+float(profile.clearance)
 		velocity = Vector3(sin(heading),0,-cos(heading))*speed
@@ -153,7 +163,7 @@ func rollout_step(dt: float, brakes: bool, steering: float, on_runway: bool) -> 
 	roll_velocity = move_toward(roll_velocity,0,dt)
 	throttle = 0; afterburner = false; engine = move_toward(engine,0,dt*0.5)
 	speed = maxf(0,speed-(Tune.ROLLOUT_DRAG+(Tune.ROLLOUT_BRAKING if brakes else 0))*dt)
-	heading += clampf(steering,-1,1)*0.11*clampf(speed/20,0,1)*dt
+	heading += clampf(steering,-1,1)*0.11*clampf(speed/20,0,1)*dt*yaw_agility
 	velocity = Vector3(sin(heading),0,-cos(heading))*speed
 	position += velocity*dt; distance += speed*dt
 	if not on_runway: contact = "overrun"

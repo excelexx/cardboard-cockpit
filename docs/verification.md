@@ -8,7 +8,7 @@
 # Version 0.10 San Francisco verification
 
 - Full `tools/verify.sh`: PASS (flight, assisted controls, scene, audio, both legacy routes, SF route, ballistics, combat feel, balance, city grounding, vision validation and reconnect).
-- SF round trip: 459.85 simulated seconds, 14/14 waypoints, safe SFO 28R stop, no terrain-recovery position corrections; 1180 cannon rounds, 23 missiles, 23 geese cleared; 89.93 seconds in the city/bridge corridor.
+- Historical SF round-trip benchmark: 459.85 simulated seconds, 14/14 waypoints, safe SFO 28R stop, and 89.93 seconds in the city/bridge corridor. Combat totals from that earlier loadout are no longer current.
 - Native packaged flight, observed with Computer Use: **Aircraft secured**, 23 geese, best streak 4, score 2700; continuous takeoff/intercept/landing complete.
 - Live cockpit city sample was 27 FPS during streaming in Balanced mode; final Balanced mode shortens distant building/tree draw ranges.
 - Native visual checks: Golden Gate 70 FPS, downtown 56 FPS, SFO 65 FPS, cockpit 42 FPS on this Mac. These are observed samples, not a constant-framerate guarantee.
@@ -26,7 +26,7 @@ The complete suite includes 24 flight, 8 angle-control, 27 scene, 41 radio, 13 a
 
 The alpine demo completes in 138.2 simulated seconds with 23 interceptions. The integrated Azure Coast tour reaches all eleven landmarks, spends 40.18 seconds above the city, peaks at 1,047 m and stops on the arrival runway after 179.15 simulated seconds. Both preserve continuous motion and harmless geese. City testing sampled 55,543 vertices with no terrain intrusion. Both the 128 base and 256 detail tiles and all 60 village homes are present.
 
-The [balance report](balance.md) documents the external reference, adapted values and measured weapon/handling timings. Small-cone acquisition, retention tolerance, crosshair convergence, unlocked-missile acceleration, no hidden retargeting, persistent smoke and frame-rate-independent speed response are tested. Holding both fire controls continues to use unlimited ammunition.
+The [balance report](balance.md) documents handling references and gun balance. Tests cover narrow aim assistance, target retention, crosshair convergence, gun ballistics and frame-rate-independent speed response.
 
 Earlier 0.8 native runs and screenshots remain historical evidence. The old graphics-branch M4 timing report is not a measurement of this integrated revision. Physical cardboard/webcam operation, Intel runtime behavior, other platforms and Apple notarization remain unverified. Trees remain forgiving; buildings and terrain collide. This is an arcade game, not certified simulation.
 

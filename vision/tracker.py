@@ -2,11 +2,14 @@
 """Local ArUco tracker. A webcam is accessed only with an explicit --camera.
 
 Run from the repository: .venv/bin/python vision/tracker.py --simulate
-All received camera images remain in memory; nothing is recorded or uploaded.
+Camera images remain in memory. A local preview is available to the game on
+/preview for yoke recovery and /preview/<control> for the preflight tutorial.
+Nothing is recorded or uploaded.
 """
 import argparse
 import asyncio
 import collections
+from dataclasses import replace
 import json
 import math
 from pathlib import Path
@@ -15,15 +18,27 @@ import sys
 import time
 
 if __package__:
+    from .control_settings import ControlSettings
+    from .neutral_calibration import NeutralCalibration
+    from .camera_devices import camera_argument, list_cameras, resolve_camera
+    from .background_camera import BackgroundCamera
     from .camera_calibration import LensProfile, run_lens_calibration, write_checkerboard
     from .pose_guard import PoseGuard
+    from .preview_framer import PreviewFramer
+    from .weapon_tags import WeaponTags, GUN_ID
     from .relative_throttle import RelativeThrottle, THROTTLE_IDLE_ID, THROTTLE_ID, THROTTLE_FULL_ID
     from .calibration import (AxisCalibration, Calibration, ControlFilter, ThrottleCalibration,
                               YokeObservation, clamp, simulated_calibration,
                               simulated_observations, wrap_degrees)
 else:
+    from control_settings import ControlSettings
+    from neutral_calibration import NeutralCalibration
+    from camera_devices import camera_argument, list_cameras, resolve_camera
+    from background_camera import BackgroundCamera
     from camera_calibration import LensProfile, run_lens_calibration, write_checkerboard
     from pose_guard import PoseGuard
+    from preview_framer import PreviewFramer
+    from weapon_tags import WeaponTags, GUN_ID
     from relative_throttle import RelativeThrottle, THROTTLE_IDLE_ID, THROTTLE_ID, THROTTLE_FULL_ID
     from calibration import (AxisCalibration, Calibration, ControlFilter, ThrottleCalibration,
                              YokeObservation, clamp, simulated_calibration,
@@ -31,11 +46,6 @@ else:
 
 # Yoke stays separate from the relative throttle IDs 0, 1 and 2.
 YOKE_ID = 7
-if __package__:
-    from .weapon_switches import WeaponSwitches
-else:
-    from weapon_switches import WeaponSwitches
-
 DEFAULT_CALIBRATION = Path(__file__).resolve().with_name("calibration.local.json")
 PREVIEW_TITLE = "Cardboard Cockpit - private local tracker"
 
@@ -58,7 +68,7 @@ def generate_markers(directory: Path) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     for marker_id, role, size_mm in ((YOKE_ID, "yoke", 70), (THROTTLE_IDLE_ID, "throttle-idle", 30),
                                      (THROTTLE_ID, "throttle", 30), (THROTTLE_FULL_ID, "throttle-full", 30),
-                                     (31,"primary-on",35),(32,"primary-off",35),(41,"salvo-on",35),(42,"salvo-off",35)):
+                                     (GUN_ID, "gun", 40)):
         # Six cells = four data cells + one-cell black border on each side.
         cells = cv2.aruco.generateImageMarker(dictionary, marker_id, 6)
         rects = ['<rect width="8" height="8" fill="white"/>']
@@ -95,7 +105,6 @@ class ArucoTracker:
         parameters = self.cv2.aruco.DetectorParameters()
         parameters.cornerRefinementMethod = self.cv2.aruco.CORNER_REFINE_SUBPIX
         self.detector = self.cv2.aruco.ArucoDetector(dictionary, parameters)
-        self.weapon_observations = {}
         self.previous_pose = None
         self.previous_pose_time = 0.0
 
@@ -106,7 +115,6 @@ class ArucoTracker:
         corners, ids, _ = self.detector.detectMarkers(gray)
         yoke = None
         throttle = self.throttle.observe(corners, ids, frame if draw else None)
-        self.weapon_observations = {}
         if ids is None:
             return yoke, throttle
         if draw:
@@ -123,15 +131,6 @@ class ArucoTracker:
         # Duplicated IDs are ambiguous; reject that control instead of choosing
         # whichever marker happens to be enumerated last.
         counts = collections.Counter(int(marker_id) for marker_id in ids.flatten())
-        for marker_corners, marker_id in zip(corners, ids.flatten()):
-            key = int(marker_id)
-            if key in WeaponSwitches.IDS and counts[key] == 1:
-                role, value = WeaponSwitches.IDS[key]
-                other = 32 if key == 31 else 31 if key == 32 else 42 if key == 41 else 41
-                points = marker_corners.reshape(4, 2)
-                side = float(min(np.linalg.norm(points[(i+1)%4]-points[i]) for i in range(4)))
-                if other not in counts and side >= 24:
-                    self.weapon_observations[role] = (value, clamp(side/75,.3,1.0))
         for marker_corners, marker_id in zip(corners, ids.flatten()):
             marker_id = int(marker_id)
             if counts[marker_id] != 1 or marker_id != self.yoke_id:
@@ -164,14 +163,17 @@ class ArucoTracker:
             if not candidates:
                 continue
             _, error, roll, pitch, rvec, tvec = min(candidates, key=lambda value: value[0])
+            rotation, _ = cv2.Rodrigues(rvec)
             if not math.isfinite(error) or error > 4.0:
                 continue
-            if not self.pose_guard.accept((roll, pitch), now):
+            normal = rotation[:, 2] * (1 if rotation[2, 2] >= 0 else -1)
+            yaw = math.degrees(math.atan2(float(normal[0]), float(normal[2])))
+            if abs(yaw) > 65 or not self.pose_guard.accept((roll, pitch, yaw), now):
                 continue
             confidence *= clamp(1 - error / 6, 0, 1)
             self.previous_pose = pitch
             self.previous_pose_time = now
-            yoke = YokeObservation(roll, pitch, confidence)
+            yoke = YokeObservation(roll, pitch, confidence, yaw=yaw)
             if draw:
                 cv2.drawFrameAxes(frame, matrix, distortion, rvec, tvec, 0.6, 2)
         return yoke, throttle
@@ -194,16 +196,19 @@ class PaperController:
         self.throttle = RelativeThrottle(self.cv2, self.np)
         self.samples = collections.deque(maxlen=24)
         self.motion = collections.deque(maxlen=3)
-        self.axis_active = [False, False]
+        self.axis_active = [False, False, False]
         self.neutral = None
-        self.message = "Show marker 7 and hold still for one second to center."
+        self.yaw_neutral = 0.0
+        self.raw_observation = None
+        self.message = "Show the yoke tag and hold still for one second to center."
 
     def recenter(self):
         self.pose_guard.reset()
         self.neutral = None
         self.samples.clear()
         self.motion.clear()
-        self.axis_active = [False, False]
+        self.axis_active = [False, False, False]
+        self.yaw_neutral = 0.0
 
     def stable_axis(self, value, index, enter, leave, full):
         # Schmitt neutral zone: don't repeatedly change signs at rest.
@@ -216,30 +221,37 @@ class PaperController:
             return 0.0
         return math.copysign(clamp((abs(value)-leave)/(full-leave), 0, 1), value)
 
-    def map_observation(self, roll, tilt, confidence):
+    def map_observation(self, roll, tilt, confidence, yaw=0.0):
         if self.neutral is None:
-            self.samples.append((roll, tilt))
+            self.samples.append((roll, tilt, yaw))
             if len(self.samples) < 20:
                 return None
             angles = [wrap_degrees(x[0] - self.samples[0][0]) for x in self.samples]
             heights = [x[1] for x in self.samples]
-            if statistics.pstdev(angles) > 2 or statistics.pstdev(heights) > 2:
-                self.message = "Hold marker 7 steady to center."
+            swivels = [wrap_degrees(x[2]-self.samples[0][2]) for x in self.samples]
+            if any(statistics.pstdev(values) > 2 for values in (angles, heights, swivels)):
+                self.message = "Hold the yoke tag steady to center."
                 return None
             self.neutral = (self.samples[0][0] + statistics.median(angles), statistics.median(heights))
-            print("YOKE READY: centered marker 7; rotate to bank, tilt to pitch.", flush=True)
+            self.yaw_neutral = wrap_degrees(self.samples[0][2] + statistics.median(swivels))
+            print("YOKE READY: rotate to bank, tilt to pitch, swivel to yaw.", flush=True)
         # Camera sees the opposite face from the person holding the card.
         # Full steering at 20 degrees bank / 25 degrees tilt; preserve the
         # downstream calibrated output ranges and existing jitter filtering.
-        self.motion.append((wrap_degrees(roll-self.neutral[0]), wrap_degrees(tilt-self.neutral[1])))
+        self.motion.append((wrap_degrees(roll-self.neutral[0]), wrap_degrees(tilt-self.neutral[1]), wrap_degrees(yaw-self.yaw_neutral)))
         bank_delta = statistics.median(x[0] for x in self.motion)
         pitch_delta = statistics.median(x[1] for x in self.motion)
+        yaw_delta = statistics.median(x[2] for x in self.motion)
         bank = -self.stable_axis(bank_delta, 0, 1.8, 1.0, 20) * 35
         pitch = self.stable_axis(pitch_delta, 1, 5.0, 3.0, 25) * 25
-        self.message = "LIVE: rotate to bank; tilt top toward you to climb. SPACE centers."
-        return YokeObservation(bank, pitch, confidence)
+        rudder = self.stable_axis(yaw_delta, 2, 4.0, 2.5, 25) * 25
+        self.message = "LIVE: rotate = bank; tilt = pitch; swivel = yaw. SPACE centers."
+        return YokeObservation(bank, pitch, confidence, yaw=rudder)
 
     def perspective_angles(self, points, width, height, mirrored=False):
+        return self.orientation_angles(points, width, height, mirrored)[:2]
+
+    def orientation_angles(self, points, width, height, mirrored=False):
         cv, np = self.cv2, self.np
         # Lens correction precedes the rigid-plane decomposition. Translation
         # in the image is never itself a pitch command.
@@ -268,9 +280,13 @@ class PaperController:
         # The face normal does not depend on which way the sticker was taped
         # (including upside down). Positive: top away from camera/toward pilot.
         tilt = math.degrees(math.atan2(rotation[1,2],rotation[2,2]))
-        return roll, tilt
+        # A right swivel by the pilot tips the normal toward camera-image right.
+        # Face normals keep the sign independent of sticker mounting rotation.
+        yaw = math.degrees(math.atan2(rotation[0,2],rotation[2,2]))
+        return roll, tilt, yaw
 
     def detect(self, frame, now, draw=True):
+        self.raw_observation = None
         cv, np = self.cv2, self.np
         corners, ids, _ = self.detector.detectMarkers(frame)
         throttle = self.throttle.observe(corners, ids)
@@ -283,23 +299,23 @@ class PaperController:
         if ids is None or list(ids.flatten()).count(YOKE_ID) != 1:
             self.samples.clear()
             self.motion.clear()
-            self.axis_active = [False, False]
-            self.message = "Marker 7 not visible - flight holds. Keep all four black corners clear."
+            self.axis_active = [False, False, False]
+            self.message = "Yoke tag not visible - flight holds. Keep all four black corners clear."
             return None, throttle
         points = corners[list(ids.flatten()).index(YOKE_ID)].reshape(4, 2).copy()
         side = min(float(np.linalg.norm(points[(i + 1) % 4] - points[i])) for i in range(4))
         if side < 70:
             self.samples.clear()
-            self.message = "Move marker 7 closer."
+            self.message = "Move the yoke tag closer."
             return None, throttle
         try:
-            roll, tilt = self.perspective_angles(points,frame.shape[1],frame.shape[0],mirrored)
+            roll, tilt, yaw = self.orientation_angles(points,frame.shape[1],frame.shape[0],mirrored)
         except (ValueError, np.linalg.LinAlgError, cv.error):
             return None, throttle
-        if not math.isfinite(tilt) or abs(tilt)>65:
+        if not all(math.isfinite(a) and abs(a)<=65 for a in (tilt, yaw)):
             self.message = "Face marker toward camera; avoid edge-on angles."
             return None, throttle
-        if not self.pose_guard.accept((roll, tilt), now):
+        if not self.pose_guard.accept((roll, tilt, yaw), now):
             self.samples.clear()
             self.message = "Checking a sudden angle change; keep marker steady."
             return None, throttle
@@ -307,7 +323,39 @@ class PaperController:
             points[:, 0] = frame.shape[1] - 1 - points[:, 0]
         if draw:
             cv.polylines(frame, [points.astype(np.int32)], True, (60,240,90), 3)
-        return self.map_observation(roll, tilt, clamp(side / 120, .4, 1)), throttle
+        self.raw_observation = YokeObservation(roll, tilt, clamp(side / 120, .4, 1), yaw=yaw)
+        return self.map_observation(roll, tilt, self.raw_observation.confidence, yaw), throttle
+
+
+class ThrottleTracker:
+    """The second camera contributes only tags 0/1/2, never steering or fire."""
+    def __init__(self, cv2, np, idle_fraction=0.0, lens=None):
+        self.lens = lens
+        self.cv2 = cv2
+        self.throttle = RelativeThrottle(cv2, np, idle_fraction=idle_fraction)
+        parameters = cv2.aruco.DetectorParameters()
+        parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+        self.detector = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50), parameters)
+
+    def detect(self, frame):
+        if frame is None:
+            return self.throttle.observe([], None)
+        for mirrored in (False, True):
+            view = self.cv2.flip(frame, 1) if mirrored else frame
+            corners, ids, _ = self.detector.detectMarkers(view)
+            if self.lens is not None:
+                height, width = frame.shape[:2]
+                corrected = []
+                for quad in corners:
+                    points = quad.reshape(-1, 2).copy()
+                    if mirrored:
+                        points[:, 0] = width-1-points[:, 0]
+                    corrected.append(self.lens.undistort(points, width, height).reshape(1, 4, 2))
+                corners = corrected
+            observation = self.throttle.observe(corners, ids)
+            if observation is not None:
+                return observation
+        return None
 
 
 class CameraSource:
@@ -315,7 +363,7 @@ class CameraSource:
         # This is the only VideoCapture call in the project. Construction is
         # reachable only through the CLI's explicit --camera branch.
         self.cv2, _ = load_cv()
-        self.capture = self.cv2.VideoCapture(camera_index)
+        self.capture = self.cv2.VideoCapture(camera_index, self.cv2.CAP_AVFOUNDATION if sys.platform == "darwin" else self.cv2.CAP_ANY)
         if not self.capture.isOpened():
             self.capture.release()
             raise RuntimeError("Cannot open camera %d. Close other camera apps and allow camera access for your terminal." % camera_index)
@@ -392,7 +440,7 @@ class CalibrationWizard:
             return None
 
 
-def draw_preview(frame, packet, wizard, fps: float, throttle_status: str = "", lens_status: str = ""):
+def draw_preview(frame, packet, wizard, fps: float, throttle_status: str = "", lens_status: str = "", weapon_status=None):
     cv2, _ = load_cv()
     cv2.rectangle(frame, (0, 0), (frame.shape[1], 150 if wizard or throttle_status else 122), (26, 30, 32), -1)
     if wizard:
@@ -403,24 +451,21 @@ def draw_preview(frame, packet, wizard, fps: float, throttle_status: str = "", l
         yoke, throttle = packet["yoke"], packet["throttle"]
         lines = ["CARDBOARD COCKPIT | %.1f FPS | %s" % (fps, lens_status or "local camera only"),
                  "YOKE %s  ROLL %+.2f  PITCH %+.2f" % ("TRACKED" if yoke["confidence"] else "LOST", yoke["roll"], yoke["pitch"]),
-                 "THROTTLE %3.0f%% %s  |  tags 0/1/2  |  Q: quit" % (throttle["value"] * 100, "TRACKED" if throttle["confidence"] else "HOLDING / LOST")]
+                 "THROTTLE %3.0f%% %s  |  handle + both end tags  |  Q: quit" % (throttle["value"] * 100, "TRACKED" if throttle["confidence"] else "HOLDING / LOST")]
     if throttle_status and not wizard:
         lines.append(throttle_status)
     for index, line in enumerate(lines):
         cv2.putText(frame, line, (18, 28 + index * 32), cv2.FONT_HERSHEY_SIMPLEX, .62,
                     (115, 226, 247) if index == 0 else (235, 239, 240), 1, cv2.LINE_AA)
-    cv2.imshow(PREVIEW_TITLE, frame)
-
-
-def encode_camera_preview(frame):
-    """Small mirrored self-view, encoded before detection draws on the frame."""
-    cv2, _ = load_cv()
+    weapons = packet["weapons"]
     height, width = frame.shape[:2]
-    scale = min(320 / width, 240 / height, 1.0)
-    small = cv2.resize(frame, (max(1, round(width * scale)), max(1, round(height * scale))),
-                       interpolation=cv2.INTER_AREA)
-    ok, jpeg = cv2.imencode(".jpg", cv2.flip(small, 1), [cv2.IMWRITE_JPEG_QUALITY, 65])
-    return jpeg.tobytes() if ok and jpeg.size <= 65536 else None
+    cv2.rectangle(frame, (0, height-66), (width, height), (26, 30, 32), -1)
+    for row, (name, label) in enumerate((("gun", "GUN"),)):
+        state = "FIRE" if weapons[name] else "OFF"
+        reason = (weapon_status or {}).get(name, "")
+        cv2.putText(frame, "%s: %s - %s" % (label, state, reason),
+            (16, height-40+row*28), cv2.FONT_HERSHEY_SIMPLEX, .6, (115, 226, 247), 1, cv2.LINE_AA)
+    cv2.imshow(PREVIEW_TITLE, frame)
 
 
 async def run(args):
@@ -430,7 +475,16 @@ async def run(args):
     except ImportError as error:
         raise RuntimeError("Install WebSockets: .venv/bin/python -m pip install -r vision/requirements.txt") from error
 
-    source = detector = wizard = None
+    source = detector = wizard = weapon_tags = framer = None
+    throttle_feed = throttle_detector = throttle_framer = None
+    primary_label = throttle_label = ""
+    devices = list_cameras() if any(isinstance(value, str) for value in (args.camera, args.throttle_camera)) else None
+    if args.camera is not None:
+        args.camera, primary_label = resolve_camera(args.camera, devices)
+    if args.throttle_camera is not None:
+        args.throttle_camera, throttle_label = resolve_camera(args.throttle_camera, devices)
+        if args.camera is None or args.simulate or args.throttle_only or args.throttle_camera == args.camera:
+            raise ValueError("Use distinct yoke and throttle cameras with --camera and --throttle-camera.")
     calibration = simulated_calibration()
     lens = LensProfile.load(args.intrinsics) if args.intrinsics is not None else None
     lens_status = "LENS CALIBRATED" if lens is not None else "LENS APPROXIMATE"
@@ -439,6 +493,9 @@ async def run(args):
             raise ValueError("Lens profile camera index differs; select its camera or recalibrate the lens.")
         print(lens_status + ("; using " + str(args.intrinsics) if lens else "; use --calibrate-lens to measure this camera."), flush=True)
         detector = PaperController(lens=lens) if args.paper_test else ArucoTracker(lens=lens)
+        detector.throttle = RelativeThrottle(detector.cv2, detector.np, idle_fraction=args.throttle_idle/100)
+        weapon_tags = WeaponTags(detector.cv2, detector.np)
+        framer = PreviewFramer(detector.cv2, detector.np)
         if args.paper_test or args.throttle_only:
             args.calibrate = False
             # Paper yoke returns normalized angle ranges. Live throttle fractions
@@ -456,19 +513,33 @@ async def run(args):
             raise RuntimeError("Calibration needs its window. Remove --no-preview for the first run.")
         if args.calibrate:
             wizard = CalibrationWizard(args.camera, args.width, args.height)
+        print("%s camera: %s (index %d)" % ("Throttle" if args.throttle_only else "Yoke + shooting", primary_label, args.camera), flush=True)
         source = CameraSource(args.camera, args.width, args.height, args.fps)
 
+    # Filter physical input first, then share live gains with the game and preview.
     controller = ControlFilter(calibration, args.smoothing, args.deadzone)
-    weapon_switches = WeaponSwitches()
+    control_settings = ControlSettings()
+    neutral_calibration = NeutralCalibration()
+    calibration_clients = set()
     clients = set()
-    preview_clients = set()
-    last_preview = 0.0
+    preview_clients = {focus: set() for focus in ("", "all", *PreviewFramer.GROUPS)}
+    preview_paths = {"/preview" + ("/" + focus if focus else ""): focus for focus in preview_clients}
 
     async def handler(connection):
+        path = connection.request.path
+        if path == "/settings":
+            await settings_handler(connection)
+            return
+        if path == "/calibration":
+            await calibration_handler(connection)
+            return
+        if path != "/" and path not in preview_paths:
+            await connection.close(1008, "Unknown stream")
+            return
         # Each client has a one-packet queue: slow consumers never build a stale
         # control backlog and never delay capture or other receivers.
         queue = asyncio.Queue(maxsize=1)
-        subscribers = preview_clients if connection.request.path == "/preview" else clients
+        subscribers = clients if path == "/" else preview_clients[preview_paths[path]]
         subscribers.add(queue)
 
         async def sender():
@@ -493,19 +564,86 @@ async def run(args):
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
 
+    async def settings_handler(connection):
+        try:
+            async for message in connection:
+                if not isinstance(message, str):
+                    raise ValueError("Settings must be JSON text")
+                reply = control_settings.accept(json.loads(message))
+                await connection.send(json.dumps(reply, allow_nan=False))
+        except (ValueError, TypeError):
+            await connection.close(1008, "Invalid settings command")
+        except ConnectionClosed:
+            pass
+
+    async def calibration_handler(connection):
+        # A separate local endpoint leaves controls and camera streams read-only.
+        # Exactly one start command per connection; closing it cancels a pending capture.
+        request_id = None
+        queue = asyncio.Queue(maxsize=1)
+        tasks = []
+        try:
+            command = json.loads(await asyncio.wait_for(connection.recv(), 5))
+            if not isinstance(command, dict) or set(command) != {"action", "request_id"} or command["action"] != "start":
+                raise ValueError("Invalid calibration command")
+            request_id = command["request_id"]
+            if not isinstance(request_id, str) or not 1 <= len(request_id) <= 80:
+                raise ValueError("Invalid calibration request")
+            neutral_calibration.start(request_id)
+            if args.throttle_only or wizard:
+                neutral_calibration.state = "unavailable"
+            calibration_clients.add(queue)
+
+            async def sender():
+                while True:
+                    await connection.send(await queue.get())
+
+            async def receiver():
+                async for _ in connection:
+                    await connection.close(1008, "One calibration per connection")
+                    return
+
+            tasks = [asyncio.create_task(sender()), asyncio.create_task(receiver())]
+            done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                task.result()
+        except (ValueError, TypeError, asyncio.TimeoutError):
+            await connection.close(1008, "Invalid calibration command")
+        except ConnectionClosed:
+            pass
+        finally:
+            calibration_clients.discard(queue)
+            if request_id == neutral_calibration.request_id and neutral_calibration.state != "complete":
+                neutral_calibration.cancel()
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
     try:
+        if args.throttle_camera is not None:
+            secondary = CameraSource(args.throttle_camera, args.width, args.height, args.fps)
+            throttle_feed = BackgroundCamera(secondary, args.fps)
+            throttle_lens_path = getattr(args, "throttle_intrinsics", None)
+            throttle_lens = LensProfile.load(throttle_lens_path) if throttle_lens_path else None
+            if throttle_lens is not None:
+                throttle_lens.check_source(args.throttle_camera, args.width, args.height)
+            throttle_detector = ThrottleTracker(detector.cv2, detector.np, idle_fraction=args.throttle_idle/100, lens=throttle_lens)
+            throttle_framer = PreviewFramer(detector.cv2, detector.np)
+            print("Throttle camera: %s (index %d)" % (throttle_label, args.throttle_camera), flush=True)
         async with serve(handler, "127.0.0.1", args.port, origins=[None], max_size=1024,
                          max_queue=2, compression=None, close_timeout=1):
             print("Cardboard controls: ws://127.0.0.1:%d [%s]" % (args.port, "SIMULATED" if args.simulate else "CAMERA"), flush=True)
-            print("Ctrl+C to stop. Camera preview stays on this computer; no images are saved or uploaded.", flush=True)
+            print("Ctrl+C to stop. Camera preview stays on this computer; no images are saved.", flush=True)
             start = previous = time.monotonic()
             frame_number = 0
             fps_estimate = float(args.fps)
             failure_count = 0
             checked_frame_size = False
+            next_preview = 0.0
             while args.duration <= 0 or time.monotonic() - start < args.duration:
                 frame_start = time.monotonic()
-                frame = None
+                frame = throttle_frame = None
+                weapons = {"gun": False}
                 if args.simulate:
                     yoke, throttle = simulated_observations(frame_number, args.fps, args.loss_demo)
                 else:
@@ -513,19 +651,12 @@ async def run(args):
                     frame = await asyncio.to_thread(source.read)
                     if frame is None:
                         yoke = throttle = None
+                        weapon_tags.reset()
                         failure_count += 1
                         if failure_count in (1, args.fps * 3):
                             print("No camera frame. Yoke will neutralize; throttle holds. Use keyboard or restart the tracker.", file=sys.stderr, flush=True)
                     else:
                         failure_count = 0
-                        if preview_clients and frame_start - last_preview >= .1:
-                            jpeg = encode_camera_preview(frame)
-                            if jpeg is not None:
-                                for queue in tuple(preview_clients):
-                                    if queue.full():
-                                        queue.get_nowait()
-                                    queue.put_nowait(jpeg)
-                            last_preview = frame_start
                         if lens is not None:
                             lens.check_source(args.camera, frame.shape[1], frame.shape[0])
                         if not checked_frame_size:
@@ -537,39 +668,98 @@ async def run(args):
                                 wizard = CalibrationWizard(args.camera, frame.shape[1], frame.shape[0])
                         if wizard:
                             wizard.width, wizard.height = frame.shape[1], frame.shape[0]
+                            weapon_tags.reset()
+                        else:
+                            # Read the untouched camera image before the yoke
+                            # or throttle draws any preview annotations.
+                            weapons = weapon_tags.detect(frame, time.monotonic())
                         yoke, throttle = detector.detect(frame, frame_start, not args.no_preview)
-                # Roles are enforced before filtering, even if the other tags are visible.
-                if args.throttle_only:
-                    yoke = None
-                if args.yoke_only:
-                    throttle = None
+                        if args.throttle_only:
+                            yoke = None
+                    if throttle_feed is not None:
+                        throttle_frame = throttle_feed.snapshot()
+                        # Never fall back to throttle tags seen by the laptop.
+                        throttle = throttle_detector.detect(throttle_frame)
                 if wizard:
                     wizard.observe(yoke, throttle)
                     yoke = throttle = None
+                if neutral_calibration.state in ("waiting", "holding"):
+                    raw = detector.raw_observation if isinstance(detector, PaperController) and frame is not None else yoke
+                    neutral = neutral_calibration.observe(raw, time.monotonic())
+                    if neutral is not None:
+                        if isinstance(detector, PaperController):
+                            detector.neutral = neutral[:2]
+                            detector.yaw_neutral = neutral[2]
+                            detector.samples.clear()
+                            detector.motion.clear()
+                            detector.axis_active = [False, False, False]
+                        else:
+                            def shifted(axis, center):
+                                delta = wrap_degrees(center-axis.neutral)
+                                return AxisCalibration(axis.negative+delta, center, axis.positive+delta)
+                            controller.calibration = replace(controller.calibration,
+                                roll=shifted(controller.calibration.roll, neutral[0]),
+                                pitch=shifted(controller.calibration.pitch, neutral[1]))
+                            controller.yaw_neutral = neutral[2]
+                        print("YOKE CALIBRATED: three-second neutral captured.", flush=True)
+                    # No stale steering or fire can escape during capture or its completion frame.
+                    controller.roll = controller.pitch = controller.roll_target = controller.pitch_target = 0.0
+                    controller.yaw = controller.yaw_target = 0.0
+                    controller.last_yoke = float("-inf")
+                    yoke = None
+                    weapons = {"gun": False}
+                calibration_packet = json.dumps(neutral_calibration.packet(), allow_nan=False)
+                for queue in tuple(calibration_clients):
+                    if queue.full():
+                        queue.get_nowait()
+                    queue.put_nowait(calibration_packet)
                 packet = controller.step(time.monotonic(), int(time.time() * 1000), yoke, throttle)
-                # Apply gain once, before both the Python readout and socket send.
-                # Keep neutral filtering and throttle behavior independent of gain.
-                for axis in ("roll", "pitch"):
-                    gain = args.yoke_sensitivity * (args.bank_scale if axis == "roll" else 1.0)
-                    packet["yoke"][axis] = clamp(packet["yoke"][axis] * gain, -1, 1)
-                weapons = weapon_switches.step(getattr(detector,"weapon_observations",{}) if frame is not None and not wizard and not args.throttle_only else {}, time.monotonic())
-                if weapon_switches.configured and not wizard:
-                    packet['weapons'] = weapons
+                control_settings.apply(packet)
+                # Fire is never smoothed or held through a missing detection.
+                packet["weapons"] = weapons
+                packet["yoke_enabled"] = not args.throttle_only
                 serialized = json.dumps(packet, allow_nan=False, separators=(",", ":"))
                 for queue in tuple(clients):
                     if queue.full():
                         queue.get_nowait()
                     queue.put_nowait(serialized)
+                # Read-only local previews: encode only requested views at 10 FPS.
+                # All roles keep the full, fixed camera frame; mirror only the display.
+                if any(preview_clients.values()) and frame_start >= next_preview:
+                    for focus, viewers in preview_clients.items():
+                        if not viewers:
+                            continue
+                        preview = b""
+                        if focus == "all" and throttle_feed is not None:
+                            view = framer.combined(frame, throttle_frame, "YOKE + SHOOTING / " + primary_label,
+                                                   "THROTTLE / " + throttle_label)
+                        elif focus == "throttle" and throttle_feed is not None:
+                            view = throttle_framer.render(throttle_frame, focus, frame_start, "THROTTLE / " + throttle_label)
+                        elif framer is not None:
+                            view = framer.render(frame, focus, frame_start, (focus.upper() or "YOKE") + " / " + primary_label)
+                        else:
+                            view = None
+                        if view is not None:
+                            encoded, jpeg = detector.cv2.imencode(".jpg", view, [detector.cv2.IMWRITE_JPEG_QUALITY, 75])
+                            if encoded:
+                                preview = jpeg.tobytes()
+                        for queue in tuple(viewers):
+                            if queue.full():
+                                queue.get_nowait()
+                            queue.put_nowait(preview)
+                    next_preview = frame_start + .1
                 if args.print_json:
                     print(serialized, flush=True)
                 if frame is not None and not args.no_preview:
                     interval = max(frame_start - previous, 0.001)
                     fps_estimate += .08 * ((1.0 / interval) - fps_estimate)
-                    draw_preview(frame, packet, wizard, fps_estimate, detector.throttle.message, lens_status)
+                    frame = detector.cv2.flip(frame, 1)
+                    draw_preview(frame, packet, wizard, fps_estimate, (throttle_detector or detector).throttle.message, lens_status, weapon_tags.messages)
                     if args.paper_test:
-                        detector.cv2.rectangle(frame, (0,0), (frame.shape[1],150), (26,30,32), -1)
-                        for row, line in enumerate(["YOKE ID 7 | " + lens_status + " | KEEP OPEN", detector.message,
-                                "BANK %+.2f  PITCH %+.2f  POWER %3.0f%% %s | Q quits" % (packet["yoke"]["roll"], packet["yoke"]["pitch"], packet["throttle"]["value"] * 100, "LIVE" if packet["throttle"]["confidence"] > .4 else "HELD"), detector.throttle.message ]):
+                        detector.cv2.rectangle(frame, (0,0), (frame.shape[1],185), (26,30,32), -1)
+                        for row, line in enumerate(["YOKE / " + primary_label + " | " + lens_status, detector.message,
+                                "BANK %+.2f  PITCH %+.2f  YAW %+.2f  POWER %3.0f%% %s | Q quits" % (packet["yoke"]["roll"], packet["yoke"]["pitch"], packet["yoke"]["yaw"], packet["throttle"]["value"] * 100, "LIVE" if packet["throttle"]["confidence"] > .4 else "HELD"), (throttle_detector or detector).throttle.message + (" / " + throttle_label if throttle_feed else ""),
+                                "SENSITIVITY  PITCH %.2fx  BANK %.2fx  YAW %.2fx" % tuple(packet["sensitivity"][axis] for axis in ("pitch", "bank", "yaw")) ]):
                             detector.cv2.putText(frame,line,(16,28+row*33),detector.cv2.FONT_HERSHEY_SIMPLEX,.55,(110,240,160),1,detector.cv2.LINE_AA)
                         detector.cv2.imshow(PREVIEW_TITLE,frame)
                     key = detector.cv2.waitKey(1) & 0xFF
@@ -602,6 +792,8 @@ async def run(args):
                 frame_number += 1
                 await asyncio.sleep(max(0.0, 1.0 / args.fps - (time.monotonic() - frame_start)))
     finally:
+        if throttle_feed is not None:
+            await throttle_feed.close()
         if source:
             source.close()
 
@@ -610,16 +802,18 @@ def parser():
     result = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     mode = result.add_mutually_exclusive_group(required=True)
     mode.add_argument("--simulate", action="store_true", help="Serve deterministic controls without opening a camera")
-    mode.add_argument("--camera", type=int, metavar="INDEX", help="Explicitly open this webcam, usually 0")
+    mode.add_argument("--camera", type=camera_argument, metavar="INDEX_OR_NAME", help="Yoke and shooting camera; macOS accepts an exact device name")
+    mode.add_argument("--list-cameras", action="store_true", help="List macOS camera names and OpenCV indices without opening them")
+    result.add_argument("--throttle-camera", type=camera_argument, metavar="INDEX_OR_NAME", help="Separate camera for throttle tracking and its tutorial view")
+    result.add_argument("--throttle-idle", type=float, default=15.0, metavar="PERCENT", help="Rail position treated as 0%% throttle; default 15; full remains 100%%")
     mode.add_argument("--markers", type=Path, metavar="DIRECTORY", help="Generate printable marker SVG/PNG files; no camera")
     mode.add_argument("--checkerboard", type=Path, metavar="SVG", help="Write the lens calibration print target; no camera")
     result.add_argument("--calibrate-lens", action="store_true", help="Measure lens parameters using a printed checkerboard, then exit")
     result.add_argument("--intrinsics", type=Path, metavar="JSON", help="Load measured lens profile, or save here with --calibrate-lens")
+    result.add_argument("--throttle-intrinsics", type=Path, metavar="JSON", help="Optional measured lens profile for the separate throttle camera")
     result.add_argument("--calibrate", action="store_true", help="Run the five-step yoke calibration; throttle endpoints are tracked live")
     result.add_argument("--paper-test", action="store_true", help="Auto-center yoke 7, with optional relative throttle tags 0/1/2")
-    roles = result.add_mutually_exclusive_group()
-    roles.add_argument("--yoke-only", action="store_true", help="Ignore throttle tags; use a separate camera for power")
-    roles.add_argument("--throttle-only", action="store_true", help="Track throttle 0/1/2 without yoke calibration; steer in game with keyboard")
+    result.add_argument("--throttle-only", action="store_true", help="Track throttle 0/1/2 without yoke calibration; steer in game with keyboard")
     result.add_argument("--calibration", type=Path, default=DEFAULT_CALIBRATION)
     result.add_argument("--no-preview", action="store_true", help="Hide camera/debug window after calibration")
     result.add_argument("--print-json", action="store_true", help="Print every normalized packet for inspection")
@@ -630,10 +824,6 @@ def parser():
     result.add_argument("--height", type=int, default=720)
     result.add_argument("--smoothing", type=float, default=.10, metavar="SECONDS")
     result.add_argument("--deadzone", type=float, default=.06, metavar="FRACTION")
-    result.add_argument("--yoke-sensitivity", type=float, default=2.0, metavar="GAIN",
-                        help="Bank/pitch gain shared by the preview and game (default: 2)")
-    result.add_argument("--bank-scale", type=float, default=.7, metavar="SCALE",
-                        help="Bank-only multiplier on yoke sensitivity (default: 0.7)")
     result.add_argument("--duration", type=float, default=0, metavar="SECONDS", help="Stop after a duration; 0 runs until quit")
     return result
 
@@ -645,12 +835,12 @@ def main():
         argument_parser.error("Invalid port, frame dimensions, or duration.")
     if not math.isfinite(args.duration) or not 0.01 <= args.smoothing <= 2 or not 0 <= args.deadzone < 0.5:
         argument_parser.error("Use finite duration, smoothing in [0.01, 2], and deadzone in [0, 0.5).")
-    if args.camera is not None and args.camera < 0:
+    if not math.isfinite(args.throttle_idle) or not 0 <= args.throttle_idle < 100:
+        argument_parser.error("Use a finite --throttle-idle percentage in [0, 100).")
+    if any(isinstance(value, int) and value < 0 for value in (args.camera, args.throttle_camera)):
         argument_parser.error("Camera index cannot be negative.")
-    if not math.isfinite(args.yoke_sensitivity) or not 0 < args.yoke_sensitivity <= 10:
-        argument_parser.error("Yoke sensitivity must be finite and in (0, 10].")
-    if not math.isfinite(args.bank_scale) or not 0 < args.bank_scale <= 10:
-        argument_parser.error("Bank scale must be finite and in (0, 10].")
+    if args.throttle_camera is not None and (args.camera is None or args.throttle_only or args.calibrate_lens):
+        argument_parser.error("--throttle-camera requires --camera in yoke mode; omit --throttle-only and --calibrate-lens.")
     if args.calibrate and args.camera is None:
         argument_parser.error("--calibrate requires an explicit --camera INDEX.")
     if args.paper_test and (args.camera is None or args.calibrate or args.no_preview):
@@ -664,10 +854,14 @@ def main():
     if args.loss_demo and not args.simulate:
         argument_parser.error("--loss-demo requires --simulate.")
     try:
-        if args.checkerboard is not None:
+        if args.list_cameras:
+            for device in list_cameras():
+                print("%d: %s" % (device["index"], device["name"]))
+        elif args.checkerboard is not None:
             write_checkerboard(args.checkerboard)
             print("Print %s in landscape on flat paper; keep the white margin." % args.checkerboard)
         elif args.calibrate_lens:
+            args.camera, _ = resolve_camera(args.camera)
             run_lens_calibration(args, CameraSource)
         elif args.markers is not None:
             generate_markers(args.markers)

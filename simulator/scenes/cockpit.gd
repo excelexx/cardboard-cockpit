@@ -10,6 +10,7 @@ var profile: Dictionary = {}
 var airframe: String = "b737"
 var navigation_kind: String = "valley"
 var navigation_checkpoint: int = 0
+var navigation_points: Array[Vector3] = []
 var control_is_stick: bool = false
 var trim := Vector3.ZERO
 var shell: StandardMaterial3D
@@ -191,11 +192,12 @@ func update_instruments(flight: FlightDynamics, control: Vector3, delta: float) 
 	for lever: Node3D in throttles:
 		lever.rotation.x = lerpf(0.30,-0.38,flight.throttle)
 
-func set_navigation(kind: String, checkpoint: int) -> void:
+func set_navigation(kind: String, checkpoint: int, points: Array[Vector3] = []) -> void:
 	navigation_kind = kind
-	navigation_checkpoint = clampi(checkpoint,0,14 if kind=="sf" else 5)
+	navigation_points.assign(points)
+	navigation_checkpoint = clampi(checkpoint,0,points.size() if not points.is_empty() else 14 if kind=="sf" else 5)
 	for display: CockpitInstruments in displays:
-		display.set_navigation(navigation_kind,navigation_checkpoint)
+		display.set_navigation(navigation_kind,navigation_checkpoint,navigation_points)
 
 func _material(color: Color, rough: float = 0.8, metallic: float = 0.0) -> StandardMaterial3D:
 	var result := StandardMaterial3D.new()
@@ -442,7 +444,7 @@ func _instrument_texture(mode: String) -> Texture2D:
 	ui.display_mode = mode
 	ui.aircraft_name = str(profile.get("short","737"))
 	ui.engine_count = int(profile.get("engines",2))
-	ui.set_navigation(navigation_kind,navigation_checkpoint)
+	ui.set_navigation(navigation_kind,navigation_checkpoint,navigation_points)
 	viewport.add_child(ui)
 	displays.append(ui)
 	return viewport.get_texture()

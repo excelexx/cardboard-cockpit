@@ -32,7 +32,7 @@ class FixtureCamera:
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from vision import tracker
-    args = tracker.parser().parse_args(["--camera", "0", "--throttle-only", "--no-preview", *sys.argv[1:]])
+    args = tracker.parser().parse_args(["--camera", "0", "--throttle-idle", "0", "--throttle-only", "--no-preview", *sys.argv[1:]])
     with patch.object(tracker, "CameraSource", return_value=FixtureCamera()), \
             patch.object(cv2, "VideoCapture", side_effect=AssertionError("No webcam in tests")):
         asyncio.run(tracker.run(args))

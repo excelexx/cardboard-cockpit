@@ -4,9 +4,8 @@ class_name GameBalance
 ## Sky Rogue reference: official mod tools f55e4c873a61a9fe380fa16f5c9fcafd8c538f0b.
 ## Published retail handling is distinct from the custom prefab's example stats.
 const ID := "sky-rogue-adapted-09"
-# Combat: one heavy missile is five reference 20-HP micro-missile hits.
 const PLAYER_HEALTH := 100.0
-const CONTACT_HEALTH := 900.0
+const CONTACT_HEALTH := 100.0
 const GUN_ROUNDS_PER_PACKET := 4
 const GUN_DAMAGE_PER_ROUND := 5.0
 const GUN_INTERVAL := .05
@@ -15,24 +14,6 @@ const GUN_DRAG := .000055
 const GUN_LIFETIME := 2.5
 const GUN_HIT_RADIUS := 12.0
 const GUN_RELEASE_TAIL := .085
-const MISSILE_DAMAGE := 130.0
-const MISSILE_INTERVAL := 1.25
-const MISSILE_SPEED := 600.0
-const MISSILE_ACCELERATION_TIME := .5
-const MISSILE_IGNITION_DELAY := .18
-const MISSILE_MOTOR_TIME := 4.0
-const MISSILE_LIFETIME := 10.0
-const MISSILE_TURN_DEGREES := 110.0
-const MISSILE_TERMINAL_DISTANCE := 150.0
-const MISSILE_TERMINAL_SPEED_RATIO := .80
-const MISSILE_LEAD_TIME := .12
-const MISSILE_COAST_SPEED := 400.0
-const MISSILE_COAST_DRAG := 18.0
-const MISSILE_HIT_RADIUS := 14.0
-const MISSILE_BAY_DELAY := .23
-const MISSILE_RAIL_DELAY := .05
-const MISSILE_DROP_SPEED := 4.0
-const MISSILE_SMOKE_TIME := 3.0
 const FLARE_INTERVAL := 1.5
 # Narrow, forgiving envelope: user constraint, not the reference's wider cone.
 const ACQUIRE_DEGREES := 6.0
@@ -40,7 +21,7 @@ const RETAIN_DEGREES := 7.5
 const LOCK_TIME := .12
 const TARGET_STICK_TIME := .12
 const TARGET_SWITCH_MARGIN := 1.0
-const TARGET_RANGE := 2300.0
+const TARGET_RANGE := 1500.0
 const AIM_RESPONSE := 30.0
 const RETICLE_RESPONSE := 28.0
 const AIM_SLEW_DEGREES := 110.0
@@ -127,14 +108,4 @@ const TOUCHDOWN_MAX_SINK := 10.0
 const TOUCHDOWN_MAX_BANK := .4
 const ROLLOUT_DRAG := 1.4
 const ROLLOUT_BRAKING := 5.2
-const BARREL_DURATION := .78
-
-# Demo spectacle tuning layered on the retained arcade physics/weapon profile.
-const DEMO_LIMIT := 148.0
-const BEAM_DPS := 220.0
-const BEAM_RANGE := 1900.0
-const ELITE_HEALTH := 2400.0
-const BOSS_HEALTH := 16000.0
-const SALVO_STAGGER := .085
-const MAX_SHOTS := 220
-const MAX_MISSILES := 48
+const BARREL_DURATION := 1.7

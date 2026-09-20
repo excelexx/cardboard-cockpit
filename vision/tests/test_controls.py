@@ -108,6 +108,16 @@ class FilterTests(unittest.TestCase):
         self.assertAlmostEqual(dead_zone(1, .06), 1)
         self.assertAlmostEqual(dead_zone(-1, .06), -1)
 
+    def test_pitch_gain_is_1_2_in_both_directions_without_changing_other_controls(self):
+        for tilt in (-25, -8, -1, 0, 1, 8, 25):
+            with self.subTest(tilt=tilt):
+                baseline = self.warm(self.make(), YokeObservation(9, tilt, 1), RelativeThrottleObservation(.35, 1))
+                boosted = self.warm(ControlFilter(simulated_calibration(), pitch_gain=1.2),
+                                    YokeObservation(9, tilt, 1), RelativeThrottleObservation(.35, 1))
+                self.assertAlmostEqual(boosted["yoke"]["pitch"], max(-1, min(1, baseline["yoke"]["pitch"]*1.2)), places=4)
+                self.assertEqual(boosted["yoke"]["roll"], baseline["yoke"]["roll"])
+                self.assertEqual(boosted["throttle"], baseline["throttle"])
+
     def test_packet_contract_and_limits(self):
         controller = self.make()
         packet = self.warm(controller, YokeObservation(100, -100, 1), ThrottleObservation((.75, -2), 1))
@@ -120,10 +130,19 @@ class FilterTests(unittest.TestCase):
         self.assertAlmostEqual(packet["throttle"]["value"], 1)
         json.dumps(packet, allow_nan=False)
 
+    def test_yaw_is_independent_bounded_and_expires_with_yoke(self):
+        for yaw in (-60,-12,0,12,60):
+            controller = self.make()
+            result = self.warm(controller,YokeObservation(0,0,1,yaw=yaw))
+            self.assertAlmostEqual(result["yoke"]["yaw"],dead_zone(max(-1,min(1,yaw/25)),.06),places=4)
+            self.assertEqual((result["yoke"]["roll"],result["yoke"]["pitch"]),(0,0))
+            for i in range(90): result = controller.step(3+i/30,4000+i*33,None,None)
+            self.assertEqual(result["yoke"]["confidence"],0)
+            self.assertAlmostEqual(result["yoke"]["yaw"],0,places=3)
     def test_startup_is_neutral(self):
         packet = self.make().step(1, 1000, None, None)
         self.assertFalse(packet["tracking"])
-        self.assertEqual(packet["yoke"], {"roll": 0, "pitch": 0, "confidence": 0})
+        self.assertEqual(packet["yoke"], {"roll": 0, "pitch": 0, "yaw": 0, "confidence": 0})
         self.assertEqual(packet["throttle"], {"value": 0, "confidence": 0})
 
     def test_yoke_loss_then_neutral(self):
@@ -173,6 +192,22 @@ class FilterTests(unittest.TestCase):
             packet = controller.step(4, 5000, None, observation)
             self.assertEqual(packet["throttle"]["value"], initial["throttle"]["value"])
             self.assertEqual(packet["throttle"]["confidence"], 0)
+
+    def test_hidden_slider_move_holds_then_blends_both_directions(self):
+        for start, end in ((.2, .9), (.9, .2)):
+            controller = self.make()
+            initial = self.warm(controller, throttle=RelativeThrottleObservation(start, 1))
+            for i in range(30):
+                hidden = controller.step(4+i/30, 5000+i*33, None, None)
+                self.assertEqual(hidden["throttle"]["value"], initial["throttle"]["value"])
+            previous = hidden["throttle"]["value"]
+            for i in range(60):
+                packet = controller.step(5+i/30, 6000+i*33, None, RelativeThrottleObservation(end, 1))
+                value = packet["throttle"]["value"]
+                self.assertLessEqual(abs(value-previous), 1.5/30+.00001)
+                self.assertLessEqual(abs(value-end), abs(previous-end)+.00001)
+                previous = value
+            self.assertAlmostEqual(value, end, places=4)
 
     def test_simulated_stream_deterministic_and_loss(self):
         a, b = self.make(), self.make()

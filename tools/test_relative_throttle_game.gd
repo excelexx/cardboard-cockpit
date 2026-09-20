@@ -17,7 +17,7 @@ func run() -> void:
 	root.add_child(app)
 	app.set_process(false); app.set_physics_process(false)
 	app.test_mode = true; app.audio.muted = true
-	app.start_flight("combat")
+	app.start_flight("combat", true)
 	app.flight.throttle = .2; app.flight.engine = .2; app.copilot = true
 	var probe := TCPServer.new()
 	if probe.listen(0, "127.0.0.1") != OK:

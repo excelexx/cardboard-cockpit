@@ -2,8 +2,6 @@ extends Node3D
 class_name FighterCameraRig
 var app: Node
 var camera: Camera3D
-var pip_viewport: SubViewport
-var pip_camera: Camera3D
 var clock := 0.0
 var trauma := 0.0
 var yaw := 0.0
@@ -13,32 +11,15 @@ var offset := Vector3(0,6.4,23)
 var last_speed := 0.0
 var acceleration := 0.0
 var initialized := false
-var missile_link := false
-var missile_requested := false
-var pip_texture: Texture2D
 func _ready() -> void:
 	camera = Camera3D.new()
 	camera.near = 0.06
 	camera.far = 90000 if app.route_id=="sf" else 38000
 	camera.current = true
 	add_child(camera)
-	pip_viewport = SubViewport.new()
-	pip_viewport.size = Vector2i(480,270)
-	pip_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	pip_viewport.world_3d = app.get_world_3d()
-	add_child(pip_viewport)
-	pip_camera = Camera3D.new()
-	pip_camera.current = true
-	pip_camera.fov = 78
-	pip_camera.near = 0.2
-	pip_camera.far = 14000
-	pip_viewport.add_child(pip_camera)
-	pip_texture = pip_viewport.get_texture()
 func impulse(amount: float) -> void: trauma = minf(1,trauma+amount)
 func reset() -> void:
 	initialized = false; trauma = 0; last_speed = app.flight.speed; acceleration = 0
-	missile_link = false; missile_requested = false
-	if is_instance_valid(pip_viewport): pip_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 func update(dt: float) -> void:
 	if app.mode=="paused": return
 	clock += dt
@@ -88,12 +69,3 @@ func update(dt: float) -> void:
 		camera.rotate_object_local(Vector3.FORWARD,bank)
 		camera.basis *= Basis.from_euler(angular)
 	app.cockpit_frame.set_presentation_visible(app.cockpit)
-	missile_link = missile_requested and is_instance_valid(app.combat.last_missile) and app.mode=="flight"
-	pip_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if missile_link else SubViewport.UPDATE_DISABLED
-	if missile_link:
-		var missile: Node3D = app.combat.last_missile
-		pip_camera.position = missile.global_position+missile.global_basis*Vector3(1,1.0,7)
-		pip_camera.look_at(missile.global_position-missile.global_basis.z*35)
-
-func _exit_tree() -> void:
-	if is_instance_valid(pip_viewport): pip_viewport.world_3d = null

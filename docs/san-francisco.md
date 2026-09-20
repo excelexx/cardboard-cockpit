@@ -21,7 +21,7 @@ The map is anchored at the midpoint of SFO runway 28R: **37.62114, -122.375285**
 | Building, road, terrain, water-normal and tree textures | [FlightGear FGData](https://gitlab.com/flightgear/fgdata) | Original FlightGear asset terms; downloaded inputs retained |
 | Actual aerial ground photography | [USGS/USDA National Map imagery](https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer) and NAIP Plus | Public domain, 23 original georeferenced 4000 × 2000 JPEGs. Extents, source requests and SHA-256 hashes are retained beside the photographs |
 | Photographic sky | [Qwantani Sunset (Pure Sky)](https://polyhaven.com/a/qwantani_sunset_puresky) | CC0. Photography Greg Zaal; processing Jarod Guest. Original 4K EXR |
-| Fighter exterior and cockpit; missile | [FGMEMBERS F-35B](https://github.com/FGMEMBERS/F-35B) | GPL-3.0; original aircraft author credits in `THIRD_PARTY_ASSETS.md`. Original livery and Cockpit/AIM-120 geometry; live 2D instruments mapped onto the source panel |
+| Fighter exterior and cockpit | [FGMEMBERS F-35B](https://github.com/FGMEMBERS/F-35B) | GPL-3.0; original aircraft author credits in `THIRD_PARTY_ASSETS.md`. Original livery and cockpit geometry; live 2D instruments mapped onto the source panel |
 | Cannon mesh and muzzle/smoke artwork | [FGMEMBERS A-10](https://github.com/FGMEMBERS/A-10) | GPL-2.0; source model, textures and COPYING retained. Cannon geometry is extracted from the existing aircraft mesh |
 | Goose | [Poly Pizza original](https://poly.pizza/m/9wn3If7Qgb4) | CC BY 3.0; existing author attribution retained in `simulator/assets/goose/README.md` |
 
@@ -36,7 +36,7 @@ No AI image generation or new Blender modeling was used for this version. HUD dr
 - `tools/import_sf_region.py`: BTG terrain, AC3D meshes, source UVs, material textures and STG placement.
 - `tools/import_sf_building_instances.py`: published BuildingList template and source dimensions/roof shapes.
 - `tools/import_sf_trees.py`: published TreeBin template, source seasonal atlas and exact source locations.
-- `tools/import_sourced_flight_art.py`: existing cockpit, cannon and missile meshes.
+- `tools/import_sourced_flight_art.py`: existing cockpit and cannon meshes.
 - `tools/finalize_sf_region.py`: geographic chunk index and terrain contact grid. Use `--index-only` when only mesh listings change.
 - `tools/prepare_sf_materials.py`: source transparency cutouts and mipmapped texture import settings.
 

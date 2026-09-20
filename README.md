@@ -1,73 +1,95 @@
 # Goose Protocol — SPECTRE X-26
 
-Version **0.12.0**: one San Francisco map, one fighter, two latched weapon switches, and a giant goose boss. A complete demo lasts **at most 150 seconds**. The game has unlimited ammunition and forgiving flight assistance.
+Version 0.10.1 is a relaxed native Mac arcade flight game: **one SPECTRE fighter, unlimited Gatling fire, and large Waterloo geese to intercept over San Francisco Bay**. The geese do not attack. There are no upgrades, reloads, heat limits or steady-lock requirements.
 
-Open **Launch Cardboard Cockpit.command** or **build/Cardboard Cockpit.app**. **Play / Enter** guides takeoff and the SF route while you shoot. Tap **Space** to switch the minigun on; tap **T** to switch repeated four-missile salvos on. Tap either again to stop. **Watch demo** flies and shoots automatically. Keyboard steering takes over from route assistance; **H** rejoins it. **R** immediately replays.
+**Five-minute flight demo:** start stationary on the runway, take off through gold rings, climb to cruising altitude and shoot sixteen spaced goose targets, then follow a gentle bend to a landing airfield roughly 27 km ahead. Prompts walk through reducing throttle, lowering gear and selecting landing flaps. The aircraft brakes automatically after touchdown. [Demo runbook](docs/DEMO_RUNBOOK.md).
 
-**Play teaches you during the mission:** spoken tips guide the first three geese, then the instructor hands the rest to you. Flight never pauses for lessons. Crashes recover to stable flight; landing mishaps retry final approach. [Coaching and voice details](docs/TUTORIAL.md).
+Open **Launch Cardboard Cockpit.command** or run `tools/run.sh`. The game opens its main menu. **Play** (or Enter) begins a three-second neutral calibration and sequential camera checks: throttle 0% → 100% → 0%, a four-second yoke overview with no required movements, then the gun grip and cover/uncover test. A fixed mirrored camera view fills the screen, with central instructions and movement arrows. After the checks, centre the yoke, set idle and cover the gun tag; flight starts automatically after one steady second. Run the Python tracker first. **Keyboard / mouse** skips camera checks; hold **Space** or **left mouse** to fire. **Watch demo** runs the sortie automatically.
 
-## Controls
+![SPECTRE in the valley](docs/screenshots/combat-09-overview.png)
+
+## Fly
 
 | Input | Action |
-|---|---|
-| Arrows / A D | Pitch and bank / rudder; release toward level |
-| W / S / hold Shift | Accelerate / airbrake / afterburner |
-| Space or left mouse | Toggle continuous minigun |
-| T or right mouse | Toggle repeated four-missile salvos |
-| Q | Fast recoverable barrel roll |
-| V / X | Cockpit or chase / missile camera inset |
+| --- | --- |
+| Arrow keys | Smooth bank / pitch; release to level |
+| A / D | Rudder; steer during rollout |
+| W / S | Fast acceleration / airbrake |
+| Hold Shift | Afterburner |
+| Hold Space / left mouse | Unlimited Gatling fire; Space brakes on the ground |
+| Z | Optional flare effects |
+| Q | Quick barrel roll, when altitude permits |
+| V | Cockpit / chase camera |
 | Alt + mouse / middle drag | Look around |
 | G / F | Gear / flap detent |
-| B / J / H | Mouse yoke / aim assistance / route assistance |
-| Hold E / Z | Eject / optional flares |
+| B / J | Mouse yoke / close-range aim assistance |
+| H | Route flight assistance on/off |
+| Hold E | Eject |
 | C / F1 | Cardboard setup / controls |
-| Escape / R / M | Pause / replay / mute |
-| F8 / F9 / F10 | Hide text / telemetry / graphics quality |
+| Escape / R / M | Pause / restart / mute |
+| F9 / F10 | Telemetry / graphics quality |
 
-The opening leads from SFO into the city; encounters escalate before an anomalous signature reveals the boss. Destroy it for several seconds of free-flight aftermath, then land at SFO. Badge B, keyboard L or the LAND AT SFO button deploys gear/flaps and starts assisted final approach, touchdown and braking. The ending also starts this automatically after its prompt. A brief transition skips the long return trip, preserving the 150-second limit. Escaping bosses remain an incomplete intercept even after a safe landing. Replays vary encounter motifs. Normal geese have 900 HP, elites 2,400, and the boss 16,000 with staged weak regions. The geese do not fire back.
+Bring a goose inside the small six-degree acquisition ring. The crosshair smoothly tracks it, a brief amber acquisition turns green, and the HUD shows track ID, range and gun aim assistance. A 7.5-degree retention margin tolerates small drift. A separate small lead diamond shows the gun solution. In the short demo, sixteen geese appear at successive positions along the higher cruising section, 500 metres apart across 7.5 km, with varied heights and left/right offsets. They stay available until cleared; landing preparation begins after all sixteen are cleared and the cruise gates are completed. Slower shooters get more cruising room ahead. Markers, projectiles, trails and impact effects keep the action readable. Clears within five seconds build a streak and increase points. Personal best scores are saved for player-controlled shooting runs; Watch demo does not set your record.
 
-Aim near a visible contact. Intent scoring, prediction, hysteresis and smoothly varying assistance make tracking forgiving without turning the aircraft automatically in manual flight. Missiles guide only toward their original selected target; free shots remain free shots. Four hardpoints launch with staggered separation and divergent paths. Hit reactions, physical smoke, spectral world cues, audio and local light reinforce real impacts.
+Hold W for immediate acceleration and S for a strong airbrake, with a forgiving 80 m/s minimum while airborne with gear up. The HUD shows ACCEL, AIRBRAKE and CRUISE. Keyboard steering or power input takes over from route assistance. The manual controller maps inputs to a controlled bank or pitch angle; releasing settles the aircraft toward level flight. A gentle terrain guard pulls up through the physics model when needed. H rejoins the guided route. Switching applications pauses flight, and help/setup overlays freeze the simulation.
 
-## Cardboard and badge
+Landing practice starts on final with gear and flaps selected. With neutral pitch input, landing assistance follows the descent and flare; neutral power input uses approach-speed assistance. After touchdown, Space brakes and A/D steers. The complete assisted sortie lands and brakes automatically. Touchdown preserves position and attitude and settles through a physical rollout.
 
-The **cardboard yoke** owns steering and both latched weapon switches. The **cardboard throttle** owns power, boost and braking. The **wireless badge** supplies occasional secondary controls: START start/replay, HOME pause, A gear, B assisted landing, LEFT view, RIGHT missile inset, UP route assist, DOWN text visibility. See [switch construction, mapping and evidence](docs/WEAPON_SWITCHES.md) and [printable switch faces](vision/markers/weapon-switches.html).
+## Scenery and presentation
 
-Use [vision setup](docs/vision-setup.md) and [construction guide](docs/cardboard-build-guide.md) for yoke ID 7 and throttle IDs 0 (idle), 1 (slider), and 2 (full). Flip-tab faces use 31/32 and 41/42 in the same `DICT_4X4_50` dictionary.
+Festyve’s `graphics/coastal-overhaul` is integrated: offline Helsinki photogrammetry, 128 base tiles with 256 detailed refinements, 60 Kominka countryside homes, a maritime air station, grounded airports, shoreline scenery and an eleven-landmark coastal tour. The cockpit improvements and instrument batching are retained. The short demo uses gold and cyan rings for a short departure-to-landing route; our SPECTRE, permanent weapons, infinite ammunition and harmless geese are shared by both routes. The existing alpine environment remains selectable. [Coastal credits](simulator/assets/photogrammetry/CREDITS.md) · [Scenic route](docs/SCENIC_ROUTE.md).
 
-For the **laptop yoke + phone throttle**, connect the phone through Apple Continuity Camera (or a webcam app) and open **Launch Two-Camera Cockpit.command**. This launches the current source game with two labeled camera previews. Hold yoke 7 steady to center; SPACE in the Python window recenters it. All three throttle tags must stay visible to the phone. The slider takes over automatic power as soon as it is tracked.
+The active balance uses developer-published Sky Rogue references with documented metric-scale and difficulty adaptations. [Balance values and provenance](docs/balance.md) distinguish source values from our calibration.
+
+## Presentation and handling
+
+SPECTRE refines a licensed FlightGear airframe with a graphite livery, reflective canopy, animated control surfaces and folding gear. The rotary cannon has an animated rotor, muzzle effects and unlimited ammunition.
+
+Cannon rounds inherit aircraft velocity and include gravity, drag and swept collision checks. Visible tracers make the gunfire easy to follow.
+
+The valley uses generated sunset-cloud, conifer, granite and explosion textures alongside the licensed environment sources. Tall varied forests, lake islands, wet shoreline boulders, reflective rippled water, cloud/mist volumes, shadows and ambient occlusion build depth. Wing vapor, wind streaks, trails, heat distortion and correctly positioned afterburner exhaust respond to flight. The sky and lighting follow the title artwork's warm/cool palette; this remains a real-time game environment rather than a reproduction of every detail in that generated still.
+
+High quality is the default. F10 selects Balanced. Internal 3D resolution is budgeted to 1600 pixels wide in High and 1280 in Balanced, with spatial upscaling; the HUD stays at window resolution. This keeps large Retina windows responsive. High uses temporal antialiasing to reduce foliage shimmer.
+
+Audio combines licensed engine, wind, weapon, impact, gear and tire sounds with cockpit ambience and music. Radio cues use filtering, priority/expiry, subtitles and ducking; these are Kenney recordings, not ElevenLabs generations. Escalating confirmation tones and streak feedback reinforce successful clears.
+
+## Cardboard controls
+
+Use [vision setup](docs/vision-setup.md) and the [construction guide](docs/cardboard-build-guide.md). Print the updated [marker sheet](vision/printable-cockpit.html) at **100% / actual size**. The yoke uses ID 7; the relative throttle uses **0 = fixed idle, 1 = moving slider, 2 = fixed full** (`DICT_4X4_50`). Legacy ID 23 PDFs do not match the new throttle.
 
 ```sh
-./tools/dual_camera_tracker.sh --list-cameras
-# Automatic laptop / iPhone selection; source game and both trackers:
-./"Launch Two-Camera Cockpit.command"
-# Other webcam apps or an explicit choice (use indices from the list):
-./"Launch Two-Camera Cockpit.command" --yoke-camera 1 --throttle-camera 0
+./tools/setup_vision.sh
+./tools/tracker.sh --list-cameras
+./tools/tracker.sh --camera "MacBook Air Camera" --throttle-camera "iPhone (2) Camera" --paper-test
+# In another terminal:
+./tools/run.sh -- --stickers
 ```
 
-Each camera has its own tracker and preview connection. Phone loss holds power while laptop steering continues. W/S takes over power and disables tracking; C opens setup to enable it again. To play the ordinary mission with two cameras, run `./tools/dual_camera_tracker.sh` and, separately, `./tools/run.sh -- --dual-cameras --stickers`. The packaged app must be rebuilt to include these source changes.
+This setup uses the phone for throttle tracking and its tutorial camera view, and the laptop webcam for the yoke and shooting tags. Select the camera names returned by `--list-cameras`; the final ready screen shows both. The fixed markers define the travel range each frame, including a roughly 10 cm slider. Keep all three marker faces coplanar and visible. Arrow keys steer with throttle-only tracking; W/S takes over power. Use `--paper-test` on the Python tracker to add auto-centered yoke control. The separate game's paper-test flight accepts the physical throttle once visible. Manual yoke calibration has five poses; throttle needs no endpoint capture.
 
-Controls and preview images stay on localhost; no camera images are saved or uploaded. Automated marker, role-isolation, preview, dropout/reconnect and game integration tests cover the input path. Physical tag placement still determines tracking quality. The release app includes an offline BLE helper and reconnects to the existing badge firmware automatically. All eight physical badge buttons and simultaneous A+B were measured live. Phase feedback was written and read back. No badge firmware was flashed.
+For shooting, mount **04 = gun** above the yoke: uncover to fire, cover to stop. Print the [gun tag](vision/printable-weapons.html) at actual size. Keep the middle finger on the green band, ring finger on the blue band, and lift/replace the right pointer finger over 04. Your left hand stays free for the throttle. No extra calibration is required. See [shooting setup](docs/vision-setup.md#shooting-tags).
 
-## World, audio and performance
+Covered throttle tags hold the current power; showing them again blends smoothly to the new slider position. Losing yoke 7 pauses the game and shows a light warning and a small mirrored camera inset over the paused flight until it stays visible for half a second. Explicit `--throttle-only` mode keeps keyboard steering without requiring a yoke.
 
-The sourced SF region includes SFO, downtown, residential streets, hills, Golden Gate Bridge, Bay Bridge and Alcatraz. The playable menu exposes one map. Historical coastal/alpine fixtures remain in source for regression testing. [SF coverage and source licenses](docs/san-francisco.md).
-
-Forward+ rendering retains streamed native meshes, LODs and filtered foliage. Local fog, selective glow, reflective missiles and bounded pools of sprites, projectile meshes, lights and spatial sounds support combat. High and Balanced modes retain independent HUD resolution. The physical terrain guard and soft protection around compact tall landmarks keep low flight forgiving; SF buildings do not use solid mesh collision.
-
-Radio uses licensed human voices processed with military-style band-pass filtering, compression, saturation, RF hiss and push-to-talk squelch. Ground-base and pilot cues have priority, expiry, subtitles and music ducking. The music track adjusts with encounter intensity without restarting. These are processed Kenney recordings, not generated voice clones.
+The service stays on `127.0.0.1`; the tutorial and recovery screens receive local previews, and images are not uploaded or recorded. The native game works without Python or a camera. Synthetic tracking and the local game connection are tested; real cardboard/webcam operation remains unverified.
 
 ## Develop and verify
 
-Godot **4.7.2**, Forward+ / Metal. Game exports are universal; the bundled badge helper is built for the build host (this release: Apple Silicon). Rebuild it on Intel if required.
+The project pins Godot 4.7.2. Mac exports include Apple Silicon and Intel binaries; runtime verification is on Apple Silicon with Metal.
 
 ```sh
 ./tools/setup.sh
 ./tools/run.sh
 ./tools/verify.sh
-./tools/build_badge_helper.sh
 ./tools/package_mac.sh
 ```
 
-Packaging produces **build/Cardboard Cockpit.app** and **build/Cardboard Cockpit Mac.zip**, including complete source and notices. The app is locally signed and not Apple-notarized. [Demo runbook](docs/DEMO_RUNBOOK.md) · [verification](docs/verification.md) · [implementation ledger](docs/SPRINT_SCOPE.md) · [asset credits](THIRD_PARTY_ASSETS.md).
+Packaging creates `build/Cardboard Cockpit.app` and `build/Cardboard Cockpit Mac.zip`, including source and asset notices. The build is locally signed and is not Apple-notarized. See [verification](docs/verification.md), [demo runbook](docs/DEMO_RUNBOOK.md), and [asset credits](docs/demo-assets.md).
 
-The licensed FlightGear airframe source, sourced Google goose and original editable M-26 missile remain included. This is an arcade demo, with game-tuned flight and exaggerated combat readability.
+This remains a compact, game-tuned flight project. It does not provide certified aerodynamics, global scenery, a clickable avionics simulation or commercial AAA production assets. Terrain and major buildings collide; trees and small scenery are forgiving. Historical licensed aircraft files remain as source provenance and are excluded from the playable export. Large geese, generous aim assistance and unlimited weapons are intentional arcade choices.
+
+## San Francisco world
+
+The default map is now a complete sourced San Francisco regional tile with the city, SFO, Golden Gate Bridge, Bay Bridge, Alcatraz, terrain, roads and residential neighborhoods. The current short demo stays near SFO and reaches a landing airfield almost directly ahead in about 85 seconds with the guided pilot. The route selector also retains the two legacy maps. See [coverage, licenses and conversion details](docs/san-francisco.md).
+
+The existing badge bridge and firmware remain in `hardware/`. Badge gear and flap buttons update the same flight state used by the landing prompts; its pause, view, assistance and flight-phase LEDs remain connected. The two-camera launcher now starts the combined tracker, with independent capture and preview for each camera.

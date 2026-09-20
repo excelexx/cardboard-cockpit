@@ -15,26 +15,7 @@ static func cylinder(parent: Node3D, radius: float, length: float, material: Mat
 	node.mesh = mesh; node.material_override = material; node.position = at; node.rotation.x = PI/2
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(node); return node
-static func missile(in_flight: bool = false) -> Node3D:
-	var root: Node3D = load("res://assets/sourced_flight/missile.gltf").instantiate()
-	root.name = "MICA26"
-	root.scale = Vector3.ONE*(1.7 if in_flight else 1.2)
-	if in_flight:
-		# Narrow tapered motor plume leaves the seeker, body and fins readable.
-		for layer in range(2):
-			var plume := MeshInstance3D.new(); var cone := CylinderMesh.new()
-			cone.top_radius = .10 if layer==0 else .040; cone.bottom_radius = .004
-			cone.height = 2.0 if layer==0 else 1.05; cone.radial_segments = 20
-			plume.mesh = cone; plume.rotation.x = -PI/2
-			plume.position.z = 1.46+cone.height*.5
-			plume.name = "Ignition" if layer==0 else "MotorFlame"
-			var gas := ShaderMaterial.new(); gas.shader = load("res://assets/vfx/missile_motor.gdshader")
-			gas.set_shader_parameter("core",float(layer)); gas.set_shader_parameter("plume_length",cone.height); plume.material_override = gas
-			plume.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			root.add_child(plume)
-	return root
-static func projectile(kind: String, _variant: String = "gatling") -> Node3D:
-	if kind=="missile": return missile(true)
+static func projectile(_variant: String = "gatling") -> Node3D:
 	var root := Node3D.new(); root.name = "CannonTracer"
 	# The visible streak represents exposure time, not an oversized physical shell.
 	cylinder(root,.055,8.5,emissive(Color(1,.66,.25),2.0,.42),Vector3(0,0,2.6))

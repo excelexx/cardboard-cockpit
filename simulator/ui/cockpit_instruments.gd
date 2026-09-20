@@ -3,11 +3,8 @@ class_name CockpitInstruments
 
 # Purpose-built training flight displays; these are artistic interpretations.
 const SFRoute = preload("res://systems/san_francisco_route.gd")
-var mission_points: Array[Vector3]=[]
-var mission_target := Vector3.ZERO
-var mission_target_name := ""
-var mission_navigation := false
-func route_points() -> Array[Vector3]: return mission_points if mission_navigation else SFRoute.POINTS if navigation_kind=="sf" else ROUTE
+var navigation_points: Array[Vector3] = []
+func route_points() -> Array[Vector3]: return navigation_points if not navigation_points.is_empty() else SFRoute.POINTS if navigation_kind=="sf" else ROUTE
 func display_heading() -> float: return fposmod(heading+(298.0 if navigation_kind=="sf" else 0.0),360.0)
 var display_mode: String = "pfd"
 var aircraft_name: String = "737"
@@ -40,25 +37,23 @@ const BACK := Color(0.012, 0.023, 0.033)
 const ROUTE: Array[Vector3] = [Vector3(0,180,-2000),Vector3(-450,420,-4200),Vector3(450,650,-6500),Vector3(150,420,-9000),Vector3(0,200,-11800)]
 const NORTH_FIELD_AIM := Vector3(0,3,-14100)
 
-func set_navigation(kind: String, checkpoint: int) -> void:
-	var bounded: int = clampi(checkpoint,0,route_points().size())
-	if navigation_kind == kind and navigation_checkpoint == bounded:
-		return
-	navigation_kind = kind
-	navigation_checkpoint = bounded
-	queue_redraw()
-	_refresh_texture()
+func set_navigation(kind: String, checkpoint: int, points: Array[Vector3] = []) -> void:
+	var count: int = points.size() if not points.is_empty() else SFRoute.POINTS.size() if kind=="sf" else ROUTE.size()
+	var bounded: int = clampi(checkpoint,0,count)
+	if navigation_kind == kind and navigation_checkpoint == bounded and navigation_points == points: return
+	navigation_kind = kind; navigation_checkpoint = bounded; navigation_points.assign(points)
+	queue_redraw(); _refresh_texture()
 
 func navigation_target() -> Vector3:
-	if mission_navigation: return mission_target
 	if navigation_kind in ["valley","sf"] and navigation_checkpoint < route_points().size():
 		return route_points()[navigation_checkpoint]
+	if not navigation_points.is_empty(): return navigation_points.back()
 	return Vector3(0,4,1300) if navigation_kind=="sf" else NORTH_FIELD_AIM
 
 func navigation_target_label() -> String:
-	if mission_navigation: return mission_target_name
 	if navigation_kind in ["valley","sf"] and navigation_checkpoint < route_points().size():
 		return "CP%02d" % (navigation_checkpoint+1)
+	if not navigation_points.is_empty(): return "LANDING STRIP"
 	return "SFO / 28R" if navigation_kind=="sf" else "NORTH FIELD"
 
 func update_flight(flight: FlightDynamics, dt: float) -> void:
@@ -260,7 +255,7 @@ func _nav() -> void:
 	_line(center+Vector2(-24,6),center+Vector2(24,6),WHITE,3)
 	_text("GS  %03d KT" % roundi(speed),Vector2(24,614),26,GREEN)
 	var checkpoint_active: bool = navigation_kind in ["valley","sf"] and navigation_checkpoint < route_points().size()
-	_text("SFO / 28R" if navigation_kind=="sf" else "ROUTE",Vector2(500,614),24,CYAN)
+	_text("DEMO ROUTE" if not navigation_points.is_empty() else "SFO / 28R" if navigation_kind=="sf" else "ROUTE",Vector2(500,614),24,CYAN)
 	_line(Vector2(20,650),Vector2(748,650),MUTED)
 	var target: Vector3 = navigation_target()
 	# Keep the next-leg readout above the yoke, not beneath its hub.

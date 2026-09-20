@@ -3,7 +3,7 @@ import unittest
 import cv2
 import numpy as np
 
-from vision.tracker import ArucoTracker, PaperController
+from vision.tracker import ArucoTracker, PaperController, ThrottleTracker
 from vision.relative_throttle import RelativeThrottle
 from vision.tests.throttle_fixture import throttle_frame
 
@@ -29,6 +29,20 @@ class RelativeThrottleTests(unittest.TestCase):
             _, observed = self.tracker.detect(frame, 0, False)
             self.assertIsNotNone(observed)
             self.assertAlmostEqual(observed.value, .25, delta=.025)
+
+    def test_adjusted_idle_preserves_full_travel(self):
+        tracker = ThrottleTracker(cv2, np, idle_fraction=.15)
+        for rail_position, expected in ((0, 0), (.10, 0), (.15, 0), (.575, .5), (1, 1), (1.2, 1)):
+            with self.subTest(rail_position=rail_position):
+                observed = tracker.detect(throttle_frame(rail_position))
+                self.assertIsNotNone(observed)
+                self.assertAlmostEqual(observed.value, expected, delta=.004)
+                self.assertGreater(observed.confidence, .4)
+
+    def test_invalid_idle_offsets_rejected(self):
+        for fraction in (-.1, 1, float("inf"), float("nan")):
+            with self.subTest(fraction=fraction), self.assertRaises(ValueError):
+                RelativeThrottle(cv2, np, idle_fraction=fraction)
 
     def test_perspective_corrects_fraction_instead_of_using_pixel_distance(self):
         source = throttle_frame(.25)

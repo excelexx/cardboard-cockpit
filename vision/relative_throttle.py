@@ -19,20 +19,23 @@ THROTTLE_FULL_ID = 2
 
 
 class RelativeThrottle:
-    def __init__(self, cv2, np):
+    def __init__(self, cv2, np, idle_fraction=0.0):
+        if not math.isfinite(idle_fraction) or not 0 <= idle_fraction < 1:
+            raise ValueError("Throttle idle fraction must be finite and in [0, 1).")
         self.cv2, self.np = cv2, np
-        self.message = "Show throttle tags 0, 1 and 2."
+        self.idle_fraction = idle_fraction
+        self.message = "Show the throttle handle tag and both end tags."
 
     def observe(self, corners, ids, frame=None):
         cv, np = self.cv2, self.np
         required = (THROTTLE_IDLE_ID, THROTTLE_ID, THROTTLE_FULL_ID)
-        self.message = "Show throttle tags 0, 1 and 2; last power held."
+        self.message = "Show the throttle handle and end tags; last power held."
         if ids is None:
             return None
         counts = collections.Counter(int(i) for i in ids.flatten())
         if any(counts[i] != 1 for i in required):
             if any(counts[i] > 1 for i in required):
-                self.message = "Duplicate throttle tag: keep only one of each ID visible."
+                self.message = "Duplicate throttle tag: keep one handle tag and one of each end tag."
             return None
         markers = {int(i): c.reshape(4, 2).astype(np.float32)
                    for c, i in zip(corners, ids.flatten()) if int(i) in required}
@@ -74,9 +77,13 @@ class RelativeThrottle:
                 return None
         except (ValueError, np.linalg.LinAlgError, cv.error):
             return None
-        value = clamp(value, 0, 1)
+        # Re-zero the physical idle stop while preserving full output at ID 2.
+        # Apply this once, before filtering, so the game and tutorial agree.
+        value = clamp((value-self.idle_fraction)/(1-self.idle_fraction), 0, 1)
         confidence = clamp(min(sides) / 85, .25, 1)
-        self.message = "THROTTLE %3.0f%% | 0 = idle, 1 = slider, 2 = full" % (value * 100)
+        self.message = "THROTTLE %3.0f%% | slide handle from idle to full" % (value * 100)
+        if self.idle_fraction:
+            self.message = "THROTTLE %3.0f%% | idle at %g%% of rail; full end = 100%%" % (value*100, self.idle_fraction*100)
         if frame is not None:
             pixels = [tuple(p.astype(int)) for p in centers]
             cv.line(frame, pixels[0], pixels[2], (50, 210, 255), 2)

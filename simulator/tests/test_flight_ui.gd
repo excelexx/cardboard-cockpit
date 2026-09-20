@@ -23,15 +23,11 @@ func run() -> void:
 	app.route_id="alpine"
 	instruments.navigation_kind="valley"
 	if not is_equal_approx(hud.flight_heading(),instruments.display_heading()):failures+=1
-	instruments.mission_navigation=true
-	instruments.mission_points.assign([Vector3(100,200,-300),Vector3(400,300,-600)])
-	instruments.mission_target=instruments.mission_points[1]
-	instruments.mission_target_name="TEST WAYPOINT"
-	if instruments.route_points().size()!=2 or instruments.navigation_target()!=Vector3(400,300,-600) or instruments.navigation_target_label()!="TEST WAYPOINT":failures+=1
-	instruments.mission_target=Vector3(0,4,1300)
-	instruments.mission_target_name="SFO / 28R FINAL"
-	instruments.navigation_checkpoint=2
-	if instruments.navigation_target()!=Vector3(0,4,1300) or instruments.navigation_target_label()!="SFO / 28R FINAL":failures+=1
+	var points: Array[Vector3]=[Vector3(100,200,-300),Vector3(400,300,-600)]
+	instruments.set_navigation("sf",1,points)
+	if instruments.route_points().size()!=2 or instruments.navigation_target()!=points[1]:failures+=1
+	instruments.set_navigation("sf",2,points)
+	if instruments.navigation_target()!=points[1] or instruments.navigation_target_label()!="LANDING STRIP":failures+=1
 	print("FLIGHT UI HEADING: ",failures," failures")
 	hud.free()
 	instruments.free()

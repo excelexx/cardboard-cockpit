@@ -1,0 +1,33 @@
+extends SceneTree
+const Preview = preload("res://systems/vision_preview.gd")
+
+func _initialize() -> void: call_deferred("run")
+func run() -> void:
+	var preview = Preview.new()
+	var frame := Image.create(64,36,false,Image.FORMAT_RGB8)
+	frame.fill(Color(.2,.6,.8))
+	var jpeg := frame.save_jpg_to_buffer(.8)
+	assert(preview._accept_frame(jpeg,1000))
+	var original: ImageTexture = preview.texture
+	assert(original != null)
+	for now in [1100,1250,1400,1699]:
+		assert(preview._accept_frame(PackedByteArray(),now))
+		assert(preview.texture == original,"Brief missing frames keep the existing picture")
+		assert(preview.last_received == 1000,"Missing frames cannot refresh the picture's age")
+	preview._accept_frame(PackedByteArray(),1700)
+	assert(preview.texture == null,"Sustained camera loss clears the view after 700 ms")
+	preview._accept_frame(jpeg,1800)
+	assert(preview.texture != null,"Live picture returns when a valid frame arrives")
+	preview._accept_frame(PackedByteArray(),1900)
+	preview._accept_frame(jpeg,2000)
+	preview._expire_frame(2500)
+	assert(preview.texture != null,"Fresh image restarts the expiry timer")
+	preview._expire_frame(2700)
+	assert(preview.texture == null,"A silent stream also expires")
+	preview._accept_frame(jpeg,3000)
+	preview.stop()
+	assert(preview.texture == null and preview.last_received == -1,"Leaving the view clears the image immediately")
+	preview._accept_frame(PackedByteArray(),3100)
+	assert(preview.texture == null,"An initial missing frame does not invent an image")
+	print("VISION PREVIEW: brief gaps, sustained loss, recovery and cleanup passed")
+	quit()

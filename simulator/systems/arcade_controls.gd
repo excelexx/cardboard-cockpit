@@ -2,7 +2,7 @@ extends RefCounted
 class_name ArcadeControls
 const Tune = preload("res://data/balance.gd")
 ## Angle-demand controls: responsive banking, release-to-level and gentle terrain protection.
-static func command(f: FlightDynamics, raw: Vector3, clearance: float, landing: bool = false) -> Vector3:
+static func command(f: FlightDynamics, raw: Vector3, clearance: float, landing: bool = false, terrain_protection: bool = true) -> Vector3:
 	if not f.airborne: return raw
 	var roll_input: float = 0 if absf(raw.x)<Tune.INPUT_DEADZONE else raw.x
 	var pitch_input: float = 0 if absf(raw.y)<Tune.INPUT_DEADZONE else raw.y
@@ -11,7 +11,7 @@ static func command(f: FlightDynamics, raw: Vector3, clearance: float, landing: 
 	var pitch: float = pitch_input*deg_to_rad(Tune.LANDING_PITCH_LIMIT_DEGREES if landing else Tune.PITCH_LIMIT_DEGREES)+trim
 	if landing and absf(pitch_input)<Tune.INPUT_DEADZONE:
 		pitch = -atan(.05241) if clearance>14 else -.012
-	if not landing:
+	if not landing and terrain_protection:
 		var safety: float = Tune.TERRAIN_MARGIN+f.speed*Tune.TERRAIN_SPEED_MARGIN
 		if clearance<safety and f.vertical_speed<3:
 			pitch = maxf(pitch,clampf(.13+(safety-clearance)*.007,.13,.42))

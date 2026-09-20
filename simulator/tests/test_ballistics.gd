@@ -9,7 +9,7 @@ func check(value: bool,label: String):
 func run():
 	app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
-	app.start_flight("combat")
+	app.start_flight("combat", true)
 	app.cockpit = false # This assertion tests exterior muzzle effects, hidden in cockpit view.
 	check(is_instance_valid(app.fighter_fx.gun_rotor) and is_instance_valid(app.fighter_fx.gun_muzzle),"Imported rotary gun retains animated rotor and physical muzzle")
 	app.combat.fire_gun(); app.fighter_fx.update_gun(.05)
@@ -19,50 +19,39 @@ func run():
 	app.combat.gun_firing_time = 0
 	for i in range(60): app.fighter_fx.update_gun(1.0/60)
 	check(app.fighter_fx.rotor_speed==0 and not app.fighter_fx.gun_flash.visible,"Releasing fire stops flash and lets rotor coast to a stop")
-	app.start_flight("combat")
+	app.start_flight("combat", true)
 	var start := Vector3(0,500,-3500)
 	app.combat.spawn_shot(start,Vector3(0,0,-1250),"cannon",-1,28)
 	var shot: Dictionary = app.combat.shots.back()
 	for i in range(60): app.combat.update_shots(1.0/60)
 	check(shot.position.y<start.y-4 and shot.position.y>start.y-6,"Cannon trajectory includes one second of gravitational drop")
 	check(shot.velocity.length()<1200 and shot.velocity.length()>1100,"Air drag slows the projectile")
-	app.start_flight("combat"); app.combat.spawn_contact()
+	app.start_flight("combat", true); app.combat.spawn_contact()
 	var enemy: Dictionary = app.combat.enemies[0]
 	enemy.position = start+Vector3(0,0,-20); enemy.health = 28
 	app.combat.spawn_shot(start,Vector3(0,0,-5000),"cannon",-1,28)
 	app.combat.update_shots(1.0/60)
 	check(app.combat.kills==1,"Swept collision detects a target crossed between frames")
-	app.start_flight("combat"); app.combat.spawn_contact(); enemy = app.combat.enemies[0]
-	enemy.position = start+Vector3(500,0,-1400)
-	app.combat.spawn_shot(start,Vector3(0,-4,-180),"missile",enemy.id,135); shot = app.combat.shots.back()
-	app.combat.update_shots(.05)
-	check(not shot.node.get_node("MotorFlame").visible and shot.velocity.length()<190,"Missile separates before ignition")
-	for i in range(15): app.combat.update_shots(1.0/60)
-	check(shot.node.get_node("MotorFlame").visible and shot.velocity.length()>200,"Motor ignites and accelerates the missile")
-	var direction: Vector3 = shot.velocity.normalized(); app.combat.update_shots(.01)
-	check(direction.angle_to(shot.velocity.normalized())<deg_to_rad(1.5),"Missile steering is rate-limited")
-	shot.age = 4.1; app.combat.update_shots(.01)
-	check(not shot.node.get_node("MotorFlame").visible,"Motor flame extinguishes after burnout")
-	app.start_flight("combat")
+	app.start_flight("combat", true)
 	app.combat.spawn_shot(Vector3(0,5,-3500),Vector3(0,-600,-100),"cannon",-1,28)
 	app.combat.update_shots(.03)
 	check(app.combat.shots.is_empty() and not app.combat.bursts.is_empty(),"Projectiles hit terrain and produce an impact")
-	app.start_flight("combat"); app.combat.spawn_contact()
+	app.start_flight("combat", true); app.combat.spawn_contact()
 	enemy = app.combat.enemies[0]; enemy.position = app.flight.position+app.flight.forward()*430
 	enemy.health = 100000; enemy.cooldown = 999; app.combat.spawn_clock = 999
-	for code in [KEY_SPACE,KEY_T]:
+	for code in [KEY_SPACE]:
 		var event := InputEventKey.new(); event.keycode = code; event.physical_keycode = code; event.pressed = true
 		Input.parse_input_event(event); Input.flush_buffered_events()
 	for i in range(1500):
 		app._physics_process(1.0/60)
 		if i%90==0: await process_frame
-	for code in [KEY_SPACE,KEY_T]:
+	for code in [KEY_SPACE]:
 		var event := InputEventKey.new(); event.keycode = code; event.physical_keycode = code; event.pressed = false
 		Input.parse_input_event(event); Input.flush_buffered_events()
-	print("DUAL FIRE rounds=",app.combat.rounds_fired," missiles=",app.combat.missiles_fired," mode=",app.mode)
-	check(app.combat.rounds_fired>1200 and app.combat.missiles_fired>8,"Holding both fire keys sustains both weapons beyond former ammunition limits")
-	check(app.combat.ammo==-1 and app.combat.missiles==-1,"Unlimited ammunition never depletes")
-	app.start_flight("combat"); app.combat.spawn_contact(); enemy = app.combat.enemies[0]
+	print("GUN FIRE rounds=",app.combat.rounds_fired," mode=",app.mode)
+	check(app.combat.rounds_fired>1200,"Holding fire sustains the gun beyond former ammunition limits")
+	check(app.combat.ammo==-1,"Unlimited ammunition never depletes")
+	app.start_flight("combat", true); app.combat.spawn_contact(); enemy = app.combat.enemies[0]
 	enemy.position = app.flight.position+Vector3(35,0,-500); app.combat.target_id = enemy.id
 	var initial: Vector3 = app.combat.assisted_direction()
 	app.combat.update_aim(1.0/60)

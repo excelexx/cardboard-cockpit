@@ -73,6 +73,14 @@ func _validation_tests() -> bool:
 	var wrong_tracking: Dictionary = _valid(2)
 	wrong_tracking.tracking = "true"
 	invalid.append(wrong_tracking)
+	for malformed: Variant in [null, [], "true", 1]:
+		var packet: Dictionary = _valid(2)
+		packet.yoke_enabled = malformed
+		invalid.append(packet)
+	for malformed: Variant in [null, [], true, "fire", {}, {"gun": 1}, {"gun": "true"}]:
+		var packet: Dictionary = _valid(2)
+		packet.weapons = malformed
+		invalid.append(packet)
 	for bad: Variant in invalid:
 		if client._accept_packet(JSON.stringify(bad).to_utf8_buffer(), 900):
 			_fail("Malformed packet accepted: " + JSON.stringify(bad))
@@ -87,20 +95,34 @@ func _validation_tests() -> bool:
 	var independent: Dictionary = _valid(2)
 	independent.tracking = false
 	independent.yoke.confidence = 0.0
+	independent.yoke_enabled = false
 	if not client._accept_packet(JSON.stringify(independent).to_utf8_buffer(), 200) or client.throttle_confidence < 0.9:
 		_fail("Independent throttle rejected when yoke lost")
 		return false
-	var switched: Dictionary=_valid(3)
-	switched.weapons={"primary":true,"salvo":true,"primary_confidence":1.0,"salvo_confidence":1.0}
-	if not client._accept_packet(JSON.stringify(switched).to_utf8_buffer(),210) or not (client.primary_switch and client.salvo_switch):
-		_fail("Valid physical weapon switches rejected");return false
-	var revision: int=client.weapons_revision
-	switched.sequence=4;switched.weapons.salvo="true"
-	if client._accept_packet(JSON.stringify(switched).to_utf8_buffer(),220) or client.weapons_revision!=revision:
-		_fail("Malformed weapon extension mutated state");return false
-	client.enabled=true;client.enabled=false
-	if client.primary_switch or client.salvo_switch or client.weapons_revision==revision:
-		_fail("Disabling camera did not release physical weapons");return false
+	assert(not client.yoke_enabled, "Explicit throttle-only mode does not require a yoke")
+	var firing: Dictionary = _valid(3)
+	firing.tracking = false
+	firing.yoke.confidence = 0
+	firing.weapons = {"gun": true}
+	assert(client._accept_packet(JSON.stringify(firing).to_utf8_buffer(), 300))
+	assert(client.gun_trigger, "Gun tag is independent of yoke visibility")
+	client.enabled = true; client.connected = true
+	client._expire_weapons(449)
+	assert(client.gun_trigger)
+	client._expire_weapons(450)
+	assert(not client.gun_trigger, "Fire expires after 150 ms")
+	firing.sequence = 4
+	assert(client._accept_packet(JSON.stringify(firing).to_utf8_buffer(), 500))
+	client.connected = false; client._expire_weapons(501)
+	assert(not client.gun_trigger, "Disconnect stops fire immediately")
+	firing.sequence = 5
+	assert(client._accept_packet(JSON.stringify(firing).to_utf8_buffer(), 600))
+	assert(client._accept_packet(JSON.stringify(_valid(6)).to_utf8_buffer(), 601))
+	assert(not client.gun_trigger, "Legacy packet releases the trigger")
+	firing.sequence = 7
+	assert(client._accept_packet(JSON.stringify(firing).to_utf8_buffer(), 700))
+	client.enabled = false
+	assert(not client.gun_trigger, "Keyboard takeover releases fire")
 	print("VISION VALIDATION PASS: %d malformed packets rejected without state mutation" % (invalid.size() + 4))
 	return true
 
