@@ -37,6 +37,9 @@ var burner_latch := false
 var inhale := 0.0
 var attributes: CameraAttributesPractical
 
+const SHAKE_STRENGTH := 0.025 # 97.5% less decorative shake; steering/aim stay unchanged.
+const HEAD_MOTION_STRENGTH := 0.15
+const FOV_PUNCH_STRENGTH := 0.15
 const SHAKE_ANGLE := 0.05585      # 3.2 deg of pitch/yaw rattle at full energy
 const SHAKE_ROLL := 0.02793       # 1.6 deg of roll rattle
 const SHAKE_SHIFT_CHASE := 0.42   # metres of boom translation
@@ -71,7 +74,7 @@ func impulse(amount: float) -> void: trauma = minf(1,trauma+amount)
 ## Clamped at both ends so a greaser still registers and a firm arrival never hurts.
 func touchdown(strength: float) -> void:
 	impulse(clampf(strength,0.12,0.60))
-	settle = 0.5
+	settle = 0.05
 	settle_clock = 0.0
 func reset() -> void:
 	initialized = false; trauma = 0; last_speed = app.flight.speed; acceleration = 0
@@ -109,6 +112,7 @@ func update(dt: float) -> void:
 		noise.get_noise_2d(t,0.0)*thump+noise.get_noise_2d(v,90.0)*vibration,
 		noise.get_noise_2d(t,37.0)*thump+noise.get_noise_2d(v,131.0)*vibration,
 		noise.get_noise_2d(t,74.0)*thump+noise.get_noise_2d(v,172.0)*vibration)
+	wobble *= SHAKE_STRENGTH
 	var angular := Vector3(wobble.x*SHAKE_ANGLE,wobble.y*SHAKE_ANGLE*0.6,wobble.z*SHAKE_ROLL)
 	if app.pilot_ejected and is_instance_valid(app.fighter_fx.parachute):
 		app.cockpit_frame.set_presentation_visible(false)
@@ -134,9 +138,9 @@ func _update_fov(dt: float, f: FlightDynamics, speed_norm: float, proximity: flo
 	burner_latch = f.afterburner
 	inhale = maxf(0.0,inhale-dt*4.0)
 	var punch: float = clampf(acceleration*0.055,-3.0,9.0)
-	var target: float = base+speed_norm*11.0+(7.0 if f.afterburner else 0.0)+proximity*6.0+punch-inhale*3.0
+	var target: float = base+speed_norm*11.0+((7.0 if f.afterburner else 0.0)+proximity*6.0+punch-inhale*3.0)*FOV_PUNCH_STRENGTH
 	target = clampf(target,base-4.0,base+14.0)
-	camera.fov = lerpf(camera.fov,target,1-exp(-dt*(9.0 if target>camera.fov else 2.2)))
+	camera.fov = lerpf(camera.fov,target,1-exp(-dt*(3.0 if target>camera.fov else 2.2)))
 
 ## Head mass. The eye is sprung against the airframe at a neck's time constant and
 ## the cockpit is counter-translated, so the canopy bow and the coaming no longer
@@ -152,9 +156,9 @@ func _cockpit_view(dt: float, f: FlightDynamics, angular: Vector3, shift: Vector
 		clampf(-g_excess*0.011,-0.055,0.055),
 		clampf(-acceleration*0.0013,-0.060,0.060))
 	var blend: float = 1-exp(-dt/HEAD_TAU)
-	head = head.lerp(want_head,blend)
-	head_pitch = lerpf(head_pitch,clampf(g_excess*0.008,-0.026,0.026),blend)
-	head_yaw = lerpf(head_yaw,clampf(f.yaw_velocity*0.30,-0.038,0.038),blend)
+	head = head.lerp(want_head*HEAD_MOTION_STRENGTH,blend)
+	head_pitch = lerpf(head_pitch,clampf(g_excess*0.008,-0.026,0.026)*HEAD_MOTION_STRENGTH,blend)
+	head_yaw = lerpf(head_yaw,clampf(f.yaw_velocity*0.30,-0.038,0.038)*HEAD_MOTION_STRENGTH,blend)
 	var look_basis: Basis = Basis.from_euler(Vector3(app.look.y+head_pitch,app.look.x+head_yaw,0))
 	var travel: Vector3 = head+shift
 	travel.x = clampf(travel.x,-HEAD_LIMIT,HEAD_LIMIT)

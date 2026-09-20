@@ -9,6 +9,7 @@ if [ ! -x .venv/bin/python ]; then ./tools/setup_vision.sh; fi
 "$engine" --headless --path simulator --script res://scenes/main.gd --check-only
 "$engine" --headless --path simulator --script res://tests/test_fighter.gd
 "$engine" --headless --path simulator --script res://tests/test_arcade_controls.gd
+"$engine" --headless --path simulator --script res://tests/test_camera_comfort.gd
 "$engine" --headless --path simulator --script res://tests/test_sticker_controls.gd
 "$engine" --headless --path simulator --script res://tests/test_xlx_controls.gd
 "$engine" --headless --path simulator --script res://tests/test_spectre_scene.gd
