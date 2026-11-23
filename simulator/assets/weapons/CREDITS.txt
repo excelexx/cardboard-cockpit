@@ -12,3 +12,15 @@ Blaster chassis and optics: Kenney Blaster Kit 2.1, CC0.
 https://kenney.nl/assets/blaster-kit
 Adaptations: ship mounting, industrial material palette, glowing coils and plasma emitters.
 KENNEY-BLASTER-LICENSE.txt is included.
+
+Machined-steel surface (gunmetal_diff_1k.jpg, gunmetal_nor_gl_1k.jpg,
+gunmetal_arm_1k.jpg): Poly Haven "Blue Metal Plate", Rob Tuytel, CC0.
+https://polyhaven.com/a/blue_metal_plate
+https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/blue_metal_plate/blue_metal_plate_diff_1k.jpg
+https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/blue_metal_plate/blue_metal_plate_nor_gl_1k.jpg
+https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/blue_metal_plate/blue_metal_plate_arm_1k.jpg
+License: https://creativecommons.org/publicdomain/zero/1.0/
+Adaptations: renamed; used for scratch/abrasion structure only. assets/weapons/
+gun_metal.gdshader desaturates the blue paint away and re-tints the plate to the
+key art's near-black graphite, drives roughness and AO from the packed ARM map,
+and adds heat-blued muzzle oxide and a firing heat glow on top.

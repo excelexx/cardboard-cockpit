@@ -6,6 +6,14 @@ Open **Launch Cardboard Cockpit.command** or **build/Cardboard Cockpit.app**. **
 
 **Play teaches you during the mission:** spoken tips guide the first three geese, then the instructor hands the rest to you. Flight never pauses for lessons. Crashes recover to stable flight; landing mishaps retry final approach. [Coaching and voice details](docs/TUTORIAL.md).
 
+## Start everything with one command
+
+```sh
+./tools/play.sh
+```
+
+That starts the badge bridge (Bluetooth), the cardboard tracker (webcam) and the game, and stops them all when the game window closes. `Play.command` in this folder does the same on double-click. Options: `--camera 1` for another webcam, `--calibrate` to redo the seven-pose yoke calibration (it runs automatically the first time), `--no-tracker` to fly with the keyboard, `--no-badge` without Bluetooth. Any other flag goes to the game (for example `--demo`). Logs land in `build/logs/`. macOS asks once for Camera access (tracker) and Bluetooth access (Terminal); if the badge reports "Bluetooth device is turned off" while it is on, allow Terminal under System Settings → Privacy & Security → Bluetooth and reopen Terminal.
+
 ## Controls
 
 | Input | Action |

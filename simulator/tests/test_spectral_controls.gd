@@ -1,4 +1,5 @@
 extends SceneTree
+const Tune = preload("res://data/balance.gd")
 var app: Node3D
 var checks:=0
 var failures: Array[String]=[]
@@ -59,13 +60,28 @@ func run() -> void:
 	check(app.combat.intent.choose(app.combat,.016)==tracked.id,"Existing target survives off-axis roll motion")
 	app.flight.barrel_remaining=0
 	check(app.combat.intent.choose(app.combat,.016)==-1,"Wide roll margin closes after recovery")
-	app.start_flight("combat");app.combat.spawn_contact("boss")
-	var boss: Dictionary=app.combat.enemies[0];boss.age=5;app.mission.phase="boss"
-	app.combat.hurt_enemy(boss,5000,"cannon",boss.position)
-	check(boss.damage_stage>=1 and boss.health>0,"Primary damage breaks boss armor without instant kill")
+	# There is no boss. Every enemy is an ordinary goose and one good cannon
+	# packet - two rounds of twelve against twenty hit points - kills outright.
+	app.start_flight("combat");app.combat.spawn_clock=999;app.combat.spawn_contact()
+	var bird: Dictionary=app.combat.enemies[0];bird.age=5
 	var kills: int=app.combat.kills
-	app.combat.hurt_enemy(boss,100000,"missile",boss.position)
-	app.combat.hurt_enemy(boss,100000,"missile",boss.position)
-	check(app.combat.boss_defeated and app.combat.kills==kills+1,"Four-salvo follow-up impacts never double-count boss death")
+	check(bird.kind=="normal" and app.combat.boss_id==-1,"Every contact is an ordinary goose and no boss id is ever handed out")
+	app.combat.hurt_enemy(bird,Tune.GUN_DAMAGE_PER_ROUND*Tune.GUN_ROUNDS_PER_PACKET,"cannon",bird.position)
+	check(bird.health<=0 and app.combat.kills==kills+1,"One cannon packet clears a goose with no armour stage in the way")
+	app.combat.hurt_enemy(bird,100000,"missile",bird.position)
+	app.combat.hurt_enemy(bird,100000,"missile",bird.position)
+	check(app.combat.kills==kills+1,"Follow-up impacts on a falling goose never double-count the kill")
+	# The flock API scenes/main.gd, systems/demo_mission.gd and ui/hud.gd read.
+	app.start_flight("combat");app.combat.spawn_clock=999
+	app.combat.spawn_skein(6)
+	check(app.combat.skein_total==6 and app.combat.skein_ids.size()==6 and app.combat.skein_remaining()==6,"spawn_skein publishes every id in the flock before it returns")
+	var spread: float=0.0
+	for member: Dictionary in app.combat.enemies:
+		if app.combat.skein_ids.has(int(member.id)):spread=maxf(spread,Vector3(member.position).distance_to(app.combat.enemies[0].position))
+	check(spread>20.0,"The flock arrives as a V, not as six geese in one place")
+	for member: Dictionary in app.combat.enemies.duplicate():
+		if app.combat.skein_ids.has(int(member.id)):app.combat.hurt_enemy(member,10000,"cannon",member.position)
+	check(app.combat.skein_remaining()==0 and app.combat.skein_down==6,"skein_down counts every bird of the flock down")
+	check(app.combat.skein_cleared and app.combat.boss_defeated,"A cleared flock reports through both the skein flag and the compatibility alias")
 	print("SPECTRAL CONTROLS: ",checks," checks / ",failures.size()," failures")
 	app.queue_free();await process_frame;quit(0 if failures.is_empty() else 1)

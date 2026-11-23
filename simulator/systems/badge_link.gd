@@ -129,6 +129,13 @@ func accept_input(bytes: PackedByteArray,now: int) -> bool:
 func held(code: int) -> bool: return connected and (mask&(1<<code))!=0
 func tapped(code: int) -> bool: return connected and (pressed&(1<<code))!=0
 
+## kind 2 means "objective contact": a bird from the big flock the sortie is
+## about. The wire format is unchanged, so the badge firmware needs no edit.
+func _objective_contact(app: Node,enemy: Dictionary) -> bool:
+	var ids: Variant=app.combat.get("skein_ids")
+	if ids is Array:return (ids as Array).has(enemy.id)
+	return app.mission.has_method("skein_has") and app.mission.skein_has(int(enemy.id))
+
 func instrument_snapshot(app: Node) -> Dictionary:
 	var f: FlightDynamics=app.flight
 	var c: CombatDirector=app.combat
@@ -148,7 +155,7 @@ func instrument_snapshot(app: Node) -> Dictionary:
 		for enemy: Dictionary in c.enemies:
 			if enemy.health<=0 or enemy.get("retiring",false):continue
 			var delta: Vector3=enemy.position-f.position
-			contacts.append({"x":clampf(delta.dot(right),-32767,32767),"y":clampf(delta.dot(forward),-32767,32767),"vx":clampf(Vector3(enemy.get("velocity",Vector3.ZERO)-f.velocity).dot(right),-32767,32767),"vy":clampf(Vector3(enemy.get("velocity",Vector3.ZERO)-f.velocity).dot(forward),-32767,32767),"altitude":clampf(delta.y,-32767,32767),"kind":2 if enemy.kind=="boss" else 1,"selected":1 if enemy.id==c.target_id else 0})
+			contacts.append({"x":clampf(delta.dot(right),-32767,32767),"y":clampf(delta.dot(forward),-32767,32767),"vx":clampf(Vector3(enemy.get("velocity",Vector3.ZERO)-f.velocity).dot(right),-32767,32767),"vy":clampf(Vector3(enemy.get("velocity",Vector3.ZERO)-f.velocity).dot(forward),-32767,32767),"altitude":clampf(delta.y,-32767,32767),"kind":2 if _objective_contact(app,enemy) else 1,"selected":1 if enemy.id==c.target_id else 0})
 		for shot: Dictionary in c.shots:
 			if shot.kind not in ["missile","hostile_missile"]:continue
 			var delta: Vector3=shot.position-f.position

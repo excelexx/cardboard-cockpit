@@ -18,7 +18,12 @@ var _effects: Node3D
 var _strobes: Array[MeshInstance3D] = []
 var _beacons: Array[MeshInstance3D] = []
 var _engine_glow: MeshInstance3D
+## Kept as the CONTROL SURFACE for callers outside this file. scenes/main.gd
+## drives the exhaust with `_engine_material.emission_energy_multiplier`, so the
+## property has to keep working even though the throat is a ShaderMaterial now;
+## update_visuals copies whatever was last written into the shader.
 var _engine_material: StandardMaterial3D
+var _throat_material: ShaderMaterial
 var _clock := 0.0
 var _control := Vector3.ZERO
 var _origin_removed := Vector3.ZERO
@@ -44,6 +49,7 @@ func initialize(model: Node3D, profile: Dictionary) -> void:
 	_beacons.clear()
 	_engine_glow = null
 	_engine_material = null
+	_throat_material = null
 	_gear = model.get_node_or_null("Airframe/LandingGear")
 	_collect_meshes(model)
 	var first := true
@@ -102,7 +108,17 @@ func update_visuals(delta: float, flight: FlightDynamics, controls: Vector3) -> 
 	if _engine_glow != null:
 		var power := clampf((flight.engine - 0.25) / 0.75, 0.0, 1.0)
 		_engine_glow.visible = power > 0.005
-		_engine_material.emission_energy_multiplier = power * (1.5 + 0.12 * sin(_clock * 24.0))
+		# Read BEFORE writing: scenes/main.gd sets the multiplier straight after
+		# this call, so the shader picks its dry/reheat split up on the next
+		# frame and nothing outside this file has to know the throat stopped
+		# being a StandardMaterial3D.
+		if _throat_material != null:
+			_throat_material.set_shader_parameter("power", clampf(_engine_material.emission_energy_multiplier * 0.52, 0.0, 1.0))
+		# Same dry/reheat scale main.gd uses, so a studio capture and the game
+		# show the same exhaust. The ripple is 2.9 Hz: a slow shimmer, well
+		# inside the "nothing may oscillate faster than the eye can follow" rule.
+		var reheat: float = 2.0 if flight.afterburner else 0.35
+		_engine_material.emission_energy_multiplier = power * reheat * (1.0 + 0.06 * sin(_clock * 18.0))
 
 func reset() -> void:
 	gear_progress = 1.0
@@ -151,6 +167,21 @@ func _record(node: Node3D) -> Dictionary:
 
 func _build_gear_groups() -> void:
 	if _gear == null:
+		return
+	# A procedural airframe publishes one node per leg with its own retraction
+	# pivot, so the whole assembly folds as authored instead of being guessed
+	# from wheel clusters.
+	var legs: Array[Node3D] = []
+	for child in _gear.get_children():
+		if child is Node3D and child.has_meta("gear_pivot"):
+			legs.append(child)
+	if not legs.is_empty():
+		for leg in legs:
+			_gear_groups.append({
+				"center": Vector3(leg.get_meta("gear_pivot")), "parts": [_record(leg)],
+				"bounds": AABB(), "has_bounds": true, "pivot": Vector3(leg.get_meta("gear_pivot")),
+				"axis": Vector3(leg.get_meta("gear_axis")).normalized(),
+				"angle": float(leg.get_meta("gear_angle")), "rise": float(leg.get_meta("gear_rise"))})
 		return
 	var parts: Array[MeshInstance3D] = []
 	var wheel_clusters: Array[Array] = []
@@ -256,9 +287,13 @@ func _body_surface(top: bool) -> Vector3:
 func _build_lights() -> void:
 	if _vertices.is_empty():
 		return
-	var radius := clampf(model_bounds.size.x * 0.0022, 0.075, 0.16)
+	# Real navigation lamps are small. Anything bigger reads as a glowing blob on
+	# a dark airframe and destroys the stealth silhouette.
+	var radius := clampf(model_bounds.size.x * 0.0052, 0.040, 0.095)
 	var left := _wingtip(-1.0)
 	var right := _wingtip(1.0)
+	if _model.has_meta("nav_port"): left = Vector3(_model.get_meta("nav_port"))
+	if _model.has_meta("nav_starboard"): right = Vector3(_model.get_meta("nav_starboard"))
 	# The 737 includes accurately positioned lamp housings in the original mesh.
 	for entry in [["navlight", -1.0], ["rhnavlight", 1.0]]:
 		var housing := _find_mesh(entry[0])
@@ -268,12 +303,14 @@ func _build_lights() -> void:
 				left = position
 			else:
 				right = position
-	_lamp("PortNavigation", left, Color(1.0, 0.025, 0.015), radius, 3.5)
-	_lamp("StarboardNavigation", right, Color(0.02, 1.0, 0.16), radius, 3.5)
-	_strobes.append(_lamp("PortStrobe", left + Vector3(0, radius, radius * 2.0), Color.WHITE, radius * 1.15, 8.0))
-	_strobes.append(_lamp("StarboardStrobe", right + Vector3(0, radius, radius * 2.0), Color.WHITE, radius * 1.15, 8.0))
-	_beacons.append(_lamp("UpperBeacon", _body_surface(true), Color(1.0, 0.035, 0.01), radius, 5.0))
-	_beacons.append(_lamp("LowerBeacon", _body_surface(false), Color(1.0, 0.035, 0.01), radius, 5.0))
+	_lamp("PortNavigation", left, Color(1.0, 0.025, 0.015), radius, 1.5)
+	_lamp("StarboardNavigation", right, Color(0.02, 1.0, 0.16), radius, 1.5)
+	_strobes.append(_lamp("PortStrobe", left + Vector3(0, radius, radius * 2.0), Color.WHITE, radius * 1.05, 3.4))
+	_strobes.append(_lamp("StarboardStrobe", right + Vector3(0, radius, radius * 2.0), Color.WHITE, radius * 1.05, 3.4))
+	var top: Vector3 = Vector3(_model.get_meta("beacon_top")) if _model.has_meta("beacon_top") else _body_surface(true)
+	var bottom: Vector3 = Vector3(_model.get_meta("beacon_bottom")) if _model.has_meta("beacon_bottom") else _body_surface(false)
+	_beacons.append(_lamp("UpperBeacon", top, Color(1.0, 0.035, 0.01), radius * 0.9, 2.1))
+	_beacons.append(_lamp("LowerBeacon", bottom, Color(1.0, 0.035, 0.01), radius * 0.9, 2.1))
 
 func _lamp(label: String, location: Vector3, color: Color, radius: float, energy: float) -> MeshInstance3D:
 	var lamp := MeshInstance3D.new()
@@ -316,8 +353,19 @@ func _surface(names: Array, pivot: Vector3, axis: Vector3, response: Vector3) ->
 		_surfaces.append(record)
 
 func _build_control_surfaces() -> void:
-	# Pivots/axes come from each bundled FlightGear model XML, not mesh-center
-	# guesses. Only separately authored surfaces move; structural wings stay fixed.
+	# A procedural airframe tags each moving surface with the hinge it was built
+	# around, which is exact; bundled FlightGear models fall back to the pivots
+	# and axes from their own model XML. Either way, structural panels stay put.
+	for node in _model.find_children("*", "Node3D", true, false):
+		if not node.has_meta("surface_axis"):
+			continue
+		var tagged := _record(node)
+		tagged.pivot = Vector3(node.get_meta("surface_pivot"))
+		tagged.axis = Vector3(node.get_meta("surface_axis")).normalized()
+		tagged.response = Vector3(node.get_meta("surface_response"))
+		_surfaces.append(tagged)
+	if not _surfaces.is_empty():
+		return
 	match str(_profile.get("id", "")):
 		"f35":
 			_surface(["flaperonL"], Vector3(3.55, -1.79, 0.47), Vector3(-0.63, -3.06, 0.04), Vector3(-25, 0, 0))
@@ -343,6 +391,9 @@ func _apply_rotation(record: Dictionary, angle: float) -> void:
 	record.node.transform = parent.affine_inverse() * motion * parent * record.original
 
 func _build_engine_glow() -> void:
+	if _model.has_meta("engine_glow_center"):
+		_engine_ring(Vector3(_model.get_meta("engine_glow_center")), float(_model.get_meta("engine_glow_radius")))
+		return
 	if str(_profile.get("id", "")) != "f35":
 		return
 	var bounds := AABB()
@@ -355,22 +406,53 @@ func _build_engine_glow() -> void:
 		found = true
 	if not found:
 		return
-	var shape := TorusMesh.new()
-	shape.inner_radius = minf(bounds.size.x, bounds.size.y) * 0.20
-	shape.outer_radius = minf(bounds.size.x, bounds.size.y) * 0.245
-	shape.rings = 40
-	shape.ring_segments = 12
+	var radius: float = minf(bounds.size.x, bounds.size.y) * 0.222
+	_engine_ring(Vector3(bounds.get_center().x, bounds.get_center().y, bounds.end.z - 0.38), radius)
+
+func _engine_ring(at: Vector3, radius: float) -> void:
+	# A recessed glowing throat, not a neon hoop: the eye should read hot metal
+	# down the pipe, with the plume effects sitting in front of it.
+	#
+	# Orientation is half the trick. CylinderMesh puts top_radius at +Y, and on
+	# a nose--Z airframe +PI/2 about X sends +Y to +Z, i.e. AFT: the wide mouth
+	# faces the chase camera and the narrow capped end recedes up the pipe. The
+	# old -PI/2 pointed the wide end at the nose, so the viewer got the small
+	# bright cap flat-on -- a disc, with the depth cue inside out.
+	#
+	# CULLING is the other half, and it is why the exit still rendered as a flat
+	# sticker with the orientation already right. With CULL_DISABLED the NEAR
+	# wall's OUTSIDE won the depth test and covered the interior, so every pixel
+	# came back the same constant emission: measured across the whole disc, mean
+	# (1.000, 0.459, 0.205) with per-channel std 0.0009 and red clipped at 1.0,
+	# 10x the airframe body and above glow_hdr_threshold so it bloomed as well.
+	# Front faces are culled now, the camera looks INTO the cone, and
+	# assets/look/jet_throat.gdshader grades the wall away from a small hot core.
+	var shape := CylinderMesh.new()
+	shape.top_radius = radius
+	shape.bottom_radius = radius * 0.34
+	shape.height = radius * 1.25
+	shape.radial_segments = 24
+	shape.rings = 1
+	shape.cap_top = false
+	shape.cap_bottom = true
 	_engine_glow = MeshInstance3D.new()
 	_engine_glow.name = "EngineCoreGlow"
 	_engine_glow.mesh = shape
 	_engine_glow.rotation.x = PI / 2.0
-	_engine_glow.position = Vector3(bounds.get_center().x, bounds.get_center().y, bounds.end.z - 0.38)
+	# `at` is the exit plane, so the mouth sits there and the cone runs forward.
+	_engine_glow.position = at - Vector3(0, 0, shape.height * 0.5)
 	_engine_glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_engine_material = StandardMaterial3D.new()
-	_engine_material.albedo_color = Color(0.07, 0.025, 0.008)
 	_engine_material.emission_enabled = true
-	_engine_material.emission = Color(1.0, 0.21, 0.035)
-	_engine_glow.material_override = _engine_material
+	_engine_material.emission = Color(1.0, 0.27, 0.05)
+	_engine_material.emission_energy_multiplier = 0.0
+	_throat_material = ShaderMaterial.new()
+	_throat_material.shader = load("res://assets/look/jet_throat.gdshader")
+	_throat_material.set_shader_parameter("mouth_radius", radius)
+	_throat_material.set_shader_parameter("pipe_length", shape.height)
+	_throat_material.set_shader_parameter("core_fraction", shape.bottom_radius / maxf(0.001, radius))
+	_throat_material.set_shader_parameter("power", 0.0)
+	_engine_glow.material_override = _throat_material
 	_effects.add_child(_engine_glow)
 
 func open_weapon_bay(side: float) -> void:
@@ -378,6 +460,18 @@ func open_weapon_bay(side: float) -> void:
 	bay_timer = 1.0
 func _build_weapon_bays() -> void:
 	bay_doors.clear()
+	for node in _model.find_children("*", "MeshInstance3D", true, false):
+		if not node.has_meta("bay_axis"):
+			continue
+		var tagged := _record(node)
+		tagged.pivot = Vector3(node.get_meta("bay_pivot"))
+		tagged.axis = Vector3(node.get_meta("bay_axis")).normalized()
+		tagged.angle = float(node.get_meta("bay_angle"))
+		tagged.side = float(node.get_meta("bay_side"))
+		tagged.inner = bool(node.get_meta("bay_inner"))
+		bay_doors.append(tagged)
+	if not bay_doors.is_empty():
+		return
 	for spec: Array in [
 		["door bayLI",Vector3(-1.48,-0.32,-0.74),Vector3(1.82,-0.31,-0.73),110.0,-1.0,true],
 		["door bayLO",Vector3(-1.94,-1.45,-0.49),Vector3(0.40,-1.44,-0.69),-100.0,-1.0,false],

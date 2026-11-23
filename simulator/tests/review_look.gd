@@ -15,16 +15,16 @@ func run() -> void:
 	if wanted.is_empty() or "title" in wanted:
 		for i in 40:await process_frame
 		await shot(folder,"title")
-	for view in ["chase","cockpit","boss","bay","cliffs","beach","gate","marin","pit","pitfight","jet","jetlow","goose","sun","sky","burner"]:
+	for view in ["chase","cockpit","boss","bay","cliffs","beach","gate","marin","pit","pitfight","jet","jetlow","goose","sun","sky","burner","beam","beampit"]:
 		if not wanted.is_empty() and view not in wanted:continue
 		app.set_process(false);app.set_physics_process(false)
-		app.start_flight("combat");app.copilot=false;app.cockpit=view in ["cockpit","pit","pitfight"];app.text_hud=true
-		var scenic:={"cliffs":[Vector3(-4200,360,-8300),0.7],"beach":[Vector3(2300,280,-13400),0.9],"gate":[Vector3(12000,300,-19300),1.45],"marin":[Vector3(16600,520,-21500),0.25],"pit":[Vector3(12000,300,-19300),1.45],"pitfight":[Vector3(12000,300,-19300),1.45],"jet":[Vector3(12000,300,-19300),1.45],"jetlow":[Vector3(12000,300,-19300),1.45],"goose":[Vector3(12000,300,-19300),1.45],"sun":[Vector3(12000,300,-19300),1.45],"sky":[Vector3(12000,300,-19300),1.45],"burner":[Vector3(12000,300,-19300),1.45]}
+		app.start_flight("combat");app.copilot=false;app.cockpit=view in ["cockpit","pit","pitfight","beampit"];app.text_hud=true
+		var scenic:={"cliffs":[Vector3(-4200,360,-8300),0.7],"beach":[Vector3(2300,280,-13400),0.9],"gate":[Vector3(12000,300,-19300),1.45],"marin":[Vector3(16600,520,-21500),0.25],"pit":[Vector3(12000,300,-19300),1.45],"pitfight":[Vector3(12000,300,-19300),1.45],"jet":[Vector3(12000,300,-19300),1.45],"jetlow":[Vector3(12000,300,-19300),1.45],"goose":[Vector3(12000,300,-19300),1.45],"sun":[Vector3(12000,300,-19300),1.45],"sky":[Vector3(12000,300,-19300),1.45],"burner":[Vector3(12000,300,-19300),1.45],"beam":[Vector3(12000,300,-19300),1.45],"beampit":[Vector3(12000,300,-19300),1.45]}
 		var start:=Vector3(15400,430,-10500) if view!="bay" else Vector3(9000,260,-6000)
 		if scenic.has(view):start=scenic[view][0]
 		app.flight.spawn_airborne(start,330);app.flight.gear=false;app.flight.throttle=.65
 		app.flight.heading=scenic[view][1] if scenic.has(view) else -.35 if view!="bay" else 1.2;app.apply_aircraft_pose();app.combat.spawn_clock=999
-		if (view!="bay" and not scenic.has(view)) or view in ["pitfight","goose"]:
+		if (view!="bay" and not scenic.has(view)) or view in ["pitfight","goose","beam","beampit"]:
 			app.combat.spawn_contact("boss" if view=="boss" else "normal")
 			var enemy: Dictionary=app.combat.enemies[0]
 			enemy.position=app.flight.position+app.flight.forward()*(420 if view=="boss" else 260)+Vector3.UP*30
@@ -36,6 +36,7 @@ func run() -> void:
 		while Time.get_ticks_msec()-began<9000:
 			var frame_began:=Time.get_ticks_msec()
 			var dt: float=minf(app.get_process_delta_time(),.05)
+			if view in ["beam","beampit"]:app.primary_latched=true;app.combat.fire_gun()
 			app.combat.tick(dt);app.flight.step(dt,Vector3.ZERO,false,0,false);app.apply_aircraft_pose()
 			app._process(dt)
 			await process_frame

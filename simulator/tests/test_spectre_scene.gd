@@ -1,4 +1,5 @@
 extends SceneTree
+const Tune = preload("res://data/balance.gd")
 var app: Node3D
 var checks := 0
 var failures: Array[String] = []
@@ -53,7 +54,7 @@ func run_tests() -> void:
 	for i in range(24): app.combat.update_aim(1.0/120)
 	check(app.combat.assisted_direction().angle_to(app.flight.forward())>deg_to_rad(3),"Narrow assistance corrects a near-centre shot")
 	check(app.combat.assisted_direction().angle_to((enemy.position-app.flight.position).normalized())<deg_to_rad(2),"Assisted shots converge on the visible goose")
-	check(app.combat.fire_gun() and app.combat.rounds_fired==4 and app.combat.ammo==-1,"Cannon records shots without depleting ammunition")
+	check(app.combat.fire_gun() and app.combat.rounds_fired==Tune.GUN_ROUNDS_PER_PACKET and app.combat.ammo==-1,"Cannon records a packet of rounds without depleting ammunition")
 	app.combat.spawn_shot(app.flight.position+Vector3(0,0,-600),Vector3(0,0,280),"hostile_missile",-1,24)
 	check(app.combat.deploy_flares() and app.combat.flares==-1 and app.combat.flares_fired==1,"Countermeasures record a burst without running out")
 	check(app.combat.shots.back().has("decoy"),"Incoming missile is redirected toward a decoy")
@@ -71,6 +72,38 @@ func run_tests() -> void:
 	for shot: Dictionary in app.combat.shots:
 		if shot.kind=="hostile_missile": incoming += 1
 	check(incoming==0,"Geese never attack the player")
+	# Camera regression for the barrel-roll wrap. flight_dynamics wraps `roll` into
+	# [-PI,PI), so a chase camera that lerps toward the WRAPPED angle reverses halfway
+	# through the roll and drags the view back the short way. The rig follows the
+	# unwrapped barrel_angle instead: the sweep must be smooth and one-directional.
+	app.start_flight("combat"); app.cockpit = false; app.copilot = false
+	app.camera_rig.reset(); app.camera_rig.update(1.0/60.0)
+	app.flight.roll = 0; app.flight.roll_velocity = 0
+	check(app.flight.start_barrel_roll(1),"A barrel roll starts from level flight")
+	var bank_before: float = app.camera_rig.bank
+	var bank_direction := 0.0
+	var bank_smooth := true
+	var bank_monotonic := true
+	var bank_travel := 0.0
+	var guard := 0
+	# Cover the roll AND the second the camera spends completing the turn afterwards.
+	while (app.flight.barrel_remaining>0 or app.camera_rig.sweeping) and guard<600:
+		guard += 1
+		app.flight.step(1.0/60.0,Vector3.ZERO,false,app.world.ground_height(app.flight.position.x,app.flight.position.z),false,false)
+		app.camera_rig.update(1.0/60.0)
+		var step: float = wrapf(app.camera_rig.bank-bank_before,-PI,PI)
+		if absf(step)>=0.25: bank_smooth = false
+		if absf(step)>0.0005:
+			if bank_direction!=0.0 and signf(step)!=bank_direction: bank_monotonic = false
+			bank_direction = signf(step)
+		bank_travel += absf(step)
+		bank_before = app.camera_rig.bank
+	check(bank_smooth,"Chase roll never jumps during a barrel roll")
+	check(bank_monotonic,"Chase roll never reverses during a barrel roll")
+	check(bank_travel>2.0,"Chase roll actually follows the jet around the roll")
+	app.camera_rig.update(1.0/60.0)
+	check(absf(wrapf(app.camera_rig.bank,-PI,PI))<0.35,"The camera ends the roll level again")
+	app.cockpit = true
 	app.start_flight("approach"); app.copilot = true
 	for i in range(12000):
 		if app.mode=="results": break

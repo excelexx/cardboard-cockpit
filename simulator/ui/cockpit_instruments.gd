@@ -20,6 +20,10 @@ var gear: bool = true
 var flaps: int = 0
 var airborne: bool = false
 var stall: bool = false
+## Calibrated airspeed and the pose numbers, filled by update_flight().
+var cas: float = 0.0
+var g_load: float = 1.0
+var mach: float = 0.0
 var position_world := Vector3.ZERO
 var elapsed: float = 0.0
 var instrument_time: float = 0.0
@@ -69,6 +73,9 @@ func navigation_target_label() -> String:
 
 func update_flight(flight: FlightDynamics, dt: float) -> void:
 	speed = flight.speed * 1.94384
+	cas = CockpitHUD.cas_knots(flight)
+	g_load = CockpitHUD.read_number(flight,"g_load",1.0)
+	mach = CockpitHUD.read_number(flight,"mach",0.0)
 	altitude = maxf(0.0, flight.position.y * 3.28084)
 	pitch = flight.pitch
 	bank = flight.roll
@@ -169,7 +176,7 @@ func _pfd() -> void:
 	var bank_point: Vector2 = center+bank_unit*170
 	draw_colored_polygon(PackedVector2Array([bank_point, bank_point+Vector2(-9,16).rotated(-bank),bank_point+Vector2(9,16).rotated(-bank)]),AMBER)
 	# Speed and altitude tapes.
-	_tape(Rect2(13,86,107,425),speed,20,50,"IAS",false)
+	_tape(Rect2(13,86,107,425),cas,20,50,"IAS",false)
 	_tape(Rect2(615,86,136,425),altitude,200,50,"ALT",true)
 	_text("KT",Vector2(28,545),21,CYAN)
 	_text("FT",Vector2(696,545),21,CYAN)
@@ -187,7 +194,7 @@ func _pfd() -> void:
 	_line(Vector2(20,692),Vector2(748,692),MUTED)
 	_text("VS  %+05d" % (roundi(climb/10.0)*10),Vector2(24,733),29,CYAN)
 	_text("FPM",Vector2(242,733),19,MUTED)
-	_text("STALL" if stall else ("AIRBORNE" if airborne else "GROUND"),Vector2(531,733),24,AMBER if stall else GREEN)
+	_text("TOO SLOW" if stall else ("AIRBORNE" if airborne else "GROUND"),Vector2(531,733),24,AMBER if stall else GREEN)
 
 func _tape(rect: Rect2, value: float, step: float, spacing: float, caption: String, alt: bool) -> void:
 	draw_rect(rect,Color(0.045,0.065,0.08))
@@ -331,6 +338,8 @@ func _panorama() -> void:
 		draw_rect(lock_rect,P_LINE,false,2); _p(heavy,lock_rect.position+Vector2(0,60),"NO TARGET",60,P_SOFT,HORIZONTAL_ALIGNMENT_CENTER,348)
 	_p(label_font,a.position+Vector2(16,360),"GEAR",24,P_SOFT); _p(heavy,a.position+Vector2(16,410),"DOWN" if gear else "UP",48,P_AMBER if gear else P_WHITE)
 	_p(label_font,a.position+Vector2(200,360),"FLAPS",24,P_SOFT); _p(heavy,a.position+Vector2(200,410),str(flaps),48,P_AMBER if flaps>0 else P_WHITE)
+	# stall is flight.stall_time, a pure airspeed test in flight_dynamics.gd - no
+	# pitch or aoa is sampled - so the panel says the speed, not the attitude.
 	if stall: _p(heavy,a.position+Vector2(16,480),"TOO SLOW",54,P_RED)
 	elif bool(tactical.get("damaged",false)): _p(heavy,a.position+Vector2(16,480),"DAMAGED",54,P_AMBER)
 	# Horizon.
@@ -349,17 +358,27 @@ func _panorama() -> void:
 		if contact.z>0.5: draw_colored_polygon(PackedVector2Array([at+Vector2(0,-11),at+Vector2(11,0),at+Vector2(0,11),at+Vector2(-11,0)]),P_RED)
 		else: draw_circle(at,6,P_RED)
 	draw_colored_polygon(PackedVector2Array([hub+Vector2(0,-13),hub+Vector2(-10,11),hub+Vector2(10,11)]),P_GREEN)
-	var boss: float = float(tactical.get("boss",-1.0))
-	if boss>=0:
-		_p(label_font,c.position+Vector2(c.size.x-216,32),"BOSS",22,P_RED,HORIZONTAL_ALIGNMENT_RIGHT,200)
-		draw_rect(Rect2(c.position+Vector2(16,c.size.y-30),Vector2(c.size.x-32,12)),P_RED*Color(1,1,1,0.25))
-		draw_rect(Rect2(c.position+Vector2(16,c.size.y-30),Vector2((c.size.x-32)*clampf(boss,0,1),12)),P_RED)
+	# The objective: one amber pip per bird in the skein. scenes/main.gd
+	# tactical_state() publishes "skein" as Vector2(birds down, skein size); it
+	# stays Vector2(0,0) - and this portal stays quiet - while its skein_total()
+	# only looks at the combat director, which is not the object keeping the flock.
+	var skein: Vector2 = tactical.get("skein",Vector2(-1,-1))
+	if skein.y>0.0:
+		_p(label_font,c.position+Vector2(c.size.x-216,32),"GEESE %d / %d" % [int(skein.x),int(skein.y)],22,P_AMBER,HORIZONTAL_ALIGNMENT_RIGHT,200)
+		var pips: int = clampi(int(skein.y),1,26)
+		var span: float = c.size.x-32.0
+		var pip: float = (span-float(pips-1)*3.0)/float(pips)
+		for index in range(pips):
+			var spot: Vector2 = c.position+Vector2(16.0+float(index)*(pip+3.0),c.size.y-30)
+			draw_rect(Rect2(spot,Vector2(pip,12)),P_AMBER if index<int(skein.x) else P_AMBER*Color(1,1,1,0.18))
 	# Flight numbers.
 	var d := Rect2(1294,top,size.x-1294-16,tall); _portal(d,"FLIGHT")
-	_p(label_font,d.position+Vector2(16,92),"SPEED · KNOTS",22,P_SOFT); _p(numerals,d.position+Vector2(12,186),"%d" % int(speed),104,P_WHITE)
+	_p(label_font,d.position+Vector2(16,92),"SPEED · KNOTS",22,P_SOFT); _p(numerals,d.position+Vector2(12,186),"%d" % int(cas),104,P_WHITE)
 	_p(label_font,d.position+Vector2(16,240),"ALTITUDE · FEET",22,P_SOFT); _p(numerals,d.position+Vector2(12,334),_thousands(int(altitude)),104,P_WHITE)
 	_p(label_font,d.position+Vector2(16,388),"HEADING",22,P_SOFT); _p(numerals,d.position+Vector2(12,452),"%03d" % int(display_heading()),64,P_WHITE)
 	_p(label_font,d.position+Vector2(170,388),"POWER",22,P_SOFT); _p(numerals,d.position+Vector2(166,452),"%d%%" % int(throttle*100),64,P_GREEN)
+	_p(numerals,d.position+Vector2(12,500),"G %+.1f" % g_load,40,P_RED if absf(g_load)>=6.8 else P_AMBER if absf(g_load)>=5.0 else P_WHITE)
+	_p(numerals,d.position+Vector2(170,500),"M %.2f" % mach,40,P_WHITE)
 	draw_rect(Rect2(d.position+Vector2(16,tall-44),Vector2(d.size.x-32,14)),P_GREEN*Color(1,1,1,0.2)); draw_rect(Rect2(d.position+Vector2(16,tall-44),Vector2((d.size.x-32)*clampf(throttle,0,1),14)),P_GREEN)
 func _thousands(value: int) -> String:
 	var digits: String = str(absi(value)); var out := ""

@@ -1,6 +1,6 @@
 # SF demo — 0.12.0
 
-1. Open `build/Cardboard Cockpit.app`; wait for BADGE CONNECTED if using the badge.
+1. Run `./tools/play.sh` (or double-click `Play.command`): it starts the badge bridge, the cardboard tracker and the game together. Wait for BADGE CONNECTED on the title screen if using the badge. The packaged `build/Cardboard Cockpit.app` still works on its own (it bundles the badge bridge) but needs the tracker started separately.
 2. Choose **Play** for assisted flight with player weapons, or **Watch demo** for automated flight and firing.
 3. Flip cardboard primary ON (minigun + continuous beam), then salvo ON (repeated four-missile volleys). Space and T are equivalent keyboard toggles.
 4. Q rolls; W/S accelerate/brake; V changes camera; X opens the missile inset. Keep flight assistance on for a predictable judge presentation.

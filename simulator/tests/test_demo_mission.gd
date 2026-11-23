@@ -35,7 +35,8 @@ func run():
 	check(app.combat.kills>=3 and app.combat.rounds_fired>0 and app.combat.missiles_fired>0,"Combat uses cannon and missiles against multiple contacts")
 	check(app.aircraft_visuals.gear_progress>.99,"Visible landing gear finishes fully deployed")
 	check(app.combat.hull==100 and app.combat.hostile_launches==0,"Relaxed demo has no enemy attacks or incoming damage")
-	check(app.combat.best_combo>=3 and app.combat.score>app.combat.kills*100,"Rapid clears earn visible streak rewards")
+	# Keyed on the live base score, so a balance change cannot quietly void it.
+	check(app.combat.best_combo>=3 and app.combat.score>app.combat.kills*load("res://data/balance.gd").BASE_SCORE,"Rapid clears earn visible streak rewards")
 	print("FULL DEMO: ",checks," checks / ",failures.size()," failures / ",snappedf(app.mission.clock,.01)," seconds / ",app.combat.kills," intercepts / enemy missiles ",app.combat.hostile_launches," / flares used ",app.combat.flares_fired," / max frame displacement ",jump)
 	app.on_action("fly")
 	for code in [KEY_SPACE,KEY_T]:

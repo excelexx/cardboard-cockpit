@@ -2,12 +2,12 @@ extends RefCounted
 class_name FlightTutorial
 ## Coaching happens inside Play. It never stops simulation or requires a menu.
 const LESSONS: Array[Dictionary]=[
- {"title":"FIRST THREE GEESE","lines":["We will shoot down your first three geese together.","After that: beat the boss, then land at SFO."]},
+ {"title":"FIRST THREE GEESE","lines":["We will shoot down your first three geese together.","After that: shoot down 12 geese, then land at SFO."]},
  {"title":"HOW TO FLY","lines":["Turn the yoke to bank. Tilt it toward you to climb, away to dive.","Push the throttle to speed up, pull to slow down. Arrow keys and W / S work too."]},
  {"title":"THE GUN","lines":["Flip yoke switch 1 ON, or tap Space, to fire the gun.","Put the ring on a goose. Flip it OFF or tap again to stop."]},
  {"title":"MISSILES","lines":["Flip yoke switch 2 ON, or tap T, to fire missiles four at a time.","They follow the red LOCKED box. You never run out of ammo."]},
  {"title":"KEEP GOING","lines":["Keep geese near the ring and shoot down three.","Badge LEFT changes the view, HOME pauses, UP turns auto-fly on or off."]},
- {"title":"YOU ARE READY","lines":["Three geese down. The rest is up to you.","Beat the boss, then press badge B or L to land."]},
+ {"title":"YOU ARE READY","lines":["Three geese down. The rest is up to you.","A big flock comes in at the end. Clear it, then press badge B or L to land."]},
  {"title":"LANDING AT SFO","lines":["Gear and flaps are down and the weapons are off.","The jet lands and brakes by itself. Enjoy the view."]}
 ]
 var app: Node

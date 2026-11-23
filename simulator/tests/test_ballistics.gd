@@ -25,7 +25,9 @@ func run():
 	var shot: Dictionary = app.combat.shots.back()
 	for i in range(60): app.combat.update_shots(1.0/60)
 	check(shot.position.y<start.y-4 and shot.position.y>start.y-6,"Cannon trajectory includes one second of gravitational drop")
-	check(shot.velocity.length()<1200 and shot.velocity.length()>1100,"Air drag slows the projectile")
+	# Recomputed for the 1040 m/s muzzle and 3e-4 drag: v0/(1+v0*k*t) puts a
+	# 1250 m/s round at about 909 m/s after one second.
+	check(shot.velocity.length()<960 and shot.velocity.length()>860,"Air drag slows the projectile")
 	app.start_flight("combat"); app.combat.spawn_contact()
 	var enemy: Dictionary = app.combat.enemies[0]
 	enemy.position = start+Vector3(0,0,-20); enemy.health = 28
@@ -61,7 +63,11 @@ func run():
 		Input.parse_input_event(event); Input.flush_buffered_events()
 	print("DUAL FIRE rounds=",app.combat.rounds_fired," missiles=",app.combat.missiles_fired," mode=",app.mode)
 	check(app.combat.rounds_fired>1200 and app.combat.missiles_fired>8,"Holding both fire keys sustains both weapons beyond former ammunition limits")
+	# A booth player must never run dry: GUN_MAGAZINE and MISSILE_STORES are
+	# both -1 and nothing in the combat director decrements a store.
 	check(app.combat.ammo==-1 and app.combat.missiles==-1,"Unlimited ammunition never depletes")
+	app.start_flight("combat")
+	check(app.combat.ammo==-1 and app.combat.missiles==-1,"A replay rearms the jet to unlimited stores")
 	app.start_flight("combat"); app.combat.spawn_contact(); enemy = app.combat.enemies[0]
 	enemy.position = app.flight.position+Vector3(35,0,-500); app.combat.target_id = enemy.id
 	var initial: Vector3 = app.combat.assisted_direction()

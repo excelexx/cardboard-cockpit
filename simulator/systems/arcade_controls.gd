@@ -13,7 +13,11 @@ static func command(f: FlightDynamics, raw: Vector3, clearance: float, landing: 
 		pitch = -atan(.05241) if clearance>14 else -.012
 	if not landing:
 		var safety: float = Tune.TERRAIN_MARGIN+f.speed*Tune.TERRAIN_SPEED_MARGIN
-		if clearance<safety and f.vertical_speed<3:
+		# Take the LOWER of the raw and the low-passed vertical speed. The lag
+		# stops a gust making the assist chatter and makes it HOLD longer, but it
+		# may never make it arm later than the raw rate did - which is what a
+		# plain vertical_trend test would do after a respawn or on a fresh bunt.
+		if clearance<safety and minf(f.vertical_speed,f.vertical_trend)<3:
 			pitch = maxf(pitch,clampf(.13+(safety-clearance)*.007,.13,.42))
 	var roll: float = clampf((bank-f.roll)*Tune.ANGLE_RESPONSE-f.roll_velocity*Tune.ROLL_DAMPING,-1,1)
 	var elevator: float = clampf((pitch-f.pitch)*Tune.ANGLE_RESPONSE-f.pitch_velocity*Tune.PITCH_DAMPING,-1,1)

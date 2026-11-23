@@ -29,7 +29,23 @@ const MUTED := SOFT
 const CYAN := GREEN
 const DANGER := RED
 const GAME_TITLE := "WILD GOOSE CHASE"
-const BOSS_NAME := "MOTHER GOOSE"
+## Sentinel from fpm_screen_point() when the flight path is behind the camera.
+const OFFSCREEN := Vector2(-9999,-9999)
+## The flight-path marker: a small ring with long wing stubs and a drooping
+## tail. Deliberately NOT the gunsight's silhouette - ring half the size, no
+## upward arm - so the two symbols never read as one double-drawn reticle.
+const FPM_RING := 7.0
+const FPM_SPAN := 18.0
+const FPM_TAIL := 16.0
+## How far the gunsight reaches: pipper ring 14 px, cross arms out to 34 px.
+const SIGHT_REACH := 34.0
+## Pixels over which the marker fades up once it is clear of the aim point.
+const FPM_FADE := 30.0
+## The marker lives inside this box and is DROPPED outside it, never pinned to
+## the edge: a pinned marker lies about where the jet is going.
+const FPM_BOX := Rect2(140,170,1320,520)
+## How bright the marker gets, clear of the sight. Quieter than the gunsight.
+const FPM_ALPHA := 0.5
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -155,7 +171,7 @@ func draw_title() -> void:
 	text(Vector2(96,150),"CARDBOARD COCKPIT",18,GREEN,true)
 	big(Vector2(92,268),"WILD GOOSE",124,WHITE,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
 	big(Vector2(92,376),"CHASE",124,WHITE,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
-	text(Vector2(96,436),"Shoot down the geese. Beat Mother Goose.",20,WHITE)
+	text(Vector2(96,436),"Shoot down the geese. Clear the big skein.",20,WHITE)
 	text(Vector2(96,466),"Land at SFO. You have 2:30.",20,WHITE)
 	button("fly",Rect2(96,520,420,72),"PLAY",true,"ENTER · START")
 	button("guided",Rect2(96,604,420,52),"WATCH DEMO")
@@ -171,11 +187,78 @@ func status_dot(at: Vector2,label: String,ok: bool) -> void:
 	else: draw_arc(at+Vector2(5,-6),4.5,0,TAU,24,AMBER,2,true)
 	put(mono,at+Vector2(20,0),label,15,WHITE if ok else AMBER)
 
+# --- pure readout helpers ---------------------------------------------------
+## Everything here is a plain function of state so tests/test_hud_readouts.gd can
+## drive it without a viewport; _draw() never runs under --headless.
+## Read a float that a sibling package may not have landed yet.
+static func read_number(from: Object,field: String,fallback: float) -> float:
+	if from==null: return fallback
+	var found: Variant = from.get(field)
+	return float(found) if found!=null else fallback
+## (birds down, birds in the skein) for the objective, from whichever object is
+## keeping the flock: the mission while it runs one, otherwise the combat
+## director. Either may expose skein_total as a method or a field, and the count
+## down as skein_down or as skein_remaining(). With no skein size from either -
+## nobody is keeping a flock right now - the answer is ZERO and the objective
+## bar simply does not draw. It must never invent a skein from the kill count
+## against the designed size: free-flight combat has no skein, and a bar reading
+## "GEESE 3 / 12" for birds that will never spawn is a false objective.
+static func skein_tally(source: Object) -> Vector2:
+	if source==null: return Vector2.ZERO
+	var total: float = float(source.call("skein_total")) if source.has_method("skein_total") else read_number(source,"skein_total",-1.0)
+	if total<=0.0: return Vector2.ZERO
+	var down: float = read_number(source,"skein_down",-1.0)
+	if down<0.0 and source.has_method("skein_remaining"): down = total-float(source.call("skein_remaining"))
+	return Vector2(clampf(maxf(down,0.0),0.0,total),total)
+## 0 with nothing down, 1 with the skein cleared, and never a divide by zero.
+static func objective_fraction(source: Object) -> float:
+	var tally: Vector2 = skein_tally(source)
+	return 0.0 if tally.y<=0.0 else clampf(tally.x/tally.y,0.0,1.0)
+## Calibrated airspeed in knots: what an airspeed indicator reads. Equal to the
+## true speed at sea level and lower than it everywhere above.
+static func cas_knots(f: FlightDynamics) -> float:
+	if f==null: return 0.0
+	return f.speed*sqrt(pow(maxf(1.0-2.2557e-5*maxf(f.position.y,0.0),0.0),4.256))*1.94384
+## Where the aircraft is actually going, in HUD space. OFFSCREEN when that point
+## is behind the camera, because unproject_position() mirrors it if it is.
+static func fpm_screen_point(f: FlightDynamics,camera: Camera3D) -> Vector2:
+	if f==null or camera==null or not camera.is_inside_tree(): return OFFSCREEN
+	var path: Vector3 = f.velocity
+	if path.length()<1.0: return OFFSCREEN
+	var ahead: Vector3 = f.position+path.normalized()*1000.0
+	if camera.is_position_behind(ahead): return OFFSCREEN
+	return camera.unproject_position(ahead)
+## The ids counted as this skein, empty when nobody is keeping a list.
+static func skein_ids(source: Object) -> Array:
+	if source==null: return []
+	var found: Variant = source.get("skein_ids")
+	return found if found is Array else []
+## Whoever is keeping the flock right now.
+func objective_source() -> Object:
+	if app.mission!=null and app.mission.active and app.mission.has_method("skein_total"): return app.mission
+	return app.combat
+## Is this contact one of the skein? Asked of the mission first, then of the
+## app's own helper, then of the combat director's id list.
+func marked(id: int) -> bool:
+	if app.mission!=null and app.mission.has_method("skein_has"): return bool(app.mission.skein_has(id))
+	if app.has_method("skein_marked"): return bool(app.skein_marked(id))
+	return skein_ids(app.combat).has(id)
+## How visible the flight-path marker is at this spot. ZERO while it would sit
+## on the gunsight: a second green ring on the exact pixel a goose has to be
+## seen and hit reads as a double-drawn reticle and hides the bird. ZERO outside
+## the HUD box too, so an off-boresight flight path is dropped rather than
+## pinned to the edge where it would lie about the jet's path.
+static func fpm_opacity(at: Vector2,aim: Vector2,nose: Vector2,ring_radius: float) -> float:
+	if at==OFFSCREEN or not FPM_BOX.has_point(at): return 0.0
+	var near: float = maxf(SIGHT_REACH+FPM_SPAN,ring_radius*0.5)
+	var gap: float = minf(at.distance_to(aim),at.distance_to(nose))
+	return clampf((gap-near)/FPM_FADE,0.0,1.0)
+
 # --- flight -----------------------------------------------------------------
 func mission_line() -> String:
 	if not app.mission.active: return ""
 	if app.mission.cinematic:
-		return {"opening":"Take off and follow the coast","combat":"Shoot down the geese","anticipation":"Something big is coming","boss":"Shoot down Mother Goose","aftermath":"Land at SFO","approach":"Landing at SFO","rollout":"Stop on the runway"}.get(app.mission.phase,"")
+		return {"opening":"Take off and follow the coast","combat":"Shoot down the geese","gather":"A skein is inbound","skein":"Clear the skein","aftermath":"Land at SFO","approach":"Landing at SFO","rollout":"Stop on the runway"}.get(app.mission.phase,"")
 	return {"takeoff":"Take off","combat":"Shoot down the geese","return":"Fly back to the airport","approach":"Land the jet","rollout":"Stop on the runway"}.get(app.mission.phase,"")
 func clock_text() -> String:
 	var c: CombatDirector = app.combat
@@ -211,20 +294,21 @@ func draw_flight() -> void:
 			put(mono,Vector2(770+index*74,62),"%03d" % int(fposmod(heading+index*10,360)),16,Color(GREEN.r,GREEN.g,GREEN.b,0.9-absf(index)*0.14),HORIZONTAL_ALIGNMENT_CENTER,60)
 		panel(Rect2(762,30,76,44),0.6,GREEN)
 		put(display,Vector2(762,65),"%03d" % int(heading),34,WHITE,HORIZONTAL_ALIGNMENT_CENTER,76)
-	# Speed and altitude flank the aiming area in chase view; the cockpit shows them on its own displays.
+	# Speed and altitude sit on the lower borders: numbers beside the aircraft read
+	# as clutter on top of it. The cockpit shows them on its own displays instead.
 	if show and not app.cockpit:
-		put(mono,Vector2(170,418),"SPEED",18,GREEN,HORIZONTAL_ALIGNMENT_RIGHT,300)
-		put(display,Vector2(170,496),str(int(f.speed*1.94384)),92,WHITE,HORIZONTAL_ALIGNMENT_RIGHT,300)
-		put(mono,Vector2(170,524),"KNOTS",18,GREEN,HORIZONTAL_ALIGNMENT_RIGHT,300)
-		put(mono,Vector2(170,566),"AFTERBURNER" if f.afterburner else "AIRBRAKE" if f.airbrake>.1 else "POWER %d%%" % int(f.throttle*100),18,AMBER if f.afterburner or f.airbrake>.1 else GREEN,HORIZONTAL_ALIGNMENT_RIGHT,300)
-		bar(Rect2(270,578,200,8),1.0 if f.afterburner else f.throttle,AMBER if f.afterburner else GREEN)
-		put(mono,Vector2(1130,418),"ALTITUDE",18,GREEN)
-		put(display,Vector2(1130,496),thousands(int(f.position.y*3.28084)),92,WHITE)
-		put(mono,Vector2(1130,524),"FEET",18,GREEN)
-		put(mono,Vector2(1130,566),"CLIMB %+d" % (int(f.vertical_speed*1.9685)*100),18,GREEN)
-		line(Vector2(500,470),Vector2(500,530),GREEN,2);line(Vector2(500,500),Vector2(516,500),GREEN,2)
-		line(Vector2(1100,470),Vector2(1100,530),GREEN,2);line(Vector2(1084,500),Vector2(1100,500),GREEN,2)
-	if f.gear or f.flaps>0: text(Vector2(56,724),"GEAR %s · FLAPS %d" % ["DOWN" if f.gear else "UP",f.flaps],18,AMBER,true)
+		put(mono,Vector2(56,726),"SPEED",18,GREEN)
+		put(display,Vector2(56,806),str(int(cas_knots(f))),84,WHITE)
+		put(mono,Vector2(56,832),"KNOTS",18,GREEN)
+		var g: float = read_number(f,"g_load",1.0)
+		put(mono,Vector2(56,864),"G %+.1f" % g,20,RED if absf(g)>=FlightDynamics.G_LIMIT-0.2 else AMBER if absf(g)>=5.0 else GREEN)
+		put(mono,Vector2(196,864),"AFTERBURNER" if f.afterburner else "AIRBRAKE" if f.airbrake>.1 else "POWER %d%%" % int(f.throttle*100),18,AMBER if f.afterburner or f.airbrake>.1 else GREEN)
+		bar(Rect2(340,854,180,8),1.0 if f.afterburner else f.throttle,AMBER if f.afterburner else GREEN)
+		put(mono,Vector2(1244,726),"ALTITUDE",18,GREEN,HORIZONTAL_ALIGNMENT_RIGHT,300)
+		put(display,Vector2(1244,806),thousands(int(f.position.y*3.28084)),84,WHITE,HORIZONTAL_ALIGNMENT_RIGHT,300)
+		put(mono,Vector2(1244,832),"FEET",18,GREEN,HORIZONTAL_ALIGNMENT_RIGHT,300)
+		put(mono,Vector2(1244,864),"CLIMB %+d" % (int(f.vertical_speed*1.9685)*100),18,GREEN,HORIZONTAL_ALIGNMENT_RIGHT,300)
+	if show and (f.gear or f.flaps>0): put(mono,Vector2(1244,894),"GEAR %s · FLAPS %d" % ["DOWN" if f.gear else "UP",f.flaps],18,AMBER,HORIZONTAL_ALIGNMENT_RIGHT,300)
 	# Next waypoint.
 	if app.mission.active and app.mission.phase in ["opening","combat","return"]:
 		var waypoint: Vector3 = app.mission.route_target()
@@ -241,9 +325,9 @@ func draw_flight() -> void:
 		big(Vector2(0,250),"+%d" % c.last_reward,56,Color(GREEN.r,GREEN.g,GREEN.b,c.reward_flash),HORIZONTAL_ALIGNMENT_CENTER,1600,true)
 		if c.combo>=3: centered(282,"%d IN A ROW" % c.combo,20,Color(WHITE.r,WHITE.g,WHITE.b,c.reward_flash))
 	if c.hit_flash>0: draw_rect(Rect2(0,0,1600,1000),Color(RED.r,RED.g,RED.b,clampf(c.hit_flash*0.9,0,1)),false,14)
-	if not app.cockpit: draw_scope(Vector2(1450,840),c)   # the cockpit's own display carries the radar
+	if not app.cockpit: draw_scope(Vector2(1450,306),c)   # the cockpit's own display carries the radar
 	draw_weapons(c)
-	draw_boss(c)
+	draw_objective(c)
 	draw_alerts(f,c)
 	if (app.flight_kind=="approach" or (app.mission.active and app.mission.phase in ["return","approach"])) and f.airborne:
 		var guidance: Dictionary = app.approach_data()
@@ -267,6 +351,23 @@ func thousands(value: int) -> String:
 		if i>0 and (digits.length()-i)%3==0: out += ","
 		out += digits[i]
 	return ("-" if value<0 else "")+out
+## The flight-path marker: where the jet is actually going. A small ring with
+## long wings and a drooping tail, dimmer and thinner than the gunsight so the
+## gunsight stays dominant - sit it on the runway numbers to land. It fades out
+## near the aim point and off the HUD box; see fpm_opacity().
+##
+## There are no on-speed chevrons beside it. The jet holds within a few per cent
+## of ALPHA_REF for the whole mission, so an indexer scaled to ALPHA_MAX never
+## moved, and it put two more marks on the one spot a goose has to be seen. Like
+## the pitch ladder, it waits for the HUD redesign.
+func draw_flight_path(f: FlightDynamics,aim: Vector2,nose: Vector2,ring_radius: float) -> void:
+	var at: Vector2 = fpm_screen_point(f,app.camera)
+	var alpha: float = fpm_opacity(at,aim,nose,ring_radius)*FPM_ALPHA
+	if alpha<=0.01: return
+	var faint := Color(GREEN.r,GREEN.g,GREEN.b,alpha)
+	ring(at,FPM_RING,0,TAU,faint,1.5)
+	for wing: Vector2 in [Vector2.RIGHT,Vector2.LEFT]: line(at+wing*FPM_RING,at+wing*FPM_SPAN,faint,1.5)
+	line(at+Vector2.DOWN*FPM_RING,at+Vector2.DOWN*FPM_TAIL,faint,1.5)
 func draw_sight(f: FlightDynamics,c: CombatDirector) -> void:
 	var nose: Vector2 = app.camera.unproject_position(f.position+c.forward()*2000)
 	var ring_edge: Vector3 = c.forward().rotated(app.camera.global_basis.x,deg_to_rad(c.intent.acquire_degrees(c)))
@@ -276,6 +377,7 @@ func draw_sight(f: FlightDynamics,c: CombatDirector) -> void:
 	# Where the nose points: a quiet ring. Where the guns point: the cross.
 	for i in range(4): ring(nose,ring_radius,i*PI/2+.2,i*PI/2+PI/2-.2,Color(GREEN.r,GREEN.g,GREEN.b,0.55),2)
 	var center: Vector2 = app.camera.unproject_position(c.reticle_point())
+	draw_flight_path(f,center,nose,ring_radius)   # under the gunsight, and never on it
 	var sight: Color = RED if locked else AMBER if tracking else GREEN
 	ring(center,14,0,TAU,sight,2)
 	for direction in [Vector2.LEFT,Vector2.RIGHT,Vector2.UP,Vector2.DOWN]: line(center+direction*20,center+direction*34,sight,2)
@@ -293,7 +395,6 @@ func draw_sight(f: FlightDynamics,c: CombatDirector) -> void:
 			else: ring(point,radius*0.62,-PI/2,-PI/2+TAU*c.lock_progress,AMBER,3)
 			big(point+Vector2(radius+16,-6),"LOCKED" if c.lock_progress>=1 else "LOCKING",30,tone,HORIZONTAL_ALIGNMENT_LEFT,-1,true)
 			text(point+Vector2(radius+16,20),"%d m" % int(distance),20,WHITE)
-			if enemy.id!=c.boss_id: bar(Rect2(point+Vector2(radius+16,30),Vector2(96,6)),enemy.health/enemy.max_health,RED)
 			var pip: Vector2 = app.camera.unproject_position(f.position+c.assisted_direction()*distance)
 			if pip.distance_to(center)>9: line(center,pip,Color(tone.r,tone.g,tone.b,0.55),2)
 		else:
@@ -314,16 +415,21 @@ func draw_weapons(c: CombatDirector) -> void:
 			draw_rect(chip,Color(GLASS.r,GLASS.g,GLASS.b,0.62));draw_rect(chip,Color(GREEN.r,GREEN.g,GREEN.b,0.7),false,1)
 			draw_string(display_bold,chip.position+Vector2(13,28),"OFF",HORIZONTAL_ALIGNMENT_LEFT,-1,30,SOFT)
 		if not rows[i][3] and app.mission.clock<25: put(body,Vector2(292,y-2),rows[i][2],16,WHITE)
-func draw_boss(c: CombatDirector) -> void:
-	if c.boss_id<0 or c.boss_defeated or hidden_in_flight(): return
-	for enemy: Dictionary in c.enemies:
-		if enemy.id!=c.boss_id: continue
-		var known: bool = not (enemy.age<4 or app.mission.phase=="anticipation")
-		put(mono,Vector2(540,118),BOSS_NAME if known else "UNKNOWN",20,RED)
-		put(mono,Vector2(540,118),"BOSS",20,RED,HORIZONTAL_ALIGNMENT_RIGHT,520)
-		var fraction: float = clampf(enemy.health/enemy.max_health,0,1)
-		for segment in range(4): bar(Rect2(540+segment*131.5,128,125.5,14),fraction*4-segment,RED)
-		break
+## How much of the skein is down, in the span the old health bar used to hold:
+## one pip per bird, amber as it goes down. No named individual, no health bar.
+func draw_objective(c: CombatDirector) -> void:
+	if hidden_in_flight() or not c.active or not c.engagement_enabled: return
+	var tally: Vector2 = skein_tally(objective_source())
+	if tally.y<=0.0: return
+	put(mono,Vector2(540,118),"GEESE %d / %d" % [int(tally.x),int(tally.y)],20,AMBER)
+	put(mono,Vector2(540,118),"SKEIN",20,AMBER,HORIZONTAL_ALIGNMENT_RIGHT,520)
+	var pips: int = clampi(int(tally.y),1,26)
+	var width: float = (526.0-float(pips-1)*4.0)/float(pips)
+	draw_rect(Rect2(536,124,534,22),Color(GLASS.r,GLASS.g,GLASS.b,0.66))
+	for index in range(pips):
+		var slot := Rect2(540.0+float(index)*(width+4.0),128,width,14)
+		if index<int(tally.x): draw_rect(slot,AMBER)
+		else: draw_rect(slot,Color(AMBER.r,AMBER.g,AMBER.b,0.18)); draw_rect(slot,Color(AMBER.r,AMBER.g,AMBER.b,0.35),false,1)
 func draw_alerts(f: FlightDynamics,c: CombatDirector) -> void:
 	var y := 800.0
 	if c.incoming_distance<2200:
@@ -333,6 +439,10 @@ func draw_alerts(f: FlightDynamics,c: CombatDirector) -> void:
 		var side := direction.orthogonal()
 		draw_colored_polygon(PackedVector2Array([position+direction*16,position-direction*9+side*11,position-direction*9-side*11]),RED)
 		banner(y,"MISSILE!",["Press","[Z]","for flares"],RED); y -= 62
+	# stall_time is a pure airspeed test in systems/flight_dynamics.gd (lift falls
+	# off below ~0.70 x rotation speed); nothing there samples pitch or aoa. The
+	# banner must name the condition the sim actually measured, and give the one
+	# recovery that works: lower the nose, open the throttle.
 	if f.stall_time>.6: banner(y,"TOO SLOW",["Nose down, add power"],RED); y -= 62
 	if app.eject_hold>0:
 		banner(y,"EJECTING",["Keep holding","[E]"],RED)
@@ -348,7 +458,7 @@ func draw_clear_flight() -> void:
 	var f: FlightDynamics=app.flight
 	var c: CombatDirector=app.combat
 	var show: bool = not hidden_in_flight()
-	big(Vector2(56,84),"%d" % int(f.speed*1.94384),56,WHITE)
+	big(Vector2(56,84),"%d" % int(cas_knots(f)),56,WHITE)
 	text(Vector2(56,110),"KNOTS",16,GREEN,true)
 	if show:
 		put(display,Vector2(1244,84),thousands(int(f.position.y*3.28084)),56,WHITE,HORIZONTAL_ALIGNMENT_RIGHT,300)
@@ -376,7 +486,7 @@ func draw_clear_flight() -> void:
 	else:
 		text(Vector2(56,952),"POWER %d%% · GEAR %s" % [int(f.throttle*100),"DOWN" if f.gear else "UP"],18,GREEN,true)
 	if c.incoming_distance<2200: banner(250,"MISSILE!",["Press","[Z]","for flares"],RED)
-	if f.stall_time>.6: banner(312,"TOO SLOW",["Nose down, add power"],RED)
+	if f.stall_time>.6: banner(312,"TOO SLOW",["Nose down, add power"],RED)   # airspeed, not attitude
 	if show and not app.audio.radio.caption.is_empty():
 		put(body,Vector2(0,884),app.audio.radio.caption,20,WHITE,HORIZONTAL_ALIGNMENT_CENTER,1600)
 func draw_scope(center: Vector2,c: CombatDirector) -> void:
@@ -389,7 +499,7 @@ func draw_scope(center: Vector2,c: CombatDirector) -> void:
 	for enemy: Dictionary in c.enemies:
 		var delta: Vector3 = enemy.position-app.flight.position
 		var point: Vector2 = center+(Vector2(delta.x,delta.z).rotated(-app.flight.heading)*0.030).limit_length(86)
-		if enemy.id==c.boss_id or enemy.id==c.target_id: draw_colored_polygon(PackedVector2Array([point+Vector2(0,-7),point+Vector2(7,0),point+Vector2(0,7),point+Vector2(-7,0)]),RED)
+		if enemy.id==c.target_id or marked(int(enemy.id)): draw_colored_polygon(PackedVector2Array([point+Vector2(0,-7),point+Vector2(7,0),point+Vector2(0,7),point+Vector2(-7,0)]),RED)
 		else: draw_circle(point,4,RED)
 	for shot: Dictionary in c.shots:
 		if shot.kind!="hostile_missile": continue

@@ -1,6 +1,7 @@
 extends Node3D
 ## Composes the existing weapon primitives, sprites, material overlays and light pools.
 const Art = preload("res://systems/weapon_visuals.gd")
+const Tune = preload("res://data/balance.gd")
 var combat: Node
 var projectile_pool := {"cannon":[],"missile":[]}
 var sprites: Array[Dictionary] = []
@@ -9,6 +10,9 @@ var lights: Array[Dictionary] = []
 var light_pool: Array[OmniLight3D] = []
 var rings: Array[Dictionary] = []
 var beams: Array[MeshInstance3D] = []
+var beam_muzzle: MeshInstance3D
+var beam_impact: MeshInstance3D
+var beam_source: Node3D
 var lead_mesh: MeshInstance3D
 var beam_light: OmniLight3D
 var ghost_clock := 0.0
@@ -19,18 +23,35 @@ var handoff_time:=0.0
 var impact_emphasis := 0.0
 var flash_texture: Texture2D
 var smoke_texture: Texture2D
+## Bird-strike debris. Three pooled feather/down emitter pairs, reused across
+## kills by restart(); they live outside the 96-sprite / 8-light pools the
+## visual budget gate counts.
+const FEATHER_RIGS := 3
+var feather_rigs: Array[Dictionary] = []
+var feather_cursor := 0
+## Countermeasures: one shared ImmediateMesh for the whole salvo, the pattern
+## every other streak in this codebase already uses.
+var flare_mesh: MeshInstance3D
+var flare_head_material: StandardMaterial3D
+var flare_smoke_material: StandardMaterial3D
+var flare_items: Array[Dictionary] = []
+var last_flares_fired := 0
+var rng := RandomNumberGenerator.new()
 func _ready() -> void:
 	flash_texture=load("res://assets/vfx/flash.png");smoke_texture=load("res://assets/sourced_flight/smoke.png")
-	beams.append(Art.beam(self,Color(.72,.94,1),.10,1))
-	beams.append(Art.energy_sheath(self,.38,0))
-	beams.append(Art.energy_sheath(self,.72,1.4))
+	beams.append(Art.beam(self,Color(.72,.94,1),.09,0.85))
+	beams.append(Art.energy_sheath(self,.30,0))
+	beams.append(Art.energy_sheath(self,.46,1.4))
 	for beam in beams:beam.visible=false
+	beam_muzzle=Art.beam_bloom(self,true);beam_impact=Art.beam_bloom(self,false)
 	beam_light=OmniLight3D.new();beam_light.light_color=Color(.15,.7,1);beam_light.omni_range=35;beam_light.shadow_enabled=false;beam_light.visible=false;add_child(beam_light)
 	lead_mesh=MeshInstance3D.new();lead_mesh.mesh=ImmediateMesh.new();lead_mesh.material_override=Art.emissive(Color(.08,.55,.8),1.3,.15);lead_mesh.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;add_child(lead_mesh)
 	for i in range(96):
 		var sprite:=Sprite3D.new();sprite.texture=flash_texture;sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.shaded=false;sprite.visible=false;sprite.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;add_child(sprite);sprite_pool.append(sprite)
 	for i in range(8):
 		var light:=OmniLight3D.new();light.shadow_enabled=false;light.visible=false;add_child(light);light_pool.append(light)
+	_build_flare_ribbon()
+	_build_feather_rigs()
 	# Warm the actual meshes/materials before the first salvo.
 	for kind in ["cannon","missile"]:
 		for i in range(48 if kind=="cannon" else 48):
@@ -48,7 +69,9 @@ func _warm_pipeline() -> void:
 	for beam in beams:beam.visible=false
 func _equip_missile(node: Node3D) -> void:
 	var flare:=Sprite3D.new();flare.name="EngineFlare";flare.texture=flash_texture;flare.billboard=BaseMaterial3D.BILLBOARD_ENABLED;flare.shaded=false;flare.position.z=1.65;flare.modulate=Color(4,2.8,1.6,.8);flare.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;node.add_child(flare)
-	var light:=OmniLight3D.new();light.name="MotorLight";light.light_color=Color(.6,.82,1);light.omni_range=24;light.shadow_enabled=false;node.add_child(light)
+	# A solid motor throws a warm light, not a cold one. This used to be
+	# Color(.6,.82,1), which disagreed with its own flare sprite.
+	var light:=OmniLight3D.new();light.name="MotorLight";light.light_color=Color(1,.72,.42);light.omni_range=24;light.shadow_enabled=false;node.add_child(light)
 	for mesh in node.find_children("*","MeshInstance3D",true,false):
 		if mesh.name in ["Ignition","MotorFlame"]:continue
 		for i in range(mesh.mesh.get_surface_count()):
@@ -56,6 +79,251 @@ func _equip_missile(node: Node3D) -> void:
 			if original is StandardMaterial3D:
 				var material: StandardMaterial3D=original.duplicate();material.metallic=.72;material.roughness=.22;material.clearcoat_enabled=true;material.clearcoat=.65
 				mesh.set_surface_override_material(i,material)
+
+# --- feathers -----------------------------------------------------------
+func _build_feather_rigs() -> void:
+	# GPUParticles3D needs a rendering device; headless regression runs skip it
+	# entirely and every call site tolerates an empty rig list.
+	if DisplayServer.get_name()=="headless":return
+	var shader: Shader=load("res://assets/vfx/feather.gdshader")
+	if shader==null:return
+	for i in range(FEATHER_RIGS):
+		feather_rigs.append({"feathers":_feather_emitter(shader,false),"down":_feather_emitter(shader,true)})
+
+func _feather_emitter(shader: Shader,down: bool) -> GPUParticles3D:
+	var node:=GPUParticles3D.new()
+	node.name=("Down" if down else "Feathers")+str(feather_rigs.size())
+	node.amount=96 if down else 64
+	node.lifetime=3.5 if down else 2.2
+	node.one_shot=true
+	node.explosiveness=1.0
+	node.emitting=false
+	node.local_coords=false
+	node.fixed_fps=30
+	node.interpolate=true
+	node.draw_order=GPUParticles3D.DRAW_ORDER_VIEW_DEPTH
+	node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var quad:=QuadMesh.new()
+	quad.size=Vector2(0.18,0.18) if down else Vector2(0.24,0.85)
+	node.draw_pass_1=quad
+	var material:=ShaderMaterial.new()
+	material.shader=shader
+	material.set_shader_parameter("down_mode",1.0 if down else 0.0)
+	material.set_shader_parameter("quill_tint",Color(.44,.34,.27))
+	material.set_shader_parameter("vane_tint",Color(.93,.91,.86))
+	material.set_shader_parameter("translucency",.62 if down else .45)
+	node.material_override=material
+	var process:=ParticleProcessMaterial.new()
+	process.particle_flag_disable_z=false
+	process.direction=Vector3(0,0,-1)
+	process.spread=65.0 if down else 35.0
+	process.initial_velocity_min=2.0 if down else 6.0
+	process.initial_velocity_max=9.0 if down else 22.0
+	process.damping_min=4.5 if down else 3.0
+	process.damping_max=6.0 if down else 4.0
+	# Feathers hang. Real gravity would drop them out of frame before a novice
+	# reads the kill, so this is deliberately about a quarter of g.
+	process.gravity=Vector3(0,-0.6,0) if down else Vector3(0,-2.2,0)
+	process.angle_min=-180.0
+	process.angle_max=180.0
+	process.angular_velocity_min=-60.0 if down else -180.0
+	process.angular_velocity_max=60.0 if down else 180.0
+	process.scale_min=1.0
+	process.scale_max=1.0
+	process.color_ramp=_feather_ramp()
+	node.process_material=process
+	add_child(node)
+	return node
+
+func _feather_ramp() -> GradientTexture1D:
+	# Brightness and the fade only: the shader owns the brown-to-off-white hue
+	# along the feather itself.
+	var gradient:=Gradient.new()
+	gradient.offsets=PackedFloat32Array([0.0,0.35,0.60,1.0])
+	gradient.colors=PackedColorArray([Color(.78,.76,.74,1),Color(.95,.94,.92,1),Color(1,1,1,1),Color(1,1,1,0)])
+	var texture:=GradientTexture1D.new()
+	texture.gradient=gradient
+	texture.width=64
+	return texture
+
+## A bird strike is feathers: a burst of tumbling primaries and a slower puff of
+## down. `velocity` is the direction the round was travelling; `weight` is the
+## contact's size factor.
+func feather_burst(at: Vector3,velocity: Vector3,weight: float=1.0) -> void:
+	if feather_rigs.is_empty():return
+	var direction: Vector3=velocity.normalized()
+	if direction.length_squared()<.5:direction=Vector3.FORWARD
+	# Kills happen at 300-600 m. Life-size feathers are sub-pixel there, so the
+	# burst is scaled up with range to stay readable - the guard explicitly
+	# allows bending physics for legibility.
+	var range_to_camera: float=combat.app.camera.global_position.distance_to(at)
+	var readability: float=clampf(1.0+range_to_camera/170.0,1.4,6.0)
+	var rig: Dictionary=feather_rigs[feather_cursor%feather_rigs.size()]
+	feather_cursor+=1
+	for key in ["feathers","down"]:
+		var node: GPUParticles3D=rig[key]
+		if not is_instance_valid(node):continue
+		var process: ParticleProcessMaterial=node.process_material
+		process.direction=direction
+		var spread_scale: float=readability*clampf(weight,.6,2.4)
+		process.scale_min=spread_scale*(2.2 if key=="down" else 1.0)
+		process.scale_max=spread_scale*(3.6 if key=="down" else 1.8)
+		var speed: float=clampf(weight,.7,2.0)
+		process.initial_velocity_min=(2.0 if key=="down" else 6.0)*speed
+		process.initial_velocity_max=(9.0 if key=="down" else 22.0)*speed
+		node.global_position=at
+		node.global_basis=Basis.IDENTITY
+		node.restart()
+		node.emitting=true
+
+func _stop_feathers() -> void:
+	for rig: Dictionary in feather_rigs:
+		for key in ["feathers","down"]:
+			var node: GPUParticles3D=rig[key]
+			if is_instance_valid(node):node.emitting=false
+
+# --- countermeasures ----------------------------------------------------
+func _build_flare_ribbon() -> void:
+	# Textured, or a quad head reads as a hard-edged square block. The heat is
+	# in albedo_color, not the vertex colour: an ImmediateMesh vertex colour is
+	# 8-bit and clamps at 1, and an unshaded material ignores emission - which
+	# left the head washing out to white against sunlit ground.
+	flare_head_material=StandardMaterial3D.new()
+	flare_head_material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	flare_head_material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+	flare_head_material.blend_mode=BaseMaterial3D.BLEND_MODE_ADD
+	# Clamped at 3.2 so a near cluster cannot blow out the AgX golden-hour grade.
+	flare_head_material.albedo_color=Color(3.2,1.72,.60,1.0)
+	flare_head_material.vertex_color_use_as_albedo=true
+	flare_head_material.cull_mode=BaseMaterial3D.CULL_DISABLED
+	flare_head_material.albedo_texture=flash_texture
+	flare_smoke_material=StandardMaterial3D.new()
+	flare_smoke_material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	flare_smoke_material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+	flare_smoke_material.vertex_color_use_as_albedo=true
+	flare_smoke_material.cull_mode=BaseMaterial3D.CULL_DISABLED
+	flare_smoke_material.albedo_texture=smoke_texture
+	flare_smoke_material.albedo_color=Color(1,1,1,1)
+	flare_mesh=MeshInstance3D.new()
+	flare_mesh.mesh=ImmediateMesh.new()
+	flare_mesh.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(flare_mesh)
+
+## Eight MJU-class cartridges ejected in the AIRCRAFT frame, then flown
+## ballistically: gravity plus quadratic drag, so they fall down-and-aft and the
+## jet runs away from them. One light for the whole salvo.
+func flare_salvo() -> void:
+	var f=combat.app.flight
+	if f==null:return
+	var basis:=Basis.from_euler(Vector3(f.pitch,-f.heading,-f.roll))
+	var origin: Vector3=f.position+basis*Vector3(0,-1.7,1.2)
+	for i in range(8):
+		var side: float=1.0 if i%2==0 else -1.0
+		# The impulse cartridge fires DOWN, not aft: everything that carries a
+		# flare aft is drag against the jet's own speed.
+		var ejection: Vector3=Vector3(side*rng.randf_range(1.8,5.4),-rng.randf_range(11.0,16.0),rng.randf_range(0.0,3.0))
+		flare_items.append({
+			# Outboard of the belly, or the first third of a second is spent
+			# hidden behind the fuselage from the chase camera.
+			"position":origin+basis*Vector3(side*rng.randf_range(1.4,2.2),-0.35,rng.randf_range(0.0,1.6)),
+			"velocity":Vector3(f.velocity)+basis*ejection,
+			"life":rng.randf_range(3.6,4.5),
+			"duration":4.5,
+			"path":PackedVector3Array(),
+			"path_clock":0.0})
+	# Clamped to 3.2 so a near cluster does not blow out the AgX golden-hour
+	# grade, and shadow-disabled like every other pooled light.
+	illuminate(origin,Color(1,.70,.38),3.2,46,.85)
+
+func _update_flares(dt: float) -> void:
+	for i in range(flare_items.size()-1,-1,-1):
+		var item: Dictionary=flare_items[i]
+		item.life-=dt
+		if item.life<=0:
+			flare_items.remove_at(i);continue
+		var speed: float=Vector3(item.velocity).length()
+		# Quadratic drag. k = 0.5*rho*Cd*A/m for a ~0.5 kg, 30x120 mm MJU-class
+		# cartridge is about 0.0011, which is why a flare falls out of a fast
+		# jet's wake in about a second.
+		item.velocity+=Vector3(0,-9.81,0)*dt-Vector3(item.velocity)*speed*0.0011*dt
+		item.position+=Vector3(item.velocity)*dt
+		item.path_clock-=dt
+		if item.path_clock<=0:
+			item.path_clock=0.055
+			var path: PackedVector3Array=item.path
+			path.append(item.position)
+			if path.size()>10:path.remove_at(0)
+			item.path=path
+
+func _draw_flares() -> void:
+	var ribbon: ImmediateMesh=flare_mesh.mesh
+	ribbon.clear_surfaces()
+	if flare_items.is_empty():return
+	var eye: Vector3=combat.app.camera.global_position
+	# Smoke first, then the heads. Both surfaces are built into buffers so an
+	# all-short-lived salvo never opens an empty ImmediateMesh surface.
+	var smoke_points := PackedVector3Array()
+	var smoke_colors := PackedColorArray()
+	var smoke_uvs := PackedVector2Array()
+	for item: Dictionary in flare_items:
+		var path: PackedVector3Array=item.path
+		for p in range(path.size()-1):
+			var a: Vector3=path[p]
+			var b: Vector3=path[p+1]
+			var fade: float=float(p+1)/maxf(path.size(),1)
+			var side: Vector3=(b-a).cross(eye-a)
+			if side.length_squared()<.000001:continue
+			side=side.normalized()*lerpf(2.6,.5,fade)
+			var alpha: float=(1.0-fade)*.30*clampf(item.life/1.2,0,1)
+			var tint:=Color(.70,.69,.66,alpha)
+			for entry: Array in [[a-side,Vector2(0,0)],[a+side,Vector2(1,0)],[b-side,Vector2(0,1)],
+					[b-side,Vector2(0,1)],[a+side,Vector2(1,0)],[b+side,Vector2(1,1)]]:
+				smoke_points.append(entry[0]);smoke_colors.append(tint);smoke_uvs.append(entry[1])
+	if not smoke_points.is_empty():
+		ribbon.surface_begin(Mesh.PRIMITIVE_TRIANGLES,flare_smoke_material)
+		for i in range(smoke_points.size()):
+			ribbon.surface_set_color(smoke_colors[i])
+			ribbon.surface_set_uv(smoke_uvs[i])
+			ribbon.surface_add_vertex(smoke_points[i])
+		ribbon.surface_end()
+	var head_points := PackedVector3Array()
+	var head_colors := PackedColorArray()
+	var head_uvs := PackedVector2Array()
+	for item: Dictionary in flare_items:
+		var at: Vector3=item.position
+		# MJU-class grains light in about a tenth of a second and burn out over
+		# the last second; the flicker is the grain, not a sine wave for show.
+		var burn: float=clampf(item.life/0.9,0,1)*clampf((float(item.duration)-float(item.life))/0.10,0,1)
+		if burn<=.01:continue
+		var size: float=clampf(eye.distance_to(at)*0.0065,.9,5.5)*(.72+.28*sin(effects_clock*57.0+at.x))
+		var forward: Vector3=at-eye
+		var right: Vector3=forward.cross(Vector3.UP)
+		if right.length_squared()<.000001:right=Vector3.RIGHT
+		right=right.normalized()*size
+		var up: Vector3=forward.cross(right)
+		if up.length_squared()<.000001:up=Vector3.UP
+		up=up.normalized()*size
+		# Clamped to 3.2 so a near cluster cannot blow out the AgX grade.
+		# The material carries the heat; this carries only the burn envelope.
+		# Two quads: a tight core and a wider, much fainter halo, so a flare
+		# reads as a pyrotechnic rather than a dot.
+		for pass_index in range(2):
+			var spread: float=1.0 if pass_index==0 else 2.8
+			var colour:=Color(1,1,1,burn*(1.0 if pass_index==0 else .22))
+			var rx: Vector3=right*spread
+			var uy: Vector3=up*spread
+			for entry: Array in [[at-rx-uy,Vector2(0,0)],[at+rx-uy,Vector2(1,0)],[at-rx+uy,Vector2(0,1)],
+					[at-rx+uy,Vector2(0,1)],[at+rx-uy,Vector2(1,0)],[at+rx+uy,Vector2(1,1)]]:
+				head_points.append(entry[0]);head_colors.append(colour);head_uvs.append(entry[1])
+	if head_points.is_empty():return
+	ribbon.surface_begin(Mesh.PRIMITIVE_TRIANGLES,flare_head_material)
+	for i in range(head_points.size()):
+		ribbon.surface_set_color(head_colors[i])
+		ribbon.surface_set_uv(head_uvs[i])
+		ribbon.surface_add_vertex(head_points[i])
+	ribbon.surface_end()
+
+# --- pools --------------------------------------------------------------
 func take_projectile(kind: String) -> Node3D:
 	var key: String="missile" if kind=="missile" else "cannon"
 	var node: Node3D
@@ -83,6 +351,10 @@ func reset() -> void:
 	for beam in beams:beam.visible=false
 	if lead_mesh!=null:lead_mesh.mesh.clear_surfaces()
 	if beam_light!=null:beam_light.visible=false
+	_stop_feathers()
+	flare_items.clear()
+	if flare_mesh!=null:flare_mesh.mesh.clear_surfaces()
+	last_flares_fired=int(combat.flares_fired) if combat!=null else 0
 	for child in get_children():
 		if child is Node3D and child.has_meta("projectile_kind"):
 			release_projectile(child,str(child.get_meta("projectile_kind")))
@@ -94,32 +366,66 @@ func illuminate(at: Vector3,color: Color,energy: float,radius: float,life: float
 	if light_pool.is_empty():return
 	var node: OmniLight3D=light_pool.pop_back();node.position=at;node.light_color=color;node.light_energy=energy;node.omni_range=radius;node.visible=true
 	lights.append({"node":node,"life":life,"duration":life,"energy":energy})
+
+func _enemy_near(at: Vector3) -> Dictionary:
+	var best: Dictionary={}
+	var best_distance: float=1.0e20
+	for item: Dictionary in combat.enemies:
+		var d: float=Vector3(item.position).distance_squared_to(at)
+		if d<best_distance:best_distance=d;best=item
+	return best
+
 func event(kind: String,at: Vector3,weight: float) -> void:
 	if kind=="roll":combat.app.audio.play_spatial("sonic",at,-24,1.15);combat.app.camera_rig.impulse(.025)
 	elif kind=="scan":scan_time=.35
-	elif kind=="candidate":puff(at,Color(.12,.65,1,.22),16,.2)
-	elif kind=="lock":puff(at,Color(.3,1,1,.75),28,.15);combat.app.audio.ping(1.35)
+	elif kind=="candidate":puff(at,Color(.34,.52,.68,.20),16,.2)
+	elif kind=="lock":puff(at,Color(.55,.72,.88,.62),28,.15);combat.app.audio.ping(1.35)
 	elif kind=="salvo":
-		illuminate(at,Color(.6,.85,1),5,16,.2)
-		puff(at-combat.forward()*5,Color(.72,.86,1,.4),12,.5,true)
+		illuminate(at,Color(1,.78,.48),5,16,.2)
+		puff(at-combat.forward()*5,Color(.72,.70,.66,.4),12,.45,true)
 	elif kind=="near_miss":
 		combat.app.audio.play_spatial("sonic",at,-19,1.35);combat.app.camera_rig.impulse(.08)
 	elif kind in ["impact","armor_break","kill","boss_death"]:
-		if kind in ["kill","boss_death"]:handoff_origin=at;handoff_time=.65
+		var lethal: bool=kind in ["kill","boss_death"]
+		if kind=="impact":add_child(ImpactFX.cannon_hit(at,combat.forward(),2.2*weight))
+		elif lethal:add_child(ImpactFX.kill_accent(at,combat.forward(),2.6*weight))
+		if lethal:handoff_origin=at;handoff_time=.65
 		var big: bool=kind=="boss_death"
 		var radius: float=(22 if kind=="impact" else 34)*weight
-		puff(at,Color(3,2.4,1.5,.95),radius,.10)
-		puff(at,Color(1,.54,.20,.90),radius*1.4,.32,false,Vector3.ZERO,.045)
-		puff(at,Color(.12,.65,1,.48),radius*1.8,.45,false,Vector3.ZERO,.08)
-		puff(at,Color(.35,.4,.46,.72),radius*2.3,2.6 if big else 1.3,true,Vector3.UP*8,.16)
-		illuminate(at,Color(1,.64,.35),9 if big else 4,180 if big else 45,.55 if big else .25)
-		combat.app.audio.play_spatial("explosion" if kind in ["kill","boss_death"] else "impact",at,-10 if big else -19,.65 if big else 1)
-		for i in range(16 if big else 5):
-			var velocity:=Vector3(sin(i*2.4),cos(i*1.7)*.5,cos(i*2.4))*weight*15
-			puff(at,Color(.2,.85,1,.8),3*weight,.7,false,velocity,.04*i if big else 0)
+		# The one bright thing left. It has to carry "scored hit" to a novice
+		# 600 m away, so it stays hot - but it is 0.07 s, not a fireball.
+		puff(at,Color(2.6,2.2,1.6,.95),radius*.6,.07)
+		if kind=="impact":
+			# A missile warhead genuinely burns. This is the only warm fireball
+			# left in the kill path.
+			puff(at,Color(1,.52,.20,.88),radius*1.15,.26,false,Vector3.ZERO,.045)
+			puff(at,Color(.52,.50,.47,.42),radius*1.25,.40,true,Vector3.UP*5,.10)
+			illuminate(at,Color(1,.60,.30),3.0,42,.18)
+		else:
+			# Bird strike: a short puff of dust, then feathers. No fireball, no
+			# cyan shockwave, no cyan sparks, no 45 m orange light. The old
+			# smoke ball was 78 m across for 1.3 s and smeared into a grey
+			# streak under FSR2 whenever the camera moved.
+			puff(at,Color(.58,.53,.47,.44),radius*.45,.22,true,Vector3.UP*4)
+		if lethal or kind=="armor_break":
+			var victim: Dictionary=_enemy_near(at)
+			# Feathers spray along the round's path, canted by the bird's own
+			# track so the burst leans the way the goose was going.
+			var direction: Vector3=(at-combat.app.flight.position).normalized()
+			if not victim.is_empty():
+				var track: Vector3=Vector3(victim.velocity).normalized()
+				if track.length_squared()>.5:direction=(direction*2.0+track).normalized()
+			feather_burst(at,direction,weight*(2.2 if big else (1.0 if lethal else .55)))
+		# Speed of sound: engine_audio queues this by range, and the flat
+		# non-positional bang combat.gd plays next is folded into the same cue.
+		var audio=combat.app.audio
+		if audio!=null and audio.has_method("mark_event_position"):
+			audio.mark_event_position("explosion" if lethal else "impact",at,-10 if big else -19,.65 if big else 1.0)
+		else:
+			audio.play_spatial("explosion" if lethal else "impact",at,-10 if big else -19,.65 if big else 1.0)
 		if big or kind=="armor_break":
 			impact_emphasis=.055;combat.app.camera_rig.impulse(.22 if big else .10)
-	elif kind=="boss_signature":scan_time=1.0;puff(at,Color(.06,.6,1,.25),180,2.0)
+	elif kind=="boss_signature":scan_time=1.0;puff(at,Color(.30,.46,.62,.20),180,2.0)
 func add_target(enemy: Dictionary) -> void:
 	var shell: ShaderMaterial
 	if DisplayServer.get_name()!="headless":
@@ -128,15 +434,8 @@ func add_target(enemy: Dictionary) -> void:
 	enemy.spectral_material=shell
 	var root:=Node3D.new();root.name="SpectralTracking";enemy.node.add_child(root)
 	var material:=Art.emissive(Color(.12,.75,1),2,.12)
-	for i in range(3):
-		var arc:=MeshInstance3D.new();var segments:=ImmediateMesh.new();segments.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-		for sector in range(4):
-			for point in range(5):
-				var a: float=sector*PI*.5+.12+point*.16;var b: float=a+.16
-				var va:=Vector3(cos(a),sin(a),0);var vb:=Vector3(cos(b),sin(b),0)
-				for v: Vector3 in [va*2.6,va*2.635,vb*2.6,vb*2.6,va*2.635,vb*2.635]:segments.surface_add_vertex(v)
-		segments.surface_end()
-		arc.mesh=segments;arc.material_override=material;arc.rotation=Vector3(PI/2,i*.75,i*.4);arc.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;root.add_child(arc)
+	# The three rotating cyan arcs that used to live here are gone: the HUD
+	# brackets do the designation work and nothing may veil the view.
 	if enemy.kind=="boss":
 		for side in [-1,0,1]:
 			var marker:=Sprite3D.new();marker.name="Weak"+str(side);marker.texture=flash_texture;marker.billboard=BaseMaterial3D.BILLBOARD_ENABLED;marker.pixel_size=.0013;marker.position.x=side*.75;root.add_child(marker)
@@ -145,25 +444,60 @@ func update_projectile(shot: Dictionary,dt: float) -> void:
 	if shot.kind!="missile":return
 	var flare: Sprite3D=shot.node.get_node_or_null("EngineFlare")
 	var motor: OmniLight3D=shot.node.get_node_or_null("MotorLight")
-	var burning: bool=shot.age>.15 and shot.age<4
+	# Keyed off the real ignition check instead of a hardcoded 0.15/4.0 window
+	# that was already 0.03 s out of sync with the physics.
+	var burn_t: float=float(shot.age)-Tune.MISSILE_IGNITION_DELAY
+	var burning: bool=burn_t>=0.0 and burn_t<Tune.MISSILE_MOTOR_TIME
+	# Boost then sustain: a short over-thrust spike at light-up, a steady lower
+	# output, then a quick tail-off at burnout.
+	var thrust: float=0.0
+	if burning:
+		var boost: float=clampf(burn_t/maxf(Tune.MISSILE_ACCELERATION_TIME,.001),0,1)
+		thrust=lerpf(1.75,1.0,smoothstep(0.0,1.0,boost))
+		thrust*=clampf(burn_t/.05,0,1)
+		thrust*=clampf((Tune.MISSILE_MOTOR_TIME-burn_t)/.55,0,1)
 	var distance: float=combat.app.camera.global_position.distance_to(shot.position)
 	if flare!=null:
-		flare.visible=burning;flare.pixel_size=clampf(distance*.000020,.007,.05)
-		flare.modulate=Color(4,3,1.8,.68+.16*sin(shot.age*91))
+		flare.visible=burning
+		flare.pixel_size=clampf(distance*.000020,.007,.05)*(.75+.35*thrust)
+		flare.modulate=Color(4,3,1.8,clampf((.52+.30*thrust)+.10*sin(shot.age*91),0,1))
 	if motor!=null:
-		motor.visible=burning and distance<450;motor.light_energy=3.5 if burning else 0
+		motor.visible=burning and distance<450;motor.light_energy=3.5*thrust
+	if not shot.node.has_meta("motor_materials"):
+		var found: Array=[]
+		for effect_name in ["Ignition","MotorFlame"]:
+			var mesh: Node=shot.node.get_node_or_null(NodePath(effect_name))
+			if mesh is MeshInstance3D and mesh.material_override is ShaderMaterial:found.append(mesh.material_override)
+		shot.node.set_meta("motor_materials",found)
+	for material: ShaderMaterial in shot.node.get_meta("motor_materials"):
+		material.set_shader_parameter("throttle",thrust)
 	if burning and shot.age-float(shot.get("ghost_at",0))>.09:
 		shot.ghost_at=shot.age
-		puff(shot.position,Color(.12,.65,1,.24),clampf(distance*.014,2,12),.24)
+		# Aluminised propellant leaves dense white-grey alumina smoke, not the
+		# cyan puff that used to be here.
+		puff(shot.position,Color(.62,.63,.60,.30),clampf(distance*.014,2,12),.24)
 func tick(dt: float) -> void:
 	effects_clock+=dt;handoff_time=maxf(0,handoff_time-dt);scan_time=maxf(0,scan_time-dt);impact_emphasis=maxf(0,impact_emphasis-dt)
+	# Countermeasures are owned here: combat.gd only counts them, so the salvo
+	# is picked up from its own counter rather than reaching into that file.
+	var fired: int=int(combat.flares_fired)
+	if fired>last_flares_fired:
+		last_flares_fired=fired
+		flare_salvo()
+	elif fired<last_flares_fired:
+		last_flares_fired=fired
+	_update_flares(dt)
+	_draw_flares()
+	var audio=combat.app.audio
+	if audio!=null and audio.has_method("update_flock"):audio.update_flock(combat,dt)
 	for i in range(sprites.size()-1,-1,-1):
 		var e: Dictionary=sprites[i]
 		if e.delay>0:e.delay-=dt;continue
 		e.node.visible=true;e.life-=dt
 		if e.life<=0:e.node.visible=false;sprite_pool.append(e.node);sprites.remove_at(i);continue
 		e.node.position+=e.velocity*dt;var t: float=1-e.life/e.duration
-		e.node.scale=Vector3.ONE*(1+t*(1.5 if e.smoke else .7));var color: Color=e.color;color.a*=1-smoothstep(.08,1,t);e.node.modulate=color
+		# Smoke used to grow 2.5x, which is what FSR2 smeared into grey streaks.
+		e.node.scale=Vector3.ONE*(1+t*(.85 if e.smoke else .7));var color: Color=e.color;color.a*=1-smoothstep(.08,1,t);e.node.modulate=color
 	for i in range(lights.size()-1,-1,-1):
 		var e: Dictionary=lights[i];e.life-=dt
 		if e.life<=0:e.node.visible=false;light_pool.append(e.node);lights.remove_at(i)
@@ -182,31 +516,50 @@ func tick(dt: float) -> void:
 			shell.set_shader_parameter("hit",enemy.hit_flash)
 			shell.set_shader_parameter("damage",float(enemy.damage_stage)/3)
 			shell.set_shader_parameter("visibility",enemy.fade)
-		var strength: float=(.25+combat.lock_progress*.6) if selected else .18 if enemy.kind=="boss" else .05 if scan_time>0 else .012
-		entry.node.visible=selected or scan_time>0 or enemy.kind=="boss"
-		entry.node.rotation.z+=dt*(.12 if selected and combat.lock_progress>=1 else .5)
-		entry.node.scale=Vector3.ONE*lerpf(1.30,.78,combat.lock_progress if selected else 0)
-		entry.material.albedo_color=Color(.13,.8,1,strength*(.2 if enemy.health<=0 else 1))
-		entry.material.emission_energy_multiplier=2+enemy.hit_flash*4
+		entry.node.visible=enemy.kind=="boss"
 		if enemy.kind=="boss":
 			for side in [-1,0,1]:
 				var marker: Sprite3D=entry.node.get_node("Weak"+str(side))
 				marker.modulate=Color(3,2,1,.85) if side==int(enemy.weak_side) and enemy.damage_stage>0 else Color(.1,.5,.8,.06)
+		var designated: bool=selected and combat.lock_progress>=1
 		for geometry in enemy.node.find_children("*","MeshInstance3D",true,false):
 			for surface in range(geometry.mesh.get_surface_count()):
 				var mat=geometry.get_active_material(surface)
 				if mat is StandardMaterial3D and mat.stencil_mode!=0:
-					mat.stencil_mode=BaseMaterial3D.STENCIL_MODE_XRAY if selected and combat.lock_progress>=1 else BaseMaterial3D.STENCIL_MODE_OUTLINE
-					mat.stencil_color=Color(.02,.12,.28,.85) if combat.app.camera.global_position.y<enemy.position.y else Color(.08,.7,1,.8 if selected else .45)
+					# One thin outline while designated. The always-on X-ray
+					# silhouette is gone: it read as a cyan ghost through the
+					# whole airframe and veiled the bird it was marking.
+					mat.stencil_mode=BaseMaterial3D.STENCIL_MODE_OUTLINE
+					mat.stencil_color=Color(.52,.64,.76,.55 if designated else 0.0)
 					mat.emission_energy_multiplier=.7+enemy.hit_flash*3+enemy.damage_stage*.3
-					mat.stencil_outline_thickness=.5 if selected else .25
-	for beam in beams:beam.visible=combat.beam_active
-	beam_light.visible=combat.beam_active and combat.beam_hit_id>=0
-	if combat.beam_active:
-		var f: FlightDynamics=combat.app.flight;var basis:=Basis.from_euler(Vector3(f.pitch,-f.heading,-f.roll));var start: Vector3=f.position+basis*Vector3(.75,-.30,-3.8)
-		for beam in beams:Art.align_beam(beam,start,combat.beam_end)
-		beam_light.position=combat.beam_end;beam_light.light_energy=3+sin(effects_clock*31)
+					mat.stencil_outline_thickness=.35 if designated else .0
+	_update_designator()
 	_draw_lead(target)
+## The plasma cannon's beam: every layer lit whenever the gun runs, sourced at the
+## PC26 emitter's muzzle, with a corona at the muzzle and a bloom where it lands.
+## The blooms are capped small so the flowing hues survive instead of whiting out.
+func _update_designator() -> void:
+	var live: bool=combat.beam_active
+	var f: FlightDynamics=combat.app.flight
+	var basis:=Basis.from_euler(Vector3(f.pitch,-f.heading,-f.roll))
+	if not is_instance_valid(beam_source) and combat.app.get("aircraft")!=null:
+		beam_source=combat.app.aircraft.find_child("BeamMuzzle",true,false)
+	var start: Vector3=beam_source.global_position if is_instance_valid(beam_source) else f.position+basis*Vector3(.75,-.30,-3.8)
+	for beam in beams:beam.visible=live
+	if not live:
+		beam_light.visible=false
+		Art.drive_bloom(beam_muzzle,0.0,0.0);Art.drive_bloom(beam_impact,0.0,0.0)
+		return
+	for beam in beams:Art.align_beam(beam,start,combat.beam_end)
+	var reach: float=start.distance_to(combat.beam_end)
+	beam_muzzle.global_position=start
+	Art.drive_bloom(beam_muzzle,1.5,0.0,0.7)
+	var landed: bool=combat.beam_hit_id>=0
+	beam_impact.global_position=combat.beam_end
+	Art.drive_bloom(beam_impact,1.3 if landed else 0.0,reach,1.8)
+	beam_light.visible=landed
+	if landed:
+		beam_light.position=combat.beam_end;beam_light.light_color=Art.beam_tint(reach);beam_light.light_energy=3+sin(effects_clock*31)
 func _draw_lead(target: Dictionary) -> void:
 	var ribbon: ImmediateMesh=lead_mesh.mesh;ribbon.clear_surfaces()
 	if target.is_empty() or combat.intent.confidence<.3:return

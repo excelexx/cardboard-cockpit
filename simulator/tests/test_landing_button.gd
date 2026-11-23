@@ -18,9 +18,17 @@ func run() -> void:
 	assert(app.combat.score==700 and app.combat.kills==4,"Landing preserves the sortie score")
 	var at: Vector3=app.flight.position;app.begin_landing()
 	assert(app.flight.position==at,"Repeated landing request does not reset approach")
+	# Record the attitude the airframe is DRAWN at on the frame the mains arrive: the
+	# flare must put the nose up, and it must do it without a harder arrival.
+	var touchdown_attitude:=-99.0
 	for i in range(60*40):
 		app._physics_process(1.0/60)
+		if touchdown_attitude<-90.0 and app.flight.contact=="landed":
+			touchdown_attitude=rad_to_deg(app.flight.pose_pitch() if app.flight.has_method("pose_pitch") else app.flight.pitch)
 		if app.mode=="results":break
 	assert(app.flight.contact=="landed" and app.flight.speed==0 and app.mode=="results","Assisted approach lands and brakes to a stop")
+	assert(touchdown_attitude>6.0,"The jet touches down nose-high, not on its nosewheel: "+str(touchdown_attitude))
+	assert(absf(app.flight.touchdown_sink)<3.0,"Flare keeps the arrival soft: "+str(app.flight.touchdown_sink))
+	print("TOUCHDOWN ATTITUDE: %.1f deg nose-up, sink %.2f m/s, speed %.0f m/s" % [touchdown_attitude,app.flight.touchdown_sink,app.flight.touchdown_speed])
 	app.on_action("fly");assert(not app.landing_started,"Replay clears landing state")
 	sender.close();app.queue_free();await process_frame;print("BADGE LANDING: PASS");quit()

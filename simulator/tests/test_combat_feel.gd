@@ -28,8 +28,10 @@ func run():
 	var enemy: Dictionary = app.combat.enemies[0]
 	enemy.position = app.flight.position+Vector3(sin(deg_to_rad(4)),0,-cos(deg_to_rad(4)))*600
 	enemy.fade = 1; enemy.age = 2; enemy.course = Vector3(0,0,-1); enemy.right = Vector3.ZERO
-	for i in range(12): app.combat.tick(1.0/60)
-	check(app.combat.target_id==enemy.id and app.combat.lock_progress>=1,"A comfortable four-degree near-centre target locks within 0.2 seconds")
+	# LOCK_SECONDS_FAST..SLOW is 0.30-0.45 s, so the cockpit LOCKING bar is
+	# actually legible while it fills. It never gates the trigger.
+	for i in range(36): app.combat.tick(1.0/60)
+	check(app.combat.target_id==enemy.id and app.combat.lock_progress>=1,"A comfortable four-degree near-centre target locks inside 0.6 seconds")
 	check(app.combat.reticle_point().distance_to(enemy.position)<4,"Visible crosshair tracks onto the target instead of staying at screen centre")
 	check(app.combat.assisted_direction().angle_to((app.combat.lead_point(enemy)-app.flight.position).normalized())<deg_to_rad(.4),"Narrow assistance still provides reliable gun alignment")
 	enemy.position = app.flight.position+Vector3(sin(deg_to_rad(6.8)),0,-cos(deg_to_rad(6.8)))*600

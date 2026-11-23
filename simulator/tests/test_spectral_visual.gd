@@ -9,13 +9,26 @@ func run() -> void:
 	app.capture_file="native-qa";app.set_quality(true);app.developer_mode=true
 	var folder:=ProjectSettings.globalize_path("res://../docs/screenshots/spectral")
 	DirAccess.make_dir_recursive_absolute(folder)
-	for scenario in ["blue-sky","cloud","dark-ground","city","sun","far-target","close-target","crossing","roll","boost","boss-stress","blue-sky-warm"]:
+	var scenarios: Array=["blue-sky","cloud","dark-ground","city","sun","far-target","close-target","crossing","roll","boost","skein-stress","blue-sky-warm"]
+	# `-- feathers` runs only the bird-strike probe: one burst, four frames
+	# across its life, so the feather cloud can be judged on its own.
+	if OS.get_cmdline_user_args().has("feathers"):scenarios=["feather-probe"]
+	for scenario in scenarios:
 		app.start_flight("combat");app.copilot=false;app.cockpit=false;app.text_hud=scenario!="city"
 		app.flight.spawn_airborne(Vector3(15400,430,-10500),330);app.flight.gear=false;app.flight.throttle=.65
 		app.flight.heading=-.35;app.apply_aircraft_pose();app.combat.spawn_clock=999
-		app.combat.spawn_contact("boss" if scenario=="boss-stress" else "normal")
+		# No boss any more: the heavy case is a full skein arriving at once.
+		if scenario=="skein-stress":
+			if app.combat.has_method("spawn_skein"):app.combat.spawn_skein()
+			else:
+				for i in range(7):app.combat.spawn_contact("normal")
+		else:
+			app.combat.spawn_contact("normal")
+		if app.combat.enemies.is_empty():app.combat.spawn_contact("normal")
 		var enemy: Dictionary=app.combat.enemies[0]
-		var distance: float=1700 if scenario=="far-target" else 120 if scenario=="close-target" else 650
+		# Framed for CONTACT_MODEL_SCALE 3.0, not the 8.5 these numbers were
+		# written against.
+		var distance: float=800 if scenario=="far-target" else 60 if scenario=="close-target" else 110 if scenario=="feather-probe" else 300
 		enemy.position=app.flight.position+app.flight.forward()*distance;enemy.node.position=enemy.position
 		enemy.fade=1;enemy.age=5;enemy.health=100000;enemy.max_health=100000;enemy.right=Vector3.ZERO
 		enemy.course=app.flight.forward()*300+(Vector3.RIGHT*150 if scenario=="crossing" else Vector3.ZERO)
@@ -30,9 +43,34 @@ func run() -> void:
 		if scenario=="boost":app.flight.afterburner=true;app.flight.power_input=1
 		app.camera_rig.reset()
 		var began:=Time.get_ticks_msec();var frames:=0;var max_shots:=0;var saved_roll:=false
+		var feather_clock:=0.0;var flare_clock:=0.6
+		var probe_marks: Array=[0.10,0.40,0.80,1.60];var probe_index:=0;var probe_fired:=false
 		while Time.get_ticks_msec()-began<4500:
 			var dt: float=minf(app.get_process_delta_time(),.05)
 			app.combat.fire_gun();app.combat.fire_missile();app.combat.tick(dt)
+			# The kill effect never fires on its own here (the contacts are
+			# given 100k health so they stay framed), so drive the bird-strike
+			# path directly: this is the shot the lead judges feather
+			# legibility and the no-fireball rule from.
+			if scenario=="feather-probe":
+				var probe_t: float=(Time.get_ticks_msec()-began)/1000.0
+				if not probe_fired and probe_t>0.6:
+					probe_fired=true;began=Time.get_ticks_msec()
+					app.combat.visuals.event("kill",enemy.position,enemy.size_factor)
+					app.combat.deploy_flares()
+				elif probe_fired and probe_index<probe_marks.size() and probe_t>float(probe_marks[probe_index]):
+					await RenderingServer.frame_post_draw
+					root.get_texture().get_image().save_png(folder+"/feather-%d.png" % probe_index)
+					print("FEATHER PROBE frame ",probe_index," t=",probe_t," flares=",app.combat.visuals.flare_items.size())
+					probe_index+=1
+			if scenario in ["close-target","far-target","skein-stress"]:
+				feather_clock-=dt
+				if feather_clock<=0:
+					feather_clock=1.1
+					app.combat.visuals.event("kill",enemy.position,enemy.size_factor)
+			if scenario=="skein-stress":
+				flare_clock-=dt
+				if flare_clock<=0:flare_clock=2.0;app.combat.deploy_flares()
 			app.flight.step(dt,Vector3.ZERO,false,0,false);app.apply_aircraft_pose()
 			app._process(dt);frames+=1;max_shots=maxi(max_shots,app.combat.shots.size())
 			await process_frame

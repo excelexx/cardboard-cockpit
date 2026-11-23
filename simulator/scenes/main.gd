@@ -25,6 +25,10 @@ var result_advice:=""
 var result_code:=""
 var landed_early:=false
 const Approach = preload("res://systems/approach_guidance.gd")
+const Gust = preload("res://systems/gust_field.gd")
+## One spatial air mass for the whole sortie: the airframe pose, the flight path
+## and the camera all read the same gust, so they jolt together.
+var gust: GustField = Gust.new()
 var badge: BadgeLink=Badge.new()
 var badge_launch_remaining:=0.0
 var pilot_number:=1
@@ -62,6 +66,9 @@ var calibration_visible := false
 var credits_visible := false
 var developer_mode := false
 var high_quality := true
+## Upscaler for measurement: "fsr2" (shipping) or "fsr1" to reproduce the old frame
+## exactly - MSAA 4x, TAA and the spatial filter - for a like-for-like fps comparison.
+var upscale := "fsr2"
 var mouse_yoke := false
 var control := Vector3.ZERO
 var look := Vector2.ZERO
@@ -84,6 +91,8 @@ var toast_time := 0.0
 var near_obstacle_cooldown:=0.0
 var landing_transition:=0.0
 var landing_started:=false
+## Highest skein size seen this sortie, so the arrival beat fires exactly once.
+var skein_seen:=0
 func profile() -> Dictionary: return Catalog.PROFILE
 func _ready() -> void:
 	get_window().title = "Goose Protocol — SPECTRE X-26"
@@ -111,6 +120,8 @@ func _ready() -> void:
 	if settings.load("user://settings.cfg")==OK: audio.muted = bool(settings.get_value("audio","muted",false))
 	combat = Combat.new(); combat.app = self; add_child(combat)
 	fighter_fx = Effects.new(); fighter_fx.app = self; add_child(fighter_fx); fighter_fx.build()
+	# Jet-only lights (layer 2): give the black airframe form and keep it readable over dark ground.
+	var hero_lights: Node3D = preload("res://systems/hero_lights.gd").new(); hero_lights.set("app",self); add_child(hero_lights)
 	var layer := CanvasLayer.new(); add_child(layer)
 	hud = Hud.new(); hud.app = self; layer.add_child(hud); hud.action.connect(on_action)
 	tutorial.configure(self)
@@ -127,6 +138,10 @@ func _ready() -> void:
 		elif arg=="--combat": flight_kind = "combat"; start = true
 		elif arg=="--demo": flight_kind = "demo"; start = true
 		elif arg=="--cockpit": cockpit = true
+		elif arg=="--tracking":
+			# tools/play.sh: the tracker is already running, so fly the cardboard yoke from the start.
+			vision.enabled = true
+			mouse_yoke = false
 		elif arg=="--stickers":
 			vision.enabled = true
 			mouse_yoke = false
@@ -138,6 +153,7 @@ func _ready() -> void:
 			cockpit = false
 			flight_kind = "paper"
 			start = true
+		elif arg.begins_with("--upscale="): upscale = arg.trim_prefix("--upscale="); _apply_render_scale()
 		elif arg.begins_with("--capture="): capture_file = arg.trim_prefix("--capture="); capture_at = 4
 		elif arg.begins_with("--capture-at="): capture_at = maxf(1,arg.trim_prefix("--capture-at=").to_float())
 	if start:
@@ -157,7 +173,7 @@ func start_flight(kind: String = "demo") -> void:
 	copilot = false; used_copilot = false; mission_success = false; result_reason = ""
 	pilot_ejected = false; record_broken = false; eject_hold = 0; crash_clock = 0; fire_guard = 0.3
 	control = Vector3.ZERO; look = Vector2.ZERO
-	landing_started=false;landing_transition=0
+	landing_started=false;landing_transition=0;skein_seen=0
 	primary_latched=false;salvo_latched=false;cv_weapon_revision=-1;gear_override=-1;flaps_override=-1;assisted_yoke_reference=vision.yoke
 	flight.reset(profile())
 	if route_id=="sf": flight.position.y += world.ground_height(flight.position.x,flight.position.z)
@@ -303,7 +319,7 @@ func _process(dt: float) -> void:
 	if mode not in ["title"]:
 		if not Input.is_key_pressed(KEY_ALT) and not Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE): look = look.lerp(Vector2.ZERO,1-exp(-dt*3))
 		if not paused: camera_rig.update(dt)
-		aircraft.visible = not cockpit or mode in ["ejected","crashed"]
+		aircraft.visible = not cockpit or mode in ["ejected","crashed","results"]
 		aircraft_visuals.update_visuals(dt if active else 0,flight,control)
 		if aircraft_visuals._engine_glow!=null:
 			aircraft_visuals._engine_glow.visible = flight.engine>0.15
@@ -388,7 +404,7 @@ func _physics_process(dt: float) -> void:
 			if route_id=="sf":recover_flight()
 			else:finish_sortie(false,"Runway excursion. Brake earlier and hold centerline.")
 		elif flight.speed==0:
-			var success: bool=combat.boss_defeated if mission.cinematic else true
+			var success: bool=skein_cleared() if mission.cinematic else true
 			finish_sortie(success,"SFO LANDING COMPLETE — AIRCRAFT SECURED" if success else "SFO LANDING COMPLETE — INTERCEPT INCOMPLETE")
 		return
 	if mode!="flight": return
@@ -454,8 +470,13 @@ func _physics_process(dt: float) -> void:
 				input.y=maxf(input.y,.55*(1-clampf(ahead.distance/100,0,1)))
 		if landing_assist and power==0 and not vision.enabled: flight.throttle = clampf(.22+(Tune.APPROACH_SPEED-flight.speed)*.055,0,1)
 	control = control.lerp(input,1-exp(-dt*Tune.INPUT_RESPONSE))
-	var agl: float = flight.position.y-world.ground_height(flight.position.x,flight.position.z)
-	flight.wind = Vector3(3.5+sin(flight.elapsed*.23)*1.7,0,sin(flight.elapsed*.17)*2.0)*clampf((agl-20)/90,0,1)
+	var arriving: int = skein_total()
+	if arriving>skein_seen:
+		skein_seen = arriving
+		if camera_rig.has_method("arrival"): camera_rig.arrival()
+	flight.wind = gust.sample(world,flight)
+	flight.pose_offset = gust.pose_offset(flight)
+	camera_rig.impulse(absf(flight.wind.y)*0.25*dt)
 	var was_airborne: bool = flight.airborne
 	if gear_override>=0:flight.gear=gear_override==1
 	if flaps_override>=0:flight.flaps=flaps_override
@@ -466,6 +487,10 @@ func _physics_process(dt: float) -> void:
 	if flight.contact=="landed":
 		mode = "rollout"; combat.active = false; flight.throttle = 0
 		if mission.active: mission.transition("rollout")
+		# The one moment in the showcase where the jet physically meets the world.
+		var arrival: float = clampf(absf(flight.touchdown_sink)*0.10,0.12,0.60)
+		camera_rig.touchdown(arrival)
+		if fighter_fx.has_method("tyre_smoke"): fighter_fx.tyre_smoke(arrival)
 		audio.play_effect("touchdown_tires",-17); audio.play_effect("touchdown_thump",-16); audio.radio.say("touchdown")
 	elif flight.contact!="": begin_crash()
 	if (absf(flight.position.x)>60000 or absf(flight.position.z)>60000) if route_id=="sf" else (absf(flight.position.x)>14500 or flight.position.z < -24500 or flight.position.z>8500):
@@ -475,7 +500,10 @@ func _physics_process(dt: float) -> void:
 	apply_aircraft_pose()
 func apply_aircraft_pose() -> void:
 	aircraft.position = flight.position
-	aircraft.rotation = Vector3(flight.pitch,-flight.heading,-flight.roll)
+	# Drawn attitude, not flown attitude: alpha, sideslip and the gust wobble ride
+	# on the mesh only. The gun still fires along the true forward vector.
+	if flight.has_method("pose_pitch"): aircraft.rotation = Vector3(flight.pose_pitch(),-flight.pose_heading(),-flight.pose_roll())
+	else: aircraft.rotation = Vector3(flight.pitch,-flight.heading,-flight.roll)
 func begin_crash() -> void:
 	if route_id=="sf":recover_flight();return
 	mode = "crashed"; crash_clock = 0; combat.active = false; copilot = false
@@ -507,7 +535,7 @@ func recover_flight() -> void:
 
 func finish_sortie(success: bool, reason: String, cause: String="") -> void:
 	if mode=="results": return
-	var result: Dictionary=Results.assess({"contact":flight.contact,"stopped":flight.speed<=.1,"boss":combat.boss_defeated,"cinematic":mission.cinematic,"ejected":pilot_ejected,"landing":landing_started or flight_kind=="approach","cause":cause,"early_landing":landed_early},success,reason)
+	var result: Dictionary=Results.assess({"contact":flight.contact,"stopped":flight.speed<=.1,"cleared":skein_cleared(),"down":skein_down(),"total":skein_total(),"cinematic":mission.cinematic,"ejected":pilot_ejected,"landing":landing_started or flight_kind=="approach","cause":cause,"early_landing":landed_early},success,reason)
 	mission_success=result.success;result_headline=result.headline;result_reason=result.summary;result_advice=result.advice;result_code=result.code
 	tutorial.stop()
 	if mission.active and mission_success:mission.transition("secured")
@@ -521,7 +549,7 @@ func finish_sortie(success: bool, reason: String, cause: String="") -> void:
 		get_tree().quit(0 if mission_success else 1)
 func begin_landing() -> void:
 	if mode!="flight" or not flight.airborne or landing_started or route_id!="sf":return
-	landed_early=mission.cinematic and mission.clock<107 and not combat.boss_defeated
+	landed_early=mission.cinematic and mission.clock<Tune.SKEIN_DEADLINE and not skein_cleared()
 	landing_started=true;landing_transition=1.2
 	tutorial.landing_begun()
 	primary_latched=false;salvo_latched=false;combat.active=false;combat.engagement_enabled=false
@@ -530,14 +558,22 @@ func begin_landing() -> void:
 	gear_override=1;flaps_override=2
 	# A deliberate short demo transition to SFO final, retaining sortie score.
 	flight.spawn_airborne(Vector3(0,49,2100),65)
-	flight.heading=0;flight.roll=0;flight.pitch=-atan(Approach.GLIDESLOPE)
+	flight.heading=0;flight.roll=0
 	flight.pitch_velocity=0;flight.roll_velocity=0;flight.yaw_velocity=0;flight.barrel_remaining=0
 	flight.gear=true;flight.flaps=2;flight.throttle=.22;flight.engine=.3;flight.afterburner=false;flight.power_input=0
 	if mission.active:mission.transition("approach")
 	else:flight_kind="approach"
-	fighter_fx.reset();camera_rig.reset();apply_aircraft_pose();camera_rig.update(.016)
+	fighter_fx.reset();camera_rig.reset()
+	# The 1.2 s fade ends on a wide, low short-final framing, not the trail shot.
+	camera_rig.offset=Vector3(-14,3.4,34)
+	apply_aircraft_pose();camera_rig.update(.016)
 	audio.radio.say("approach",2)
 
+## Wheel height where the flare begins, and the sink rates it interpolates between.
+const FLARE_HEIGHT := 11.0
+const FLARE_SINK_START := -3.4
+const FLARE_SINK_TOUCH := -0.7
+const FLARE_MIN_SPEED := 52.0
 func approach_controls() -> Vector3:
 	if not flight.airborne:
 		flight.throttle = 1
@@ -546,24 +582,70 @@ func approach_controls() -> Vector3:
 	var guidance: Dictionary = Approach.solution(approach_position)
 	var heading: float = atan2(-flight.position.x,900)
 	var error: float = wrapf(heading-flight.heading,-PI,PI)
-	var wanted_pitch: float = clampf(-atan(Approach.GLIDESLOPE)+(float(guidance.ideal_height)-approach_position.y)*0.002,-0.15,0.08)
-	if flight.position.y<14: wanted_pitch = -0.022 if flight.position.y>5 else -0.012
+	var wanted_pitch: float = clampf(-atan(Approach.GLIDESLOPE)+(float(guidance.ideal_height)-approach_position.y)*0.002,-0.09,0.24)
+	# THE FLARE. In this model `pitch` is the flight path angle: commanding a nose-up
+	# attitude outright would simply stop the descent and float the jet down the whole
+	# runway, so the flare is flown as a SINK profile - 3.4 m/s on the slope eased to
+	# 0.7 m/s at the wheels - with the throttle coming back at the same time. The
+	# visible nose-up is real and comes from two places: the path angle rising to
+	# about level, and the angle of attack the airframe is DRAWN at growing as the
+	# speed bleeds (roughly 9 deg on the slope to 11 deg over the numbers).
+	var surface: float = world.ground_height(flight.position.x,flight.position.z)
+	var wheels: float = flight.position.y-surface-(flight.gear_drop() if flight.has_method("gear_drop") else 3.0)
+	var flaring: bool = wheels<FLARE_HEIGHT
+	var flare: float = smoothstep(0.0,1.0,clampf(1.0-wheels/FLARE_HEIGHT,0,1)) if flaring else 0.0
+	if flaring:
+		var sink: float = lerpf(FLARE_SINK_START,FLARE_SINK_TOUCH,flare)
+		wanted_pitch = asin(clampf(sink/maxf(flight.speed,40.0),-0.25,0.10))
 	flight.gear = true; flight.flaps = 2
-	flight.throttle = clampf(0.22+(Tune.APPROACH_SPEED-flight.speed)*0.055,0,1)
+	# The speed hold stays in charge until the flare, and takes over again if the
+	# flare ever bleeds the jet toward the lift break: the landing cannot get harder.
+	if flaring and flight.speed>FLARE_MIN_SPEED: flight.throttle = lerpf(flight.throttle,0.02,flare)
+	else: flight.throttle = clampf(0.22+(Tune.APPROACH_SPEED-flight.speed)*0.055,0,1)
 	return Vector3(clampf((error*1.5-flight.roll)*1.8-flight.roll_velocity*0.3,-1,1),clampf((wanted_pitch-flight.pitch)*2.5-flight.pitch_velocity*0.3,-1,1),0)
+## The last wave is a big V of geese, not a boss. The tally is owned by
+## demo_mission.gd, with combat.gd as a second source; both belong to other packages
+## and are mid-rename, so every reading goes through a guard and falls back in order.
+func skein_total() -> int:
+	if mission.has_method("skein_total"): return int(mission.skein_total())
+	if "skein_total" in combat: return int(combat.skein_total)
+	return 0
+func skein_down() -> int:
+	if "skein_down" in mission: return clampi(int(mission.skein_down),0,maxi(skein_total(),0))
+	if "skein_total" in combat and combat.has_method("skein_remaining"): return maxi(0,skein_total()-int(combat.skein_remaining()))
+	return 0
+func skein_cleared() -> bool:
+	if "skein_success" in mission: return bool(mission.skein_success)
+	if "skein_cleared" in combat: return bool(combat.skein_cleared)
+	return bool(combat.boss_defeated) if "boss_defeated" in combat else false
+func skein_marked(id: int) -> bool:
+	if mission.has_method("skein_has"): return mission.skein_has(id)
+	if "skein_ids" in combat: return combat.skein_ids.has(id)
+	return ("boss_id" in combat) and id==int(combat.boss_id)
 func is_on_runway(at: Vector3) -> bool: return world.is_runway(at.x,at.z)
 func approach_data() -> Dictionary: return Approach.solution(flight.position-Vector3(0,4,15400) if route_id=="sf" else flight.position)
 func set_quality(high: bool) -> void:
 	high_quality = high
 	_apply_render_scale()
-	get_viewport().msaa_3d = Viewport.MSAA_4X
-	get_viewport().use_taa = high and RenderingServer.get_current_rendering_method()=="forward_plus"
 	world.apply_quality(high)
 	save_settings()
+## FSR2 is a temporal upscaler: it needs its own history and hates being stacked on
+## an MSAA resolve plus TAA. project.godot asks for FSR2 with MSAA off; this honours it
+## instead of falling back to the purely spatial FSR 1.0 at boot and on every resize.
 func _apply_render_scale() -> void:
+	var view: Viewport = get_viewport()
 	var width: float = maxf(get_window().size.x,1)
-	get_viewport().scaling_3d_scale = minf(1.0,(1600.0 if high_quality else 1280.0)/width)
-	get_viewport().scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
+	if upscale=="fsr1":
+		view.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
+		view.scaling_3d_scale = minf(1.0,(1600.0 if high_quality else 1280.0)/width)
+		view.msaa_3d = Viewport.MSAA_4X
+		view.use_taa = high_quality and RenderingServer.get_current_rendering_method()=="forward_plus"
+		return
+	view.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR2
+	view.scaling_3d_scale = clampf((1900.0 if high_quality else 1400.0)/width,0.5,1.0)
+	view.fsr_sharpness = 0.25
+	view.msaa_3d = Viewport.MSAA_DISABLED
+	view.use_taa = false
 
 func load_settings() -> void:
 	var config := ConfigFile.new()
@@ -597,17 +679,16 @@ func _exit_tree() -> void:
 ## What the cockpit's panoramic display shows beyond raw flight data.
 func tactical_state() -> Dictionary:
 	var contacts: Array[Vector3] = []
-	var boss := -1.0
+	var down: int = skein_down()
 	for enemy: Dictionary in combat.enemies:
 		var delta: Vector3 = enemy.position-flight.position
 		var relative: Vector2 = Vector2(delta.x,delta.z).rotated(-flight.heading)
-		var important: bool = enemy.id==combat.boss_id or enemy.id==combat.target_id
+		var important: bool = skein_marked(int(enemy.id)) or enemy.id==combat.target_id
 		contacts.append(Vector3(relative.x,relative.y,1.0 if important else 0.0))
-		if enemy.id==combat.boss_id and not combat.boss_defeated: boss = clampf(enemy.health/enemy.max_health,0,1)
 	var waypoint := Vector2.ZERO
 	if mission.active and mission.phase in ["opening","combat","return"]:
 		var target: Vector3 = mission.route_target()-flight.position
 		waypoint = Vector2(target.x,target.z).rotated(-flight.heading)
 	return {"gun":primary_latched or combat.beam_active,"missiles":salvo_latched,"tracking":combat.target_id>=0 and combat.assist,
-		"lock":combat.lock_progress,"contacts":contacts,"boss":boss,"waypoint":waypoint,"damaged":combat.hull<=65,
+		"lock":combat.lock_progress,"contacts":contacts,"skein":Vector2(down,skein_total()),"waypoint":waypoint,"damaged":combat.hull<=65,
 		"objective":hud.mission_line(),"clock":hud.clock_text()}

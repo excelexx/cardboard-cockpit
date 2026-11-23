@@ -17,14 +17,18 @@ func run():
 	app = load("res://scenes/main.tscn").instantiate(); app.set_meta("route_override","alpine"); root.add_child(app)
 	app.set_process(false); app.set_physics_process(false); app.audio.muted = true
 	var target: Dictionary = target_at(400)
-	check(target.health==900,"Reactive normal target starts with 900 HP")
+	check(target.health==20,"An ordinary goose starts with 20 HP, not a boss health bar")
 	var gun_ttk := 0.0
 	for i in range(600):
 		app.combat.tick(1.0/120); app.combat.fire_gun()
 		gun_ttk += 1.0/120
 		if app.combat.kills>0: break
-	check(app.combat.kills==1 and app.combat.rounds_hit>=40,"Sustained primary clears a durable target after visible hits")
-	check(gun_ttk>1 and gun_ttk<5,"At 400 metres gun travel plus tracking yields a sustained readable burst")
+	# One 2-round packet carries 24 damage against 20 HP, and the plasma cannon
+	# burns the same goose while the gun runs: either way one good burst downs it
+	# well inside half a second. (The owner restored the beam as a weapon; it can
+	# only make this faster.)
+	check(app.combat.kills==1 and gun_ttk<=0.5,"One good burst downs a goose")
+	check(gun_ttk>.05 and gun_ttk<.9,"At 400 metres the goose is down inside a second of held trigger")
 	target = target_at(600)
 	for i in range(18): app.combat.tick(1.0/120)
 	app.combat.fire_missile()
@@ -32,7 +36,9 @@ func run():
 	for i in range(480):
 		app.combat.tick(1.0/120); app.combat.fire_missile(); missile_ttk += 1.0/120
 		if app.combat.kills>0: break
-	check(app.combat.kills==1 and app.combat.missiles_fired>=8,"Repeated four-missile salvos clear a fresh durable target")
+	check(app.combat.kills==1 and app.combat.missiles_fired>=1 and app.combat.missiles_fired<=16,"A salvo clears a fresh goose")
+	# Re-measured under proportional navigation and the G limit, which fly a
+	# longer curved intercept than the old per-frame lead snap did.
 	check(missile_ttk>1 and missile_ttk<4,"Missile launch, ignition, guidance and hit remain visible and responsive")
 	app.start_flight("combat"); app.combat.spawn_clock = 999
 	app.combat.spawn_shot(Vector3(0,500,-3500),Vector3(0,0,-185),"missile",-1,100)
